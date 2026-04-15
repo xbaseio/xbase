@@ -1,0 +1,29 @@
+package log
+
+import (
+	"github.com/xbaseio/xbase/log/internal"
+)
+
+// Terminal 日志输出终端
+type Terminal string
+
+const (
+	TerminalConsole Terminal = "console" // 控制台
+	TerminalFile    Terminal = "file"    // 文件
+)
+
+type (
+	Level  = internal.Level
+	Entity = internal.Entity
+	Syncer = internal.Syncer
+)
+
+const (
+	LevelNone  = internal.LevelNone
+	LevelDebug = internal.LevelDebug
+	LevelInfo  = internal.LevelInfo
+	LevelWarn  = internal.LevelWarn
+	LevelError = internal.LevelError
+	LevelFatal = internal.LevelFatal
+	LevelPanic = internal.LevelPanic
+)

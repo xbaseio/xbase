@@ -1,0 +1,87 @@
+package xtcp
+
+import (
+	"crypto/tls"
+	"net"
+	"sync/atomic"
+
+	ctls "github.com/xbaseio/xbase/core/tls"
+	"github.com/xbaseio/xbase/network"
+)
+
+type client struct {
+	opts              *clientOptions            // 配置
+	id                atomic.Int64              // 连接ID
+	connectHandler    network.ConnectHandler    // 连接打开hook函数
+	disconnectHandler network.DisconnectHandler // 连接关闭hook函数
+	receiveHandler    network.ReceiveHandler    // 接收消息hook函数
+}
+
+var _ network.Client = &client{}
+
+func NewClient(opts ...ClientOption) network.Client {
+	o := defaultClientOptions()
+	for _, opt := range opts {
+		opt(o)
+	}
+
+	return &client{opts: o}
+}
+
+// Dial 拨号连接
+func (c *client) Dial(addr ...string) (network.Conn, error) {
+	var (
+		conn    net.Conn
+		address string
+	)
+
+	if len(addr) > 0 && addr[0] != "" {
+		address = addr[0]
+	} else {
+		address = c.opts.addr
+	}
+
+	tcpAddr, err := net.ResolveTCPAddr("xtcp", address)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.opts.caFile != "" {
+		config, err := ctls.MakeTCPClientTLSConfig(c.opts.caFile, c.opts.serverName)
+		if err != nil {
+			return nil, err
+		}
+
+		dialer := &net.Dialer{Timeout: c.opts.timeout}
+
+		if conn, err = tls.DialWithDialer(dialer, tcpAddr.Network(), tcpAddr.String(), config); err != nil {
+			return nil, err
+		}
+	} else {
+		if conn, err = net.DialTimeout(tcpAddr.Network(), tcpAddr.String(), c.opts.timeout); err != nil {
+			return nil, err
+		}
+	}
+
+	return newClientConn(c, c.id.Add(1), conn), nil
+}
+
+// Protocol 协议
+func (c *client) Protocol() string {
+	return protocol
+}
+
+// OnConnect 监听连接打开
+func (c *client) OnConnect(handler network.ConnectHandler) {
+	c.connectHandler = handler
+}
+
+// OnDisconnect 监听连接关闭
+func (c *client) OnDisconnect(handler network.DisconnectHandler) {
+	c.disconnectHandler = handler
+}
+
+// OnReceive 监听接收到消息
+func (c *client) OnReceive(handler network.ReceiveHandler) {
+	c.receiveHandler = handler
+}

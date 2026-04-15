@@ -1,0 +1,103 @@
+package client
+
+import (
+	"net/url"
+	"sync"
+
+	"github.com/xbaseio/xbase/core/tls"
+	"github.com/xbaseio/xbase/registry"
+	"github.com/xbaseio/xbase/transport/rpcx/internal/resolver"
+	"github.com/xbaseio/xbase/transport/rpcx/internal/resolver/direct"
+	"github.com/xbaseio/xbase/transport/rpcx/internal/resolver/discovery"
+	"github.com/xbaseio/xbase/xerrors"
+	cli "github.com/smallnest/rpcx/client"
+	proto "github.com/smallnest/rpcx/protocol"
+	"golang.org/x/sync/singleflight"
+)
+
+const defaultPoolSize = 10
+
+type Builder struct {
+	err      error
+	opts     *Options
+	dialOpts cli.Option
+	builders map[string]resolver.Builder
+	sfg      singleflight.Group
+	pools    sync.Map
+}
+
+type Options struct {
+	PoolSize   int
+	CAFile     string
+	ServerName string
+	Discovery  registry.Discovery
+	FailMode   cli.FailMode
+}
+
+func NewBuilder(opts *Options) *Builder {
+	b := &Builder{}
+	b.opts = opts
+	b.builders = make(map[string]resolver.Builder)
+	b.dialOpts = cli.DefaultOption
+	b.dialOpts.CompressType = proto.Gzip
+	b.RegisterBuilder(direct.NewBuilder(opts.Discovery))
+	if opts.Discovery != nil {
+		b.RegisterBuilder(discovery.NewBuilder(opts.Discovery))
+	}
+
+	if opts.CAFile != "" {
+		b.dialOpts.TLSConfig, b.err = tls.MakeTCPClientTLSConfig(opts.CAFile, opts.ServerName)
+	}
+
+	return b
+}
+
+// RegisterBuilder 注册构建器
+func (b *Builder) RegisterBuilder(builder resolver.Builder) {
+	b.builders[builder.Scheme()] = builder
+}
+
+// Build 建立Discovery
+func (b *Builder) Build(target string) (*cli.OneClient, error) {
+	if b.err != nil {
+		return nil, b.err
+	}
+
+	u, err := url.Parse(target)
+	if err != nil {
+		return nil, err
+	}
+
+	val, ok := b.pools.Load(target)
+	if ok {
+		return val.(*cli.OneClientPool).Get(), nil
+	}
+
+	val, err, _ = b.sfg.Do(target, func() (any, error) {
+		builder, ok := b.builders[u.Scheme]
+		if !ok {
+			return nil, xerrors.ErrMissingResolver
+		}
+
+		dis, err := builder.Build(u)
+		if err != nil {
+			return nil, err
+		}
+
+		size := b.opts.PoolSize
+		if size <= 0 {
+			size = defaultPoolSize
+		}
+
+		pool := cli.NewOneClientPool(size, cli.Failtry, cli.RoundRobin, dis, b.dialOpts)
+
+		b.pools.Store(target, pool)
+
+		return pool, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return val.(*cli.OneClientPool).Get(), nil
+}

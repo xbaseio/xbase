@@ -1,0 +1,86 @@
+services:
+  mysql:
+    image: mysql:8.0.45
+    container_name: cr-mysql-prd
+    platform: linux/x86_64
+    restart: always
+
+    # 生产级优化命令参数
+    command: >
+      --innodb_file_per_table=1
+      --general_log=0
+      --lower_case_table_names=1
+      --log_bin_trust_function_creators=ON
+      --character_set_server=utf8mb4
+      --collation_server=utf8mb4_general_ci
+      --event_scheduler=ON
+      --innodb_buffer_pool_size=1G
+      --max_connections=4096
+      --group_concat_max_len=1844674407370954752
+      --sql_mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+
+    environment:
+      MYSQL_ROOT_PASSWORD: areanEm2354PzeMT
+      MYSQL_ROOT_HOST: '%'                  # 允许远程连接
+      # 新版本推荐使用 caching_sha2_password
+      MYSQL_ROOT_DEFAULT_AUTH: caching_sha2_password
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - ./cr-mysql-prd:/var/lib/mysql   # 持久化数据库文件
+      - ./cr-mysql-prd-init:/docker-entrypoint-initdb.d  # 可放初始化SQL脚本
+
+    networks:
+      - middleware
+  consul:
+    image: hashicorp/consul:1.17.2
+    container_name: server-consul-prd
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    platform: linux/x86_64
+    restart: always
+    environment:
+      - CONSUL_LIMITS_HTTP_MAX_CONNS_PER_CLIENT=8192
+      - CONSUL_LIMITS_RPC_RATE=128
+      - CONSUL_LIMITS_RPC_MAX_BURST=256
+    volumes:
+      - ./server-consul-prd:/data
+    ports:
+      - '8300:8300'
+      - '8301:8301'
+      - '8301:8301/udp'
+      - '8500:8500'
+      - '8600:8600'
+      - '8600:8600/udp'
+  nats:
+    image: nats:latest
+    container_name: server-nats-prd
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: always
+    volumes:
+      - ./server-nats-prd/jetstream:/data # JetStream 数据持久化
+    ports:
+      - '4222:4222' # 客户端端口
+      - '8222:8222' # 监控端口（可选）
+    # 移除 6222 端口（除非需要集群）
+    healthcheck:
+      test: [ "CMD", "nats", "server", "info" ]
+      interval: 20s
+networks:
+  middleware:
+    driver: bridge
