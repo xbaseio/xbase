@@ -54,9 +54,14 @@ func (r *request) Seq() int32 {
 	return r.message.Seq
 }
 
-// Route 获取消息路由号
-func (r *request) Route() int32 {
-	return r.message.Route
+// NodeID 获取消息节点ID
+func (r *request) NodeID() int32 {
+	return r.message.NodeID
+}
+
+// MessageID 获取消息ID
+func (r *request) MessageID() int32 {
+	return r.message.MessageID
 }
 
 // Event 获取事件类型
@@ -136,9 +141,10 @@ func (r *request) Clone() Context {
 		uid:  r.uid,
 		ctx:  context.Background(),
 		message: &cluster.Message{
-			Seq:   r.message.Seq,
-			Route: r.message.Route,
-			Data:  r.message.Data,
+			Seq:       r.message.Seq,
+			NodeID:    r.message.NodeID,
+			MessageID: r.message.MessageID,
+			Data:      r.message.Data,
 		},
 	}
 
@@ -404,9 +410,10 @@ func (r *request) Reply(message *cluster.Message) error {
 // Response 响应消息
 func (r *request) Response(message any) error {
 	return r.Reply(&cluster.Message{
-		Route: r.message.Route,
-		Seq:   r.message.Seq,
-		Data:  message,
+		NodeID:    r.message.NodeID,
+		MessageID: r.message.MessageID,
+		Seq:       r.message.Seq,
+		Data:      message,
 	})
 }
 

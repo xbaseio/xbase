@@ -99,9 +99,10 @@ func (c *Conn) Push(message *cluster.Message) error {
 	}
 
 	msg, err := packet.PackMessage(&packet.Message{
-		Seq:    message.Seq,
-		Route:  message.Route,
-		Buffer: buffer,
+		Seq:       message.Seq,
+		NodeID:    message.NodeID,
+		MessageID: message.MessageID,
+		Buffer:    buffer,
 	})
 	if err != nil {
 		return err

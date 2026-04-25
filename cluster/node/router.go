@@ -117,8 +117,8 @@ func (r *Router) SetPostRouteHandler(handler RouteHandler) {
 }
 
 // CheckRouteStateful 是否为有状态路由
-func (r *Router) CheckRouteStateful(route int32) (stateful bool, exist bool) {
-	if entity, ok := r.routes[route]; ok {
+func (r *Router) CheckRouteStateful(nodeID, messageID int32) (stateful bool, exist bool) {
+	if entity, ok := r.routes[nodeID]; ok {
 		exist, stateful = ok, entity.options.Stateful
 	}
 	return
@@ -147,7 +147,8 @@ func (r *Router) deliver(gid, nid, pid string, cid, uid int64, seq, route int32,
 	req.cid = cid
 	req.uid = uid
 	req.message.Seq = seq
-	req.message.Route = route
+	req.message.NodeID = route
+	req.message.MessageID = 0 // Set a default value or derive it from the data
 	req.message.Data = data
 	r.reqChan <- req
 }
@@ -163,10 +164,10 @@ func (r *Router) close() {
 func (r *Router) handle(req *request) {
 	version := req.incrVersion()
 
-	route, ok := r.routes[req.message.Route]
+	route, ok := r.routes[req.message.NodeID]
 	if !ok && r.defaultRouteHandler == nil {
 		req.compareVersionRecycle(version)
-		log.Warnf("message routing does not register handler function, route: %v", req.message.Route)
+		log.Warnf("message routing does not register handler function, route: %v", req.message.NodeID)
 		return
 	}
 

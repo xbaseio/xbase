@@ -192,7 +192,8 @@ func (a *Actor) Deliver(uid int64, message *cluster.Message) error {
 	req.nid = a.scheduler.node.opts.id
 	req.uid = uid
 	req.message.Seq = message.Seq
-	req.message.Route = message.Route
+	req.message.NodeID = message.NodeID
+	req.message.MessageID = message.MessageID
 	req.message.Data = buf
 
 	a.Next(req)
@@ -207,7 +208,7 @@ func (a *Actor) Push(uid int64, message *cluster.Message) error {
 		return err
 	}
 
-	a.scheduler.node.router.deliver("", a.scheduler.node.opts.id, a.PID(), 0, uid, message.Seq, message.Route, buf)
+	a.scheduler.node.router.deliver("", a.scheduler.node.opts.id, a.PID(), 0, uid, message.Seq, message.NodeID, buf)
 
 	return nil
 }
@@ -284,7 +285,7 @@ func (a *Actor) dispatch() {
 					ctx.compareVersionExecDefer(version)
 				}
 			} else {
-				if handler, ok := a.routes[ctx.Route()]; ok {
+				if handler, ok := a.routes[ctx.NodeID()]; ok {
 					xcall.Call(func() { handler(ctx) })
 
 					ctx.compareVersionExecDefer(version)

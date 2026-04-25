@@ -19,8 +19,10 @@ type Context interface {
 	UID() int64
 	// Seq 获取消息序列号
 	Seq() int32
-	// Route 获取消息路由号
-	Route() int32
+	// NodeID 获取消息节点ID
+	NodeID() int32
+	// MessageID 获取消息ID
+	MessageID() int32
 	// Event 获取事件类型
 	Event() cluster.Event
 	// Kind 上下文消息类型

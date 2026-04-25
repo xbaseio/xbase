@@ -41,7 +41,7 @@ type Packer interface {
 	// PackMessage 打包消息
 	PackMessage(message *Message) ([]byte, error)
 	// UnpackMessage 解包消息
-	UnpackMessage(data []byte) (*Message, error)
+	UnpackMessage(data []byte) (*Message, int, error)
 	// PackHeartbeat 打包心跳
 	PackHeartbeat() ([]byte, error)
 	// CheckHeartbeat 检测心跳包
@@ -251,61 +251,76 @@ func (p *defaultPacker) PackMessage(message *Message) ([]byte, error) {
 	return buf, nil
 }
 
-// UnpackMessage 解包消息
-func (p *defaultPacker) UnpackMessage(data []byte) (*Message, error) {
-	var (
-		reader = bytes.NewReader(data)
-		size   uint32
-		header uint8
-	)
+func (p *defaultPacker) UnpackMessage(data []byte) (*Message, int, error) {
 
-	if len(data)-defaultHeaderSize < 0 {
-		return nil, xerrors.ErrInvalidMessage
+	// -------------------------
+	// 1. 至少要有 size
+	// -------------------------
+	if len(data) < 4 {
+		return nil, 0, nil // half packet
 	}
 
-	err := binary.Read(reader, p.opts.byteOrder, &size)
-	if err != nil {
-		return nil, err
+	offset := 0
+
+	// -------------------------
+	// 2. size（payload长度，不含4字节本身）
+	// -------------------------
+	size := int(p.opts.byteOrder.Uint32(data[offset:]))
+	offset += 4
+
+	if size <= 0 || size > p.opts.bufferBytes {
+		return nil, 0, xerrors.ErrInvalidMessage
 	}
 
-	if uint64(len(data))-defaultSizeBytes != uint64(size) {
-		return nil, xerrors.ErrInvalidMessage
+	totalLen := 4 + size
+	if len(data) < totalLen {
+		return nil, 0, nil // half packet
 	}
 
-	err = binary.Read(reader, p.opts.byteOrder, &header)
-	if err != nil {
-		return nil, err
+	// -------------------------
+	// 3. dataBit
+	// -------------------------
+	dataBitVal := int32(p.opts.byteOrder.Uint32(data[offset:]))
+	offset += 4
+
+	if dataBitVal&int32(dataBit) != int32(dataBit) {
+		return nil, 0, xerrors.ErrInvalidMessage
 	}
 
-	if header&dataBit != dataBit {
-		return nil, xerrors.ErrInvalidMessage
+	// -------------------------
+	// 4. nodeID
+	// -------------------------
+	nodeID := int32(p.opts.byteOrder.Uint32(data[offset:]))
+	offset += 4
+
+	// -------------------------
+	// 5. messageID
+	// -------------------------
+	messageID := int32(p.opts.byteOrder.Uint32(data[offset:]))
+	offset += 4
+
+	// -------------------------
+	// 6. seq
+	// -------------------------
+	seq := int32(p.opts.byteOrder.Uint32(data[offset:]))
+	offset += 4
+
+	// -------------------------
+	// 7. body（zero-copy）
+	// -------------------------
+	body := data[offset:totalLen]
+
+	// -------------------------
+	// 8. 组装 message
+	// -------------------------
+	msg := &Message{
+		NodeID:    nodeID,
+		Seq:       seq,
+		MessageID: messageID,
+		Buffer:    body,
 	}
 
-	message := &Message{}
-
-	var nodeID int32
-	if err = binary.Read(reader, p.opts.byteOrder, &nodeID); err != nil {
-		return nil, err
-	} else {
-		message.NodeID = nodeID
-	}
-	var messageID int32
-	if err = binary.Read(reader, p.opts.byteOrder, &messageID); err != nil {
-		return nil, err
-	} else {
-		message.MessageID = messageID
-	}
-
-	var seq int32
-	if err = binary.Read(reader, p.opts.byteOrder, &seq); err != nil {
-		return nil, err
-	} else {
-		message.Seq = seq
-	}
-
-	message.Buffer = data[defaultHeaderSize:]
-
-	return message, nil
+	return msg, totalLen, nil
 }
 
 // PackHeartbeat 打包心跳

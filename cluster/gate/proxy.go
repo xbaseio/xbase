@@ -70,27 +70,28 @@ func (p *proxy) trigger(ctx context.Context, event cluster.Event, cid, uid int64
 
 // 投递消息
 func (p *proxy) deliver(ctx context.Context, cid, uid int64, data []byte) {
-	message, err := packet.UnpackMessage(data)
+	message, _, err := packet.UnpackMessage(data)
 	if err != nil {
 		log.Errorf("unpack message failed: %v", err)
 		return
 	}
 
 	if err = p.nodeLinker.Deliver(ctx, &link.DeliverArgs{
-		CID:    cid,
-		UID:    uid,
-		Route:  messag,
-		Buffer: data,
+		CID:       cid,
+		UID:       uid,
+		NodeID:    message.NodeID,
+		MessageID: message.MessageID,
+		Buffer:    data,
 	}); err != nil {
 		switch {
 		case xerrors.Is(err, xerrors.ErrNotFoundRoute), xerrors.Is(err, xerrors.ErrNotFoundEndpoint):
-			log.Warnf("deliver message failed, cid: %d uid: %d seq: %d route: %d err: %v", cid, uid, message.Seq, message.Route, err)
+			log.Warnf("deliver message failed, cid: %d uid: %d seq: %d node: %d message: %d err: %v", cid, uid, message.Seq, message.NodeID, message.MessageID, err)
 		default:
-			log.Errorf("deliver message failed, cid: %d uid: %d seq: %d route: %d err: %v", cid, uid, message.Seq, message.Route, err)
+			log.Errorf("deliver message failed, cid: %d uid: %d seq: %d node: %d message: %d err: %v", cid, uid, message.Seq, message.NodeID, message.MessageID, err)
 		}
 	} else {
 		if mode.IsDebugMode() {
-			log.Debugf("deliver message success, cid: %d uid: %d seq: %d route: %d", cid, uid, message.Seq, message.Route)
+			log.Debugf("deliver message success, cid: %d uid: %d seq: %d node: %d message: %d", cid, uid, message.Seq, message.NodeID, message.MessageID)
 		}
 	}
 }

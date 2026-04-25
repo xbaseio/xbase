@@ -214,14 +214,14 @@ func (s *Scheduler) dispatchRequest(ctx Context) error {
 		return xerrors.ErrMissingDispatchStrategy
 	}
 
-	kind, ok := s.routes.Load(ctx.Route())
+	kind, ok := s.routes.Load(ctx.NodeID())
 	if !ok {
 		return xerrors.ErrUnregisterRoute
 	}
 
 	act, ok := s.loadActor(uid, kind.(string))
 	if !ok {
-		log.Errorf("dispatch request failed, uid = %v route = %v kind = %v", uid, ctx.Route(), kind)
+		log.Errorf("dispatch request failed, uid = %v route = %v kind = %v", uid, ctx.NodeID(), kind)
 		return xerrors.ErrNotBindActor
 	}
 

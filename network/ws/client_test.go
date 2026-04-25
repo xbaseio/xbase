@@ -27,7 +27,7 @@ func TestClient_Dial(t *testing.T) {
 				t.Log("connection is closed")
 			})
 			client.OnReceive(func(conn network.Conn, data []byte) {
-				message, err := packet.UnpackMessage(data)
+				message, _, err := packet.UnpackMessage(data)
 				if err != nil {
 					t.Error(err)
 					return
@@ -83,7 +83,7 @@ func TestNewClient(t *testing.T) {
 		log.Info("connection is closed")
 	})
 	client.OnReceive(func(conn network.Conn, data []byte) {
-		message, err := packet.UnpackMessage(data)
+		message, _, err := packet.UnpackMessage(data)
 		if err != nil {
 			t.Error(err)
 			return

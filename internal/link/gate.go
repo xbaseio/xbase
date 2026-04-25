@@ -766,9 +766,10 @@ func (l *GateLinker) PackMessage(message *Message, encrypt bool) (*buffer.Nocopy
 	}
 
 	return packet.PackBuffer(&packet.Message{
-		Seq:    message.Seq,
-		Route:  message.Route,
-		Buffer: buf,
+		Seq:       message.Seq,
+		NodeID:    message.NodeID,
+		MessageID: message.MessageID,
+		Buffer:    buf,
 	})
 }
 

@@ -283,10 +283,11 @@ func (p *Proxy) Deliver(ctx context.Context, args *cluster.DeliverArgs) error {
 	}
 
 	return p.nodeLinker.Deliver(ctx, &link.DeliverArgs{
-		NID:    args.NID,
-		UID:    args.UID,
-		Route:  args.Message.Route,
-		Buffer: args.Message,
+		NID:       args.NID,
+		UID:       args.UID,
+		NodeID:    args.Message.NodeID,
+		MessageID: args.Message.MessageID,
+		Buffer:    args.Message,
 	})
 }
 

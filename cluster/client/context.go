@@ -37,9 +37,14 @@ func (c *Context) Seq() int32 {
 	return c.message.Seq
 }
 
-// Route 获取消息路由
-func (c *Context) Route() int32 {
-	return c.message.Route
+// NodeID 获取消息节点ID
+func (c *Context) NodeID() int32 {
+	return c.message.NodeID
+}
+
+// MessageID 获取消息ID
+func (c *Context) MessageID() int32 {
+	return c.message.MessageID
 }
 
 // Data 获取消息数据

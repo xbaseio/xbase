@@ -125,13 +125,13 @@ func (c *Client) handleReceive(conn network.Conn, data []byte) {
 		return
 	}
 
-	message, err := packet.UnpackMessage(data)
+	message, _, err := packet.UnpackMessage(data)
 	if err != nil {
 		log.Errorf("unpack message failed: %v", err)
 		return
 	}
 
-	handlers, ok := c.routes[message.Route]
+	handlers, ok := c.routes[message.NodeID]
 	if ok {
 		for _, handler := range handlers {
 			xcall.Call(func() {
@@ -149,7 +149,7 @@ func (c *Client) handleReceive(conn network.Conn, data []byte) {
 			message: message,
 		})
 	} else {
-		log.Debugf("route handler is not registered, route: %v", message.Route)
+		log.Debugf("route handler is not registered, route: %v", message.NodeID)
 	}
 }
 

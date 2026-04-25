@@ -48,7 +48,7 @@ func TestDefaultPacker_PackBuffer(t *testing.T) {
 
 	t.Log(buf.Bytes())
 
-	message, err := packer.UnpackMessage(buf.Bytes())
+	message, _, err := packer.UnpackMessage(buf.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestDefaultPacker_PackMessage(t *testing.T) {
 
 	t.Log(data)
 
-	message, err := packer.UnpackMessage(data)
+	message, _, err := packer.UnpackMessage(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func BenchmarkDefaultPacker_UnpackMessage(b *testing.B) {
 	b.SetBytes(int64(len(buf)))
 
 	for i := 0; i < b.N; i++ {
-		if _, err := packer.UnpackMessage(buf); err != nil {
+		if _, _, err := packer.UnpackMessage(buf); err != nil {
 			b.Fatal(err)
 		}
 	}

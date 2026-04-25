@@ -50,8 +50,13 @@ func (e *event) Seq() int32 {
 	return 0
 }
 
-// Route 获取消息路由号
-func (e *event) Route() int32 {
+// NodeID 获取消息节点ID
+func (e *event) NodeID() int32 {
+	return 0
+}
+
+// MessageID 获取消息ID
+func (e *event) MessageID() int32 {
 	return 0
 }
 

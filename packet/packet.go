@@ -43,7 +43,7 @@ func PackMessage(message *Message) ([]byte, error) {
 }
 
 // UnpackMessage 解包消息
-func UnpackMessage(data []byte) (*Message, error) {
+func UnpackMessage(data []byte) (*Message, int, error) {
 	return globalPacker.UnpackMessage(data)
 }
 

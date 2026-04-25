@@ -27,7 +27,7 @@ func TestClient_Simple(t *testing.T) {
 	})
 
 	client.OnReceive(func(conn network.Conn, data []byte) {
-		message, err := packet.UnpackMessage(data)
+		message, _, err := packet.UnpackMessage(data)
 		if err != nil {
 			log.Errorf("unpack message failed: %v", err)
 			return

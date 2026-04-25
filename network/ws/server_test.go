@@ -23,7 +23,7 @@ func TestServer(t *testing.T) {
 		t.Logf("connection is closed, connection id: %d", conn.ID())
 	})
 	server.OnReceive(func(conn network.Conn, data []byte) {
-		message, err := packet.UnpackMessage(data)
+		message, _, err := packet.UnpackMessage(data)
 		if err != nil {
 			t.Error(err)
 			return
@@ -69,7 +69,7 @@ func TestServer_Benchmark(t *testing.T) {
 		t.Logf("server is started")
 	})
 	server.OnReceive(func(conn network.Conn, data []byte) {
-		if _, err := packet.UnpackMessage(data); err != nil {
+		if _, _, err := packet.UnpackMessage(data); err != nil {
 			t.Error(err)
 			return
 		}

@@ -21,12 +21,12 @@ func (p *provider) Trigger(ctx context.Context, gid string, cid, uid int64, even
 
 // Deliver 投递消息
 func (p *provider) Deliver(ctx context.Context, gid, nid string, cid, uid int64, message []byte) error {
-	msg, err := packet.UnpackMessage(message)
+	msg, _, err := packet.UnpackMessage(message)
 	if err != nil {
 		return err
 	}
 
-	stateful, ok := p.node.router.CheckRouteStateful(msg.Route)
+	stateful, ok := p.node.router.CheckRouteStateful(msg.NodeID, msg.MessageID)
 	if !ok {
 		if ok = p.node.router.HasDefaultRouteHandler(); !ok {
 			return nil
@@ -48,7 +48,7 @@ func (p *provider) Deliver(ctx context.Context, gid, nid string, cid, uid int64,
 		}
 	}
 
-	p.node.router.deliver(gid, nid, "", cid, uid, msg.Seq, msg.Route, msg.Buffer)
+	p.node.router.deliver(gid, nid, "", cid, uid, msg.Seq, msg.NodeID, msg.Buffer)
 
 	return nil
 }

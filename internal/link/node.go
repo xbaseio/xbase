@@ -192,7 +192,7 @@ func (l *NodeLinker) Deliver(ctx context.Context, args *DeliverArgs) error {
 			return client.Deliver(ctx, args.CID, args.UID, buf)
 		}
 	} else {
-		if _, err = l.doRPC(ctx, args.Route, args.UID, func(ctx context.Context, client *node.Client) (bool, any, error) {
+		if _, err = l.doRPC(ctx, args.NodeID, args.UID, func(ctx context.Context, client *node.Client) (bool, any, error) {
 			isDeliver = true
 
 			return false, nil, client.Deliver(ctx, args.CID, args.UID, buf)
@@ -337,7 +337,8 @@ func (l *NodeLinker) PackMessage(message *Message, encrypt bool) (*buffer.Nocopy
 
 	return packet.PackBuffer(&packet.Message{
 		Seq:       message.Seq,
-		NodeID:    message.Route,
+		NodeID:    message.NodeID,
+		MessageID: message.MessageID,
 		Buffer:    buffer,
 	})
 }
