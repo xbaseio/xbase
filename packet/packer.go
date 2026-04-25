@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"math"
 	"time"
 
 	"github.com/xbaseio/xbase/core/buffer"
@@ -58,14 +59,6 @@ func NewPacker(opts ...Option) *defaultPacker {
 		opt(o)
 	}
 
-	if o.routeBytes != 1 && o.routeBytes != 2 && o.routeBytes != 4 {
-		log.Fatalf("the number of route bytes must be 1、2、4, and give %d", o.routeBytes)
-	}
-
-	if o.seqBytes != 0 && o.seqBytes != 1 && o.seqBytes != 2 && o.seqBytes != 4 {
-		log.Fatalf("the number of seq bytes must be 0、1、2、4, and give %d", o.seqBytes)
-	}
-
 	if o.bufferBytes < 0 {
 		log.Fatalf("the number of buffer bytes must be greater than or equal to 0, and give %d", o.bufferBytes)
 	}
@@ -106,41 +99,25 @@ func (p *defaultPacker) ReadBuffer(reader io.Reader) (buffer.Buffer, error) {
 
 // PackBuffer 以buffer的形式打包消息
 func (p *defaultPacker) PackBuffer(message *Message) (*buffer.NocopyBuffer, error) {
-	if message.Route > int32(1<<(8*p.opts.routeBytes-1)-1) || message.Route < int32(-1<<(8*p.opts.routeBytes-1)) {
-		return nil, xerrors.ErrRouteOverflow
-	}
-
-	if p.opts.seqBytes > 0 {
-		if message.Seq > int32(1<<(8*p.opts.seqBytes-1)-1) || message.Seq < int32(-1<<(8*p.opts.seqBytes-1)) {
-			return nil, xerrors.ErrSeqOverflow
-		}
-	}
-
 	if len(message.Buffer) > p.opts.bufferBytes {
 		return nil, xerrors.ErrMessageTooLarge
 	}
+	// -------------------------
+	// 2. 固定 header = 4字段 * 4bytes
+	// -------------------------
 
-	writer := buffer.MallocWriter(defaultSizeBytes + defaultHeaderBytes + p.opts.routeBytes + p.opts.seqBytes)
-	writer.WriteInt32s(p.opts.byteOrder, int32(defaultHeaderBytes+p.opts.routeBytes+p.opts.seqBytes+len(message.Buffer)))
-	writer.WriteInt8s(int8(dataBit))
+	totalLen := defaultHeaderSize + len(message.Buffer)
 
-	switch p.opts.routeBytes {
-	case 1:
-		writer.WriteInt8s(int8(message.Route))
-	case 2:
-		writer.WriteInt16s(p.opts.byteOrder, int16(message.Route))
-	case 4:
-		writer.WriteInt32s(p.opts.byteOrder, message.Route)
+	if totalLen > p.opts.bufferBytes || totalLen > math.MaxInt32 {
+		return nil, xerrors.ErrMessageTooLarge
 	}
+	writer := buffer.MallocWriter(defaultHeaderSize)
+	writer.WriteInt32s(p.opts.byteOrder, int32(totalLen))
+	writer.WriteInt32s(p.opts.byteOrder, dataBit)
 
-	switch p.opts.seqBytes {
-	case 1:
-		writer.WriteInt8s(int8(message.Seq))
-	case 2:
-		writer.WriteInt16s(p.opts.byteOrder, int16(message.Seq))
-	case 4:
-		writer.WriteInt32s(p.opts.byteOrder, message.Seq)
-	}
+	writer.WriteInt32s(p.opts.byteOrder, message.NodeID)
+	writer.WriteInt32s(p.opts.byteOrder, message.MessageID)
+	writer.WriteInt32s(p.opts.byteOrder, message.Seq)
 
 	return buffer.NewNocopyBuffer(writer, message.Buffer), nil
 }
@@ -210,79 +187,79 @@ func (p *defaultPacker) nocopyReadMessage(reader NocopyReader) ([]byte, error) {
 
 // PackMessage 打包消息
 func (p *defaultPacker) PackMessage(message *Message) ([]byte, error) {
-	if message.Route > int32(1<<(8*p.opts.routeBytes-1)-1) || message.Route < int32(-1<<(8*p.opts.routeBytes-1)) {
-		return nil, xerrors.ErrRouteOverflow
-	}
 
-	if p.opts.seqBytes > 0 {
-		if message.Seq > int32(1<<(8*p.opts.seqBytes-1)-1) || message.Seq < int32(-1<<(8*p.opts.seqBytes-1)) {
-			return nil, xerrors.ErrSeqOverflow
-		}
-	}
-
+	// -------------------------
+	// 1. body 校验
+	// -------------------------
 	if len(message.Buffer) > p.opts.bufferBytes {
 		return nil, xerrors.ErrMessageTooLarge
 	}
 
-	var (
-		size = defaultHeaderBytes + p.opts.routeBytes + p.opts.seqBytes + len(message.Buffer)
-		buf  = &bytes.Buffer{}
-	)
+	// -------------------------
+	// 2. 固定 header = 4字段 * 4bytes
+	// -------------------------
 
-	buf.Grow(size + defaultSizeBytes)
+	totalLen := defaultHeaderSize + len(message.Buffer)
 
-	err := binary.Write(buf, p.opts.byteOrder, int32(size))
-	if err != nil {
-		return nil, err
+	// 防止 int32 溢出
+	if totalLen > math.MaxInt32 {
+		return nil, xerrors.ErrMessageTooLarge
 	}
 
-	err = binary.Write(buf, p.opts.byteOrder, int8(dataBit))
-	if err != nil {
-		return nil, err
-	}
+	// -------------------------
+	// 3. 分配 buffer
+	// -------------------------
+	buf := make([]byte, 4+totalLen) // +4 是 length
 
-	switch p.opts.routeBytes {
-	case 1:
-		err = binary.Write(buf, p.opts.byteOrder, int8(message.Route))
-	case 2:
-		err = binary.Write(buf, p.opts.byteOrder, int16(message.Route))
-	case 4:
-		err = binary.Write(buf, p.opts.byteOrder, message.Route)
-	}
-	if err != nil {
-		return nil, err
-	}
+	offset := 0
 
-	switch p.opts.seqBytes {
-	case 1:
-		err = binary.Write(buf, p.opts.byteOrder, int8(message.Seq))
-	case 2:
-		err = binary.Write(buf, p.opts.byteOrder, int16(message.Seq))
-	case 4:
-		err = binary.Write(buf, p.opts.byteOrder, message.Seq)
-	}
-	if err != nil {
-		return nil, err
-	}
+	// -------------------------
+	// 4. 写 totalLen
+	// -------------------------
+	p.opts.byteOrder.PutUint32(buf[offset:], uint32(totalLen))
+	offset += 4
 
-	err = binary.Write(buf, p.opts.byteOrder, message.Buffer)
-	if err != nil {
-		return nil, err
-	}
+	// -------------------------
+	// 5. dataBit
+	// -------------------------
+	p.opts.byteOrder.PutUint32(buf[offset:], uint32(dataBit))
+	offset += 4
 
-	return buf.Bytes(), nil
+	// -------------------------
+	// 6. NodeID
+	// -------------------------
+	p.opts.byteOrder.PutUint32(buf[offset:], uint32(message.NodeID))
+	offset += 4
+
+	// -------------------------
+	// 7. messageID
+	// -------------------------
+	p.opts.byteOrder.PutUint32(buf[offset:], uint32(message.MessageID))
+	offset += 4
+
+	// -------------------------
+	// -------------------------
+	// 8. seq
+	// -------------------------
+	p.opts.byteOrder.PutUint32(buf[offset:], uint32(message.Seq))
+	offset += 4
+	// -------------------------
+	// 9. body
+	// -------------------------
+	copy(buf[offset:], message.Buffer)
+
+	return buf, nil
 }
 
 // UnpackMessage 解包消息
 func (p *defaultPacker) UnpackMessage(data []byte) (*Message, error) {
 	var (
-		ln     = defaultSizeBytes + defaultHeaderBytes + p.opts.routeBytes + p.opts.seqBytes
 		reader = bytes.NewReader(data)
 		size   uint32
 		header uint8
 	)
 
-	if len(data)-ln < 0 {
+	if len(data)-defaultHeaderSize < 0 {
 		return nil, xerrors.ErrInvalidMessage
 	}
 
@@ -306,55 +283,27 @@ func (p *defaultPacker) UnpackMessage(data []byte) (*Message, error) {
 
 	message := &Message{}
 
-	switch p.opts.routeBytes {
-	case 1:
-		var route int8
-		if err = binary.Read(reader, p.opts.byteOrder, &route); err != nil {
-			return nil, err
-		} else {
-			message.Route = int32(route)
-		}
-	case 2:
-		var route int16
-		if err = binary.Read(reader, p.opts.byteOrder, &route); err != nil {
-			return nil, err
-		} else {
-			message.Route = int32(route)
-		}
-	case 4:
-		var route int32
-		if err = binary.Read(reader, p.opts.byteOrder, &route); err != nil {
-			return nil, err
-		} else {
-			message.Route = route
-		}
+	var nodeID int32
+	if err = binary.Read(reader, p.opts.byteOrder, &nodeID); err != nil {
+		return nil, err
+	} else {
+		message.NodeID = nodeID
+	}
+	var messageID int32
+	if err = binary.Read(reader, p.opts.byteOrder, &messageID); err != nil {
+		return nil, err
+	} else {
+		message.MessageID = messageID
 	}
 
-	switch p.opts.seqBytes {
-	case 1:
-		var seq int8
-		if err = binary.Read(reader, p.opts.byteOrder, &seq); err != nil {
-			return nil, err
-		} else {
-			message.Seq = int32(seq)
-		}
-	case 2:
-		var seq int16
-		if err = binary.Read(reader, p.opts.byteOrder, &seq); err != nil {
-			return nil, err
-		} else {
-			message.Seq = int32(seq)
-		}
-	case 4:
-		var seq int32
-		if err = binary.Read(reader, p.opts.byteOrder, &seq); err != nil {
-			return nil, err
-		} else {
-			message.Seq = seq
-		}
+	var seq int32
+	if err = binary.Read(reader, p.opts.byteOrder, &seq); err != nil {
+		return nil, err
+	} else {
+		message.Seq = seq
 	}
 
-	message.Buffer = data[ln:]
+	message.Buffer = data[defaultHeaderSize:]
 
 	return message, nil
 }

@@ -10,9 +10,10 @@ import (
 
 func TestEncodePublishReq(t *testing.T) {
 	message, err := packet.PackMessage(&packet.Message{
-		Route:  1,
-		Seq:    2,
-		Buffer: []byte("hello world"),
+		NodeID:    1,
+		MessageID: 1001,
+		Seq:       2,
+		Buffer:    []byte("hello world"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -25,9 +26,10 @@ func TestEncodePublishReq(t *testing.T) {
 
 func TestDecodePublishReq(t *testing.T) {
 	message, err := packet.PackMessage(&packet.Message{
-		Route:  1,
-		Seq:    2,
-		Buffer: []byte("hello world"),
+		NodeID:    1,
+		MessageID: 1001,
+		Seq:       2,
+		Buffer:    []byte("hello world"),
 	})
 	if err != nil {
 		t.Fatal(err)

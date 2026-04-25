@@ -79,7 +79,7 @@ func (p *proxy) deliver(ctx context.Context, cid, uid int64, data []byte) {
 	if err = p.nodeLinker.Deliver(ctx, &link.DeliverArgs{
 		CID:    cid,
 		UID:    uid,
-		Route:  message.Route,
+		Route:  messag,
 		Buffer: data,
 	}); err != nil {
 		switch {

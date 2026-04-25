@@ -336,9 +336,9 @@ func (l *NodeLinker) PackMessage(message *Message, encrypt bool) (*buffer.Nocopy
 	}
 
 	return packet.PackBuffer(&packet.Message{
-		Seq:    message.Seq,
-		Route:  message.Route,
-		Buffer: buffer,
+		Seq:       message.Seq,
+		NodeID:    message.Route,
+		Buffer:    buffer,
 	})
 }
 

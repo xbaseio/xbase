@@ -24,18 +24,18 @@ const (
 
 const (
 	defaultSizeBytes          = 4
-	defaultHeaderBytes        = 1
-	defaultRouteBytes         = 2
-	defaultSeqBytes           = 2
+	defaultHeaderBytes        = 4
+	defaultNodeIDBytes        = 4
+	defaultMessageIDBytes     = 4
+	defaultSeqBytes           = 4
 	defaultBufferBytes        = 5000
 	defaultHeartbeatTime      = false
 	defaultHeartbeatTimeBytes = 8
+	defaultHeaderSize         = 16
 )
 
 const (
 	defaultEndianKey        = "etc.packet.byteOrder"
-	defaultRouteBytesKey    = "etc.packet.routeBytes"
-	defaultSeqBytesKey      = "etc.packet.seqBytes"
 	defaultBufferBytesKey   = "etc.packet.bufferBytes"
 	defaultHeartbeatTimeKey = "etc.packet.heartbeatTime"
 )
@@ -44,14 +44,6 @@ type options struct {
 	// 字节序
 	// 默认为binary.LittleEndian
 	byteOrder binary.ByteOrder
-
-	// 路由字节数
-	// 默认为2字节
-	routeBytes int
-
-	// 序列号字节数，长度为0时不开启序列号编码
-	// 默认为2字节
-	seqBytes int
 
 	// 消息字节数
 	// 默认为5000字节
@@ -67,8 +59,6 @@ type Option func(o *options)
 func defaultOptions() *options {
 	opts := &options{
 		byteOrder:     binary.BigEndian,
-		routeBytes:    etc.Get(defaultRouteBytesKey, defaultRouteBytes).Int(),
-		seqBytes:      etc.Get(defaultSeqBytesKey, defaultSeqBytes).Int(),
 		bufferBytes:   etc.Get(defaultBufferBytesKey, defaultBufferBytes).Int(),
 		heartbeatTime: etc.Get(defaultHeartbeatTimeKey, defaultHeartbeatTime).Bool(),
 	}
@@ -87,16 +77,6 @@ func defaultOptions() *options {
 // WithByteOrder 设置字节序
 func WithByteOrder(byteOrder binary.ByteOrder) Option {
 	return func(o *options) { o.byteOrder = byteOrder }
-}
-
-// WithRouteBytes 设置路由字节数
-func WithRouteBytes(routeBytes int) Option {
-	return func(o *options) { o.routeBytes = routeBytes }
-}
-
-// WithSeqBytes 设置序列号字节数
-func WithSeqBytes(seqBytes int) Option {
-	return func(o *options) { o.seqBytes = seqBytes }
 }
 
 // WithBufferBytes 设置消息字节数

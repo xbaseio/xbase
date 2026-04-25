@@ -33,7 +33,7 @@ func TestClient_Simple(t *testing.T) {
 			return
 		}
 
-		log.Infof("receive msg from server, cid: %d, seq: %d, route: %d, msg: %s", conn.ID(), message.Seq, message.Route, string(message.Buffer))
+		log.Infof("receive msg from server, cid: %d, seq: %d, node id: %d, msg: %s", conn.ID(), message.Seq, message.NodeID, string(message.Buffer))
 	})
 
 	conn, err := client.Dial()
@@ -51,9 +51,10 @@ func TestClient_Simple(t *testing.T) {
 		select {
 		case <-ticker.C:
 			msg, err := packet.PackMessage(&packet.Message{
-				Seq:    1,
-				Route:  1,
-				Buffer: []byte("hello server~~"),
+				Seq:       1,
+				NodeID:    1,
+				MessageID: 1001,
+				Buffer:    []byte("hello server~~"),
 			})
 			if err != nil {
 				log.Errorf("pack message failed: %v", err)
@@ -168,9 +169,10 @@ func doPressureTest(c int, n int, size int) {
 					}
 
 					msg, err := packet.PackMessage(&packet.Message{
-						Seq:    1,
-						Route:  1,
-						Buffer: buffer,
+						Seq:       1,
+						NodeID:    1,
+						MessageID: 1001,
+						Buffer:    buffer,
 					})
 					if err != nil {
 						log.Errorf("pack message failed: %v", err)

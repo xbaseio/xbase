@@ -14,9 +14,10 @@ var packer = packet.NewPacker(
 
 func TestDefaultPacker_ReadMessage(t *testing.T) {
 	data, err := packer.PackMessage(&packet.Message{
-		Seq:    1,
-		Route:  1,
-		Buffer: []byte("hello world"),
+		Seq:       1,
+		NodeID:    1,
+		MessageID: 1001,
+		Buffer:    []byte("hello world"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -36,9 +37,10 @@ func TestDefaultPacker_ReadMessage(t *testing.T) {
 
 func TestDefaultPacker_PackBuffer(t *testing.T) {
 	buf, err := packer.PackBuffer(&packet.Message{
-		Seq:    1,
-		Route:  1,
-		Buffer: []byte("hello world"),
+		Seq:       1,
+		NodeID:    1,
+		MessageID: 1001,
+		Buffer:    []byte("hello world"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -54,15 +56,17 @@ func TestDefaultPacker_PackBuffer(t *testing.T) {
 	buf.Release()
 
 	t.Logf("seq: %d", message.Seq)
-	t.Logf("route: %d", message.Route)
+	t.Logf("node id: %d", message.NodeID)
+	t.Logf("message id: %d", message.MessageID)
 	t.Logf("buffer: %s", string(message.Buffer))
 }
 
 func TestDefaultPacker_PackMessage(t *testing.T) {
 	data, err := packer.PackMessage(&packet.Message{
-		Seq:    1,
-		Route:  1,
-		Buffer: []byte("hello world"),
+		Seq:       1,
+		NodeID:    1,
+		MessageID: 1001,
+		Buffer:    []byte("hello world"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +80,8 @@ func TestDefaultPacker_PackMessage(t *testing.T) {
 	}
 
 	t.Logf("seq: %d", message.Seq)
-	t.Logf("route: %d", message.Route)
+	t.Logf("node id: %d", message.NodeID)
+	t.Logf("message id: %d", message.MessageID)
 	t.Logf("buffer: %s", string(message.Buffer))
 }
 
@@ -98,9 +103,10 @@ func TestDefaultPacker_PackHeartbeat(t *testing.T) {
 
 func BenchmarkDefaultPacker_ReadBuffer(b *testing.B) {
 	data, err := packer.PackMessage(&packet.Message{
-		Seq:    1,
-		Route:  1,
-		Buffer: []byte(xrand.Letters(2048)),
+		Seq:       1,
+		NodeID:    1,
+		MessageID: 1001,
+		Buffer:    []byte(xrand.Letters(2048)),
 	})
 	if err != nil {
 		b.Fatal(err)
@@ -124,9 +130,10 @@ func BenchmarkDefaultPacker_ReadBuffer(b *testing.B) {
 
 func BenchmarkDefaultPacker_ReadMessage(b *testing.B) {
 	data, err := packer.PackMessage(&packet.Message{
-		Seq:    1,
-		Route:  1,
-		Buffer: []byte(xrand.Letters(2048)),
+		Seq:       1,
+		NodeID:    1,
+		MessageID: 1001,
+		Buffer:    []byte(xrand.Letters(2048)),
 	})
 	if err != nil {
 		b.Fatal(err)
@@ -154,9 +161,10 @@ func BenchmarkDefaultPacker_PackBuffer(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		buf, err := packer.PackBuffer(&packet.Message{
-			Seq:    1,
-			Route:  1,
-			Buffer: buffer,
+			Seq:       1,
+			NodeID:    1,
+			MessageID: 1001,
+			Buffer:    buffer,
 		})
 		if err != nil {
 			b.Fatal(err)
@@ -174,9 +182,10 @@ func BenchmarkDefaultPacker_PackMessage(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		_, err := packer.PackMessage(&packet.Message{
-			Seq:    1,
-			Route:  1,
-			Buffer: buffer,
+			Seq:       1,
+			NodeID:    1,
+			MessageID: 1001,
+			Buffer:    buffer,
 		})
 		if err != nil {
 			b.Fatal(err)
@@ -186,9 +195,10 @@ func BenchmarkDefaultPacker_PackMessage(b *testing.B) {
 
 func BenchmarkDefaultPacker_UnpackMessage(b *testing.B) {
 	buf, err := packer.PackMessage(&packet.Message{
-		Seq:    1,
-		Route:  1,
-		Buffer: []byte(xrand.Letters(1024)),
+		Seq:       1,
+		NodeID:    1,
+		MessageID: 1001,
+		Buffer:    []byte(xrand.Letters(1024)),
 	})
 	if err != nil {
 		b.Fatal(err)
