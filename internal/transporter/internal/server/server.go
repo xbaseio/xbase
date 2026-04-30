@@ -1,8 +1,10 @@
 package server
 
 import (
+	"errors"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/xbaseio/xbase/core/endpoint"
@@ -25,6 +27,7 @@ type Server struct {
 	handlers    map[uint8]RouteHandler // 路由处理器
 	rw          sync.RWMutex           // 锁
 	connections map[net.Conn]*Conn     // 连接
+	closed      int32                  // 是否关闭
 }
 
 func NewServer(opts *Options) (*Server, error) {
@@ -39,6 +42,8 @@ func NewServer(opts *Options) (*Server, error) {
 	s.endpoint = endpoint.NewEndpoint(scheme, exposeAddr, false)
 	s.connections = make(map[net.Conn]*Conn)
 	s.handlers = make(map[uint8]RouteHandler)
+
+	// 协议层路由：握手
 	s.handlers[route.Handshake] = s.handshake
 
 	return s, nil
@@ -66,6 +71,10 @@ func (s *Server) Endpoint() *endpoint.Endpoint {
 
 // Start 启动服务器
 func (s *Server) Start() error {
+	if atomic.LoadInt32(&s.closed) == 1 {
+		return net.ErrClosed
+	}
+
 	addr, err := net.ResolveTCPAddr("tcp", s.listenAddr)
 	if err != nil {
 		return err
@@ -76,13 +85,24 @@ func (s *Server) Start() error {
 		return err
 	}
 
+	s.rw.Lock()
+	if atomic.LoadInt32(&s.closed) == 1 {
+		s.rw.Unlock()
+		_ = ln.Close()
+		return net.ErrClosed
+	}
 	s.listener = ln
+	s.rw.Unlock()
 
 	var tempDelay time.Duration
 
 	for {
-		conn, err := s.listener.Accept()
+		rawConn, err := ln.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return nil
+			}
+
 			if e, ok := err.(net.Error); ok && e.Timeout() {
 				if tempDelay == 0 {
 					tempDelay = 5 * time.Millisecond
@@ -100,47 +120,89 @@ func (s *Server) Start() error {
 			}
 
 			log.Warnf("tcp accept connect error: %v", err)
-			return nil
+			return err
 		}
 
 		tempDelay = 0
 
-		s.allocate(conn)
+		s.allocate(rawConn)
 	}
 }
 
 // Stop 停止服务器
 func (s *Server) Stop() error {
-	if err := s.listener.Close(); err != nil {
-		return err
+	if !atomic.CompareAndSwapInt32(&s.closed, 0, 1) {
+		return nil
 	}
+
+	var ln net.Listener
+	var conns []*Conn
 
 	s.rw.Lock()
+
+	ln = s.listener
+	s.listener = nil
+
 	for _, conn := range s.connections {
-		_ = conn.close()
+		conns = append(conns, conn)
 	}
-	s.connections = nil
+
+	// 不要设置成 nil，避免并发 allocate 时 panic
+	s.connections = make(map[net.Conn]*Conn)
+
 	s.rw.Unlock()
 
-	return nil
+	var err error
+	if ln != nil {
+		err = ln.Close()
+	}
+
+	// 不要在 s.rw 锁内 close，避免 conn.close -> recycle 再抢锁导致死锁
+	for _, conn := range conns {
+		_ = conn.close(false)
+	}
+
+	return err
 }
 
 // RegisterHandler 注册处理器
-func (s *Server) RegisterHandler(route uint8, handler RouteHandler) {
-	s.handlers[route] = handler
-}
-
-// 分配连接
-func (s *Server) allocate(conn net.Conn) {
+func (s *Server) RegisterHandler(routeID uint8, handler RouteHandler) {
 	s.rw.Lock()
-	s.connections[conn] = newConn(s, conn)
+	s.handlers[routeID] = handler
 	s.rw.Unlock()
 }
 
-// 回收连接
-func (s *Server) recycle(conn net.Conn) {
+// getHandler 获取路由处理器
+func (s *Server) getHandler(routeID uint8) RouteHandler {
+	s.rw.RLock()
+	handler := s.handlers[routeID]
+	s.rw.RUnlock()
+	return handler
+}
+
+// 分配连接
+func (s *Server) allocate(rawConn net.Conn) {
+	conn := newConn(s, rawConn)
+
 	s.rw.Lock()
-	delete(s.connections, conn)
+
+	if atomic.LoadInt32(&s.closed) == 1 {
+		s.rw.Unlock()
+		_ = conn.close(false)
+		return
+	}
+
+	s.connections[rawConn] = conn
+
+	s.rw.Unlock()
+
+	conn.start()
+}
+
+// 回收连接
+func (s *Server) recycle(rawConn net.Conn) {
+	s.rw.Lock()
+	delete(s.connections, rawConn)
 	s.rw.Unlock()
 }
 
@@ -154,5 +216,5 @@ func (s *Server) handshake(conn *Conn, data []byte) error {
 	conn.InsID = insID
 	conn.InsKind = insKind
 
-	return conn.Send(protocol.EncodeHandshakeRes(seq, codes.ErrorToCode(err)))
+	return conn.Send(protocol.EncodeHandshakeRes(seq, codes.ErrorToCode(nil)))
 }
