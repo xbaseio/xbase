@@ -3,8 +3,8 @@ package redis
 import (
 	"context"
 
-	"github.com/xbaseio/xbase/etc"
 	"github.com/redis/go-redis/v9"
+	"github.com/xbaseio/xbase/etc"
 )
 
 const (
@@ -65,7 +65,7 @@ type options struct {
 	client redis.UniversalClient
 
 	// 前缀
-	// key前缀，默认为due:locate
+	// key前缀，默认为xbase:locate
 	prefix string
 }
 
