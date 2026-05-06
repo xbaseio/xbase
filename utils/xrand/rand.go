@@ -21,6 +21,7 @@ const (
 	DigitWithoutZeroSeed = "123456789"
 	SymbolSeed           = "!\\\"#$%&'()*+,-./:;<=>?@[\\\\]^_`{|}~"
 	Base62Seed           = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	HumanSafeSeed        = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 )
 
 // 熵池大小：4KB。
@@ -59,6 +60,11 @@ func init() {
 // 注意：返回的是独立实例，调用方自己持有使用。
 func Rand() *rand.Rand {
 	return rand.New(rand.NewSource(newSeed()))
+}
+
+// HumanSafeRand 返回一个新的 *rand.Rand，使用人类友好的种子字符集。
+func HumanSafeSeedRand(length int) string {
+	return Str(HumanSafeSeed, length)
 }
 
 // Str 生成指定长度的字符串。
