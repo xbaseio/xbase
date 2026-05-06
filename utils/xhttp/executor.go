@@ -55,36 +55,68 @@ func (e *executor) call(req *http.Request) (resp *Response, err error) {
 
 // nitiate an HTTP request and return the response data.
 func (e *executor) doRequest() (resp *Response, err error) {
-	resp = &Response{Request: e.request}
-
-	defer func() {
-		if err != nil {
-			resp = nil
-		}
-	}()
-
-	for {
-		resp.Response, err = e.client.Do(e.request)
-		if err == nil {
-			break
-		}
-
-		if resp.Response != nil {
-			resp.Response.Body.Close()
-		}
-
-		if e.client.retryCount <= 0 {
-			break
-		}
-
-		e.client.retryCount--
-
-		if e.client.retryInterval > 0 {
-			time.Sleep(e.client.retryInterval)
-		}
+	resp = &Response{
+		Request: e.request,
 	}
 
-	return
+	retryCount := e.client.retryCount
+	retryInterval := e.client.retryInterval
+	ctx := e.client.ctx
+
+	for attempt := 0; ; attempt++ {
+		// 重试时，如果是 POST/PUT 等带 Body 的请求，需要重置 Body
+		// 否则第二次 Do 可能会出现空 body / ContentLength 不匹配
+		if attempt > 0 && e.request.Body != nil {
+			if e.request.GetBody == nil {
+				// Body 不可重复读取，不能安全重试
+				return nil, err
+			}
+
+			body, bodyErr := e.request.GetBody()
+			if bodyErr != nil {
+				return nil, bodyErr
+			}
+			e.request.Body = body
+		}
+
+		resp.Response, err = e.client.Do(e.request)
+		if err == nil {
+			return resp, nil
+		}
+
+		// 有些情况下 err != nil 也可能返回 Response，防御性关闭
+		if resp.Response != nil && resp.Response.Body != nil {
+			_ = resp.Response.Body.Close()
+			resp.Response = nil
+		}
+
+		// 已经达到最大重试次数
+		if attempt >= retryCount {
+			return nil, err
+		}
+
+		// 如果请求已经被取消，直接返回
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
+		// 等待重试间隔，但要支持 ctx cancel
+		if retryInterval > 0 {
+			timer := time.NewTimer(retryInterval)
+
+			select {
+			case <-timer.C:
+			case <-ctx.Done():
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
+				return nil, ctx.Err()
+			}
+		}
+	}
 }
 
 func (e *executor) makeUrl(url string) string {

@@ -9,14 +9,17 @@ require (
 	github.com/aliyun/aliyun-log-go-sdk v0.1.117
 	github.com/bradfitz/gomemcache v0.0.0-20250403215159-8d39553ac7cf
 	github.com/bytedance/sonic v1.15.0
+	github.com/dobyte/jwt v0.1.6
 	github.com/ethereum/go-ethereum v1.17.1
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-openapi/runtime v0.29.3
 	github.com/gofiber/fiber/v3 v3.1.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/consul/api v1.33.7
 	github.com/jinzhu/copier v0.4.0
+	github.com/liangma499/xbase v0.0.0-20260407025400-afe8e20e1b67
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.5
 	github.com/nats-io/nats.go v1.50.0
 	github.com/redis/go-redis/v9 v9.18.0
