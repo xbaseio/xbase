@@ -20,7 +20,9 @@ type Cache interface {
 	// Set 设置缓存值
 	Set(ctx context.Context, key string, value any, expiration ...time.Duration) error
 	// GetSet 获取设置缓存值
-	GetSet(ctx context.Context, key string, fn SetValueFunc) Result
+	GetSet(ctx context.Context, key string, fn SetValueFunc, expiration ...time.Duration) Result
+	// GetExpiration 获取过期时间
+	GetExpiration(expiration ...time.Duration) time.Duration
 	// Delete 删除缓存
 	Delete(ctx context.Context, keys ...string) (int64, error)
 	// IncrInt 整数自增
@@ -33,6 +35,7 @@ type Cache interface {
 	DecrFloat(ctx context.Context, key string, value float64) (float64, error)
 	// AddPrefix 添加Key前缀
 	AddPrefix(key string) string
+
 	// Client 获取客户端
 	Client() any
 	// Close 关闭缓存
