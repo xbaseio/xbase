@@ -1,7 +1,7 @@
 services:
   mysql:
     image: mysql:8.0.45
-    container_name: cr-mysql-prd
+    container_name: xgame-mysql
     platform: linux/x86_64
     restart: always
 
@@ -35,14 +35,70 @@ services:
       - "3306:3306"
 
     volumes:
-      - ./cr-mysql-prd:/var/lib/mysql   # 持久化数据库文件
-      - ./cr-mysql-prd-init:/docker-entrypoint-initdb.d  # 可放初始化SQL脚本
+      - ./xgame-mysql:/var/lib/mysql   # 持久化数据库文件
+      - ./xgame-mysql-init:/docker-entrypoint-initdb.d  # 可放初始化SQL脚本
 
     networks:
       - middleware
+  redis:
+    image: redis:7.4
+    container_name: xgame-redis
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    platform: linux/x86_64
+    restart: always
+    volumes:
+      - ./xgame-redis:/data
+    ports:
+      - '6379:6379'
+    command: redis-server --requirepass areanEm2354PzeRs
+    networks:
+      - middleware 
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    container_name: xgame-nacos
+    restart: unless-stopped
+
+    environment:
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+
+      # 开启鉴权
+      NACOS_AUTH_ENABLE: "true"
+      NACOS_AUTH_IDENTITY_KEY: serverIdentity
+      NACOS_AUTH_IDENTITY_VALUE: security
+
+      # 建议换成你自己的 Base64 Secret，不要生产用默认示例值
+      NACOS_AUTH_TOKEN: SecretKey012345678901234567890123456789012345678901234567890123456789
+
+      # 降低内存占用，适合本地开发
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+      JVM_XMN: 128m
+
+    volumes:
+      - ./xgame-nacos/logs:/home/nacos/logs
+      - ./xgame-nacos/data:/home/nacos/data
+
+    ports:
+      # 控制台 / HTTP API
+      - "127.0.0.1:8848:8848"
+
+      # Nacos 2.x 客户端 gRPC 通信端口，官方 v2.x Docker 示例也暴露了 9848
+      - "127.0.0.1:9848:9848"
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8848/nacos/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
   consul:
     image: hashicorp/consul:1.17.2
-    container_name: server-consul-prd
+    container_name: server-consul
     logging:
       driver: "json-file"
       options:
@@ -55,17 +111,17 @@ services:
       - CONSUL_LIMITS_RPC_RATE=128
       - CONSUL_LIMITS_RPC_MAX_BURST=256
     volumes:
-      - ./server-consul-prd:/data
+      - ./server-consul:/data
     ports:
       - '8300:8300'
       - '8301:8301'
       - '8301:8301/udp'
       - '8500:8500'
-      - '8600:8600'
-      - '8600:8600/udp'
+      - '18600:8600'
+      - '18600:8600/udp'
   nats:
     image: nats:latest
-    container_name: server-nats-prd
+    container_name: server-nats
     logging:
       driver: "json-file"
       options:
@@ -73,7 +129,7 @@ services:
         max-file: "3"
     restart: always
     volumes:
-      - ./server-nats-prd/jetstream:/data # JetStream 数据持久化
+      - ./server-nats/jetstream:/data # JetStream 数据持久化
     ports:
       - '4222:4222' # 客户端端口
       - '8222:8222' # 监控端口（可选）
