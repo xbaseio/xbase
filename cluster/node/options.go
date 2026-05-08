@@ -55,7 +55,7 @@ type options struct {
 	transporter transport.Transporter // 消息传输器
 	metadata    map[string]string     // 元数据
 	nodeKind    cluster.NodeKind      // 节点类型
-	gameID      string                // 游戏ID
+	gameID      int32                 // 游戏ID
 }
 
 func defaultOptions() *options {
@@ -69,7 +69,7 @@ func defaultOptions() *options {
 		metadata: make(map[string]string),
 		expose:   etc.Get(defaultExposeKey).Bool(),
 		nodeKind: cluster.Node_Normal,
-		gameID:   "",
+		gameID:   -1,
 	}
 
 	if id := etc.Get(defaultIDKey).String(); id != "" {
@@ -183,7 +183,7 @@ func WithNodeKind(nodeKind cluster.NodeKind) Option {
 		o.nodeKind = nodeKind
 	}
 }
-func WithGameID(gameID string) Option {
+func WithGameID(gameID int32) Option {
 	return func(o *options) {
 		o.gameID = gameID
 	}

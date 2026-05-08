@@ -43,7 +43,7 @@ type options struct {
 	encryptor   crypto.Encryptor      // 消息加密器
 	transporter transport.Transporter // 消息传输器
 	nodeKind    cluster.NodeKind      // 节点类型
-	gameID      string                // 游戏ID
+	gameID      int32                 // 游戏ID
 	metadata    map[string]string     // 元数据
 }
 
@@ -55,7 +55,7 @@ func defaultOptions() *options {
 		timeout:  defaultTimeout,
 		metadata: make(map[string]string),
 		nodeKind: cluster.Node_Normal,
-		gameID:   "",
+		gameID:   -1,
 	}
 
 	if id := etc.Get(defaultIDKey).String(); id != "" {

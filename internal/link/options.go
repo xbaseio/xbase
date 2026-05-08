@@ -17,7 +17,7 @@ type Options struct {
 	Encryptor   crypto.Encryptor  // 加密器
 	Dispatch    cluster.Dispatch  // 无状态路由消息分发策略
 	NodeKind    cluster.NodeKind  // 节点类型，仅节点链接器有效
-	GameID      string            // 游戏ID，仅网关链接器有效
+	GameID      int32             // 游戏ID，仅网关链接器有效
 	WaitHandler func()            // 等待处理
 	DoneHandler func()            // 完成处理
 }

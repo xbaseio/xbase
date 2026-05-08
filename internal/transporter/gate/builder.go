@@ -17,7 +17,7 @@ type Options struct {
 	InsID    string           // 实例ID
 	InsKind  cluster.Kind     // 实例类型
 	NodeKind cluster.NodeKind // 节点类型
-	GameID   string           // 游戏ID
+	GameID   int32            // 游戏ID
 }
 
 type Builder struct {

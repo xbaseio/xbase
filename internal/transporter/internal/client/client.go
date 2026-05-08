@@ -18,12 +18,12 @@ const (
 )
 
 type Options struct {
-	Addr          string       // 连接地址
-	InsID         string       // 实例ID
-	InsKind       cluster.Kind // 实例类型
-	ConnNum       int          // 连接数
-	FaultInterval int64        //
-	GameID        string
+	Addr          string           // 连接地址
+	InsID         string           // 实例ID
+	InsKind       cluster.Kind     // 实例类型
+	ConnNum       int              // 连接数
+	FaultInterval int64            //
+	GameID        int32            // 游戏ID
 	NodeKind      cluster.NodeKind // 节点类型
 }
 
