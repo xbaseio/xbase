@@ -1,4 +1,4 @@
-package xtcp_test
+package xgnet_test
 
 import (
 	"net/http"
@@ -7,12 +7,12 @@ import (
 
 	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
-	"github.com/xbaseio/xbase/network/xtcp"
+	"github.com/xbaseio/xbase/network/xgnet"
 	"github.com/xbaseio/xbase/packet"
 )
 
 func TestServer_Simple(t *testing.T) {
-	server := xtcp.NewServer()
+	server := xgnet.NewServer()
 
 	server.OnStart(func() {
 		log.Info("server is started")
@@ -63,7 +63,7 @@ func TestServer_Simple(t *testing.T) {
 }
 
 func TestServer_Benchmark(t *testing.T) {
-	server := xtcp.NewServer()
+	server := xgnet.NewServer()
 
 	server.OnStart(func() {
 		log.Info("server is started")

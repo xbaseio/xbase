@@ -1,4 +1,4 @@
-package tcp_test
+package xgnet_test
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 
 	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
-	"github.com/xbaseio/xbase/network/tcp"
+	"github.com/xbaseio/xbase/network/xgnet"
 	"github.com/xbaseio/xbase/packet"
 	"github.com/xbaseio/xbase/utils/xrand"
 )
@@ -19,7 +19,7 @@ import (
 var pprofOnce sync.Once
 
 func TestClient_Simple(t *testing.T) {
-	client := tcp.NewClient()
+	client := xgnet.NewClient()
 
 	client.OnConnect(func(conn network.Conn) {
 		log.Info("connection is opened")
@@ -49,7 +49,7 @@ func TestClient_Simple(t *testing.T) {
 	if err != nil {
 		t.Fatalf("client dial failed: %v", err)
 	}
-	defer conn.Close()
+	defer conn.Close(true)
 
 	msg, err := packet.PackMessage(&packet.Message{
 		Seq:       1,
@@ -114,10 +114,9 @@ func doPressureTest(concurrency int, requests int, size int) {
 		totalFail int64
 	)
 
-	client := tcp.NewClient()
+	client := xgnet.NewClient()
 
 	client.OnReceive(func(conn network.Conn, data []byte) {
-		// 防止异常情况下收到超过 requests 的响应导致统计失真
 		for {
 			old := atomic.LoadInt64(&totalRecv)
 			if old >= int64(requests) {
@@ -143,9 +142,12 @@ func doPressureTest(concurrency int, requests int, size int) {
 		return
 	}
 
-	conns := dialClients(client, concurrency)
+	conns := dialClients(func() (network.Conn, error) {
+		return client.Dial()
+	}, concurrency)
+
 	if len(conns) == 0 {
-		log.Errorf("no tcp connection available")
+		log.Errorf("no xtcp connection available")
 		return
 	}
 
@@ -186,8 +188,7 @@ func doPressureTest(concurrency int, requests int, size int) {
 
 	sent := atomic.LoadInt64(&totalSent)
 
-	ok := waitRecv(&totalRecv, sent, 5*time.Minute)
-	if !ok {
+	if ok := waitRecv(&totalRecv, sent, 5*time.Minute); !ok {
 		log.Warnf(
 			"wait receive timeout, sent: %d, recv: %d, fail: %d",
 			sent,
@@ -217,7 +218,7 @@ func doPressureTest(concurrency int, requests int, size int) {
 	fmt.Printf("--------------------------------\n")
 }
 
-func dialClients(client network.Client, concurrency int) []network.Conn {
+func dialClients(dial func() (network.Conn, error), concurrency int) []network.Conn {
 	conns := make([]network.Conn, 0, concurrency)
 
 	maxAttempts := concurrency * 10
@@ -226,7 +227,7 @@ func dialClients(client network.Client, concurrency int) []network.Conn {
 	}
 
 	for attempts := 0; len(conns) < concurrency && attempts < maxAttempts; attempts++ {
-		conn, err := client.Dial()
+		conn, err := dial()
 		if err != nil {
 			log.Errorf("client dial failed: %v", err)
 			time.Sleep(100 * time.Millisecond)
@@ -234,6 +235,10 @@ func dialClients(client network.Client, concurrency int) []network.Conn {
 		}
 
 		conns = append(conns, conn)
+
+		if len(conns)%100 == 0 {
+			time.Sleep(10 * time.Millisecond)
+		}
 	}
 
 	if len(conns) < concurrency {

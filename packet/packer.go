@@ -11,8 +11,7 @@ import (
 )
 
 const (
-	dataBit      = 0 << 7 // 数据标识
-	heartbeatBit = 1 << 7 // 心跳标识
+	dataBit = 0 << 7 // 数据标识
 )
 
 type NocopyReader interface {

@@ -1,4 +1,4 @@
-package xtcp
+package xgnet
 
 const protocol = "tcp"
 
