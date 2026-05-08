@@ -29,11 +29,11 @@ func TestServer(t *testing.T) {
 			return
 		}
 
-		t.Logf("receive msg from client, connection id: %d, seq: %d, node id: %d, msg: %s", conn.ID(), message.Seq, message.NodeID, string(message.Buffer))
+		t.Logf("receive msg from client, connection id: %d, seq: %d, game id: %d, msg: %s", conn.ID(), message.Seq, message.GameID, string(message.Buffer))
 
 		msg, err := packet.PackMessage(&packet.Message{
 			Seq:       1,
-			NodeID:    1,
+			GameID:    1,
 			MessageID: 1001,
 			Buffer:    []byte("I'm fine~~"),
 		})
@@ -76,7 +76,7 @@ func TestServer_Benchmark(t *testing.T) {
 
 		msg, err := packet.PackMessage(&packet.Message{
 			Seq:       1,
-			NodeID:    101,
+			GameID:    101,
 			MessageID: 1001,
 			Buffer:    []byte("I'm fine~~"),
 		})

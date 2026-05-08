@@ -54,9 +54,9 @@ func (r *request) Seq() int32 {
 	return r.message.Seq
 }
 
-// NodeID 获取消息节点ID
-func (r *request) NodeID() int32 {
-	return r.message.NodeID
+// GameID 获取消息游戏ID
+func (r *request) GameID() int32 {
+	return r.message.GameID
 }
 
 // MessageID 获取消息ID
@@ -142,7 +142,7 @@ func (r *request) Clone() Context {
 		ctx:  context.Background(),
 		message: &cluster.Message{
 			Seq:       r.message.Seq,
-			NodeID:    r.message.NodeID,
+			GameID:    r.message.GameID,
 			MessageID: r.message.MessageID,
 			Data:      r.message.Data,
 		},
@@ -410,7 +410,7 @@ func (r *request) Reply(message *cluster.Message) error {
 // Response 响应消息
 func (r *request) Response(message any) error {
 	return r.Reply(&cluster.Message{
-		NodeID:    r.message.NodeID,
+		GameID:    r.message.GameID,
 		MessageID: r.message.MessageID,
 		Seq:       r.message.Seq,
 		Data:      message,

@@ -8,14 +8,12 @@ import (
 	"github.com/xbaseio/xbase/utils/xrand"
 )
 
-var packer = packet.NewPacker(
-	packet.WithHeartbeatTime(true),
-)
+var packer = packet.NewPacker()
 
 func TestDefaultPacker_ReadMessage(t *testing.T) {
 	data, err := packer.PackMessage(&packet.Message{
 		Seq:       1,
-		NodeID:    1,
+		GameID:    1,
 		MessageID: 1001,
 		Buffer:    []byte("hello world"),
 	})
@@ -38,7 +36,7 @@ func TestDefaultPacker_ReadMessage(t *testing.T) {
 func TestDefaultPacker_PackBuffer(t *testing.T) {
 	buf, err := packer.PackBuffer(&packet.Message{
 		Seq:       1,
-		NodeID:    1,
+		GameID:    1,
 		MessageID: 1001,
 		Buffer:    []byte("hello world"),
 	})
@@ -56,7 +54,7 @@ func TestDefaultPacker_PackBuffer(t *testing.T) {
 	buf.Release()
 
 	t.Logf("seq: %d", message.Seq)
-	t.Logf("node id: %d", message.NodeID)
+	t.Logf("node id: %d", message.GameID)
 	t.Logf("message id: %d", message.MessageID)
 	t.Logf("buffer: %s", string(message.Buffer))
 }
@@ -64,7 +62,7 @@ func TestDefaultPacker_PackBuffer(t *testing.T) {
 func TestDefaultPacker_PackMessage(t *testing.T) {
 	data, err := packer.PackMessage(&packet.Message{
 		Seq:       1,
-		NodeID:    1,
+		GameID:    1,
 		MessageID: 1001,
 		Buffer:    []byte("hello world"),
 	})
@@ -80,31 +78,15 @@ func TestDefaultPacker_PackMessage(t *testing.T) {
 	}
 
 	t.Logf("seq: %d", message.Seq)
-	t.Logf("node id: %d", message.NodeID)
+	t.Logf("game id: %d", message.GameID)
 	t.Logf("message id: %d", message.MessageID)
 	t.Logf("buffer: %s", string(message.Buffer))
-}
-
-func TestDefaultPacker_PackHeartbeat(t *testing.T) {
-	data, err := packer.PackHeartbeat()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Log(data)
-
-	isHeartbeat, err := packer.CheckHeartbeat(data)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Log(isHeartbeat)
 }
 
 func BenchmarkDefaultPacker_ReadBuffer(b *testing.B) {
 	data, err := packer.PackMessage(&packet.Message{
 		Seq:       1,
-		NodeID:    1,
+		GameID:    1,
 		MessageID: 1001,
 		Buffer:    []byte(xrand.Letters(2048)),
 	})
@@ -131,7 +113,7 @@ func BenchmarkDefaultPacker_ReadBuffer(b *testing.B) {
 func BenchmarkDefaultPacker_ReadMessage(b *testing.B) {
 	data, err := packer.PackMessage(&packet.Message{
 		Seq:       1,
-		NodeID:    1,
+		GameID:    1,
 		MessageID: 1001,
 		Buffer:    []byte(xrand.Letters(2048)),
 	})
@@ -162,7 +144,7 @@ func BenchmarkDefaultPacker_PackBuffer(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		buf, err := packer.PackBuffer(&packet.Message{
 			Seq:       1,
-			NodeID:    1,
+			GameID:    1,
 			MessageID: 1001,
 			Buffer:    buffer,
 		})
@@ -183,7 +165,7 @@ func BenchmarkDefaultPacker_PackMessage(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, err := packer.PackMessage(&packet.Message{
 			Seq:       1,
-			NodeID:    1,
+			GameID:    1,
 			MessageID: 1001,
 			Buffer:    buffer,
 		})
@@ -196,7 +178,7 @@ func BenchmarkDefaultPacker_PackMessage(b *testing.B) {
 func BenchmarkDefaultPacker_UnpackMessage(b *testing.B) {
 	buf, err := packer.PackMessage(&packet.Message{
 		Seq:       1,
-		NodeID:    1,
+		GameID:    1,
 		MessageID: 1001,
 		Buffer:    []byte(xrand.Letters(1024)),
 	})

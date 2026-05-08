@@ -50,8 +50,8 @@ func (e *event) Seq() int32 {
 	return 0
 }
 
-// NodeID 获取消息节点ID
-func (e *event) NodeID() int32 {
+// GameID 获取消息游戏ID
+func (e *event) GameID() int32 {
 	return 0
 }
 

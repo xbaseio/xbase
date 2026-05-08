@@ -10,7 +10,7 @@ import (
 
 func TestEncodePublishReq(t *testing.T) {
 	message, err := packet.PackMessage(&packet.Message{
-		NodeID:    1,
+		GameID:    1,
 		MessageID: 1001,
 		Seq:       2,
 		Buffer:    []byte("hello world"),
@@ -26,7 +26,7 @@ func TestEncodePublishReq(t *testing.T) {
 
 func TestDecodePublishReq(t *testing.T) {
 	message, err := packet.PackMessage(&packet.Message{
-		NodeID:    1,
+		GameID:    1,
 		MessageID: 1001,
 		Seq:       2,
 		Buffer:    []byte("hello world"),

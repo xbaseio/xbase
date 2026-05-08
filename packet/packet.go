@@ -46,13 +46,3 @@ func PackMessage(message *Message) ([]byte, error) {
 func UnpackMessage(data []byte) (*Message, int, error) {
 	return globalPacker.UnpackMessage(data)
 }
-
-// PackHeartbeat 打包心跳
-func PackHeartbeat() ([]byte, error) {
-	return globalPacker.PackHeartbeat()
-}
-
-// CheckHeartbeat 检测心跳包
-func CheckHeartbeat(data []byte) (bool, error) {
-	return globalPacker.CheckHeartbeat(data)
-}

@@ -454,7 +454,7 @@ func (n *Node) printInfo() {
 	infos = append(infos, fmt.Sprintf("Codec: %s", n.opts.codec.Name()))
 	infos = append(infos, fmt.Sprintf("Locator: %s", n.opts.locator.Name()))
 	infos = append(infos, fmt.Sprintf("Registry: %s", n.opts.registry.Name()))
-
+	infos = append(infos, fmt.Sprintf("NodeKind: %s", n.opts.nodeKind.String()))
 	if n.opts.encryptor != nil {
 		infos = append(infos, fmt.Sprintf("Encryptor: %s", n.opts.encryptor.Name()))
 	} else {

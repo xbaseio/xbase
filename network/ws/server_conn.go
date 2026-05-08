@@ -9,7 +9,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
-	"github.com/xbaseio/xbase/packet"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/utils/xnet"
 	"github.com/xbaseio/xbase/utils/xtime"
@@ -17,19 +16,26 @@ import (
 )
 
 type serverConn struct {
-	id                int64           // 连接ID
-	uid               atomic.Int64    // 用户ID
-	attr              *attr           // 连接属性
-	state             atomic.Int32    // 连接状态
-	connMgr           *serverConnMgr  // 连接管理
-	rw                sync.RWMutex    // 锁
-	conn              *websocket.Conn // WS源连接
-	chLowWrite        chan chWrite    // 低级队列
-	chHighWrite       chan chWrite    // 优先队列
-	done              chan struct{}   // 写入完成信号
-	close             chan struct{}   // 关闭信号
-	lastHeartbeatTime atomic.Int64    // 上次心跳时间
-	authorizeTimer    atomic.Value    // 授权定时器
+	id      int64          // 连接ID
+	uid     atomic.Int64   // 用户ID
+	attr    *attr          // 连接属性
+	state   atomic.Int32   // 连接状态
+	connMgr *serverConnMgr // 连接管理
+
+	rw     sync.RWMutex // conn 保护锁
+	sendMu sync.Mutex   // 发送锁，保护 Send/Push/closeSig 和 channel close 的并发安全
+
+	conn        *websocket.Conn // WS源连接
+	chLowWrite  chan chWrite    // 低优先级队列
+	chHighWrite chan chWrite    // 高优先级队列
+	done        chan struct{}   // 写入完成信号，使用 close 通知
+	close       chan struct{}   // 关闭信号
+
+	doneOnce  sync.Once
+	closeOnce sync.Once
+
+	lastHeartbeatTime atomic.Int64 // 上次心跳时间
+	authorizeTimer    atomic.Value // 授权定时器
 }
 
 var _ network.Conn = &serverConn{}
@@ -52,51 +58,59 @@ func (c *serverConn) Attr() network.Attr {
 // Bind 绑定用户ID
 func (c *serverConn) Bind(uid int64) {
 	c.uid.Store(uid)
-
 	c.uncheckAuthorize()
 }
 
 // Unbind 解绑用户ID
 func (c *serverConn) Unbind() {
 	c.uid.Store(0)
-
 	c.checkAuthorize()
 }
 
-// Send 发送消息（同步）
-func (c *serverConn) Send(msg []byte) (err error) {
-	if err := c.checkState(); err != nil {
-		return err
-	}
-
-	c.rw.RLock()
-	defer c.rw.RUnlock()
-
-	if c.conn == nil {
-		return xerrors.ErrConnectionClosed
-	}
-
-	c.chHighWrite <- chWrite{typ: dataPacket, msg: msg}
-
-	return nil
+// Send 发送消息。
+// 注意：gorilla/websocket 不允许并发写，这里仍然走高优先级写队列。
+func (c *serverConn) Send(msg []byte) error {
+	return c.enqueueWrite(c.chHighWrite, msg)
 }
 
 // Push 发送消息（异步）
 func (c *serverConn) Push(msg []byte) error {
+	return c.enqueueWrite(c.chLowWrite, msg)
+}
+
+func (c *serverConn) enqueueWrite(ch chan chWrite, msg []byte) error {
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
+
 	if err := c.checkState(); err != nil {
 		return err
 	}
 
-	c.rw.RLock()
-	defer c.rw.RUnlock()
+	if len(msg) == 0 {
+		return nil
+	}
 
-	if c.conn == nil {
+	if c.getConn() == nil {
 		return xerrors.ErrConnectionClosed
 	}
 
-	c.chLowWrite <- chWrite{typ: dataPacket, msg: msg}
+	select {
+	case <-c.close:
+		return xerrors.ErrConnectionClosed
 
-	return nil
+	default:
+	}
+
+	select {
+	case ch <- chWrite{typ: dataPacket, msg: msg}:
+		if c.isClosed() {
+			return xerrors.ErrConnectionClosed
+		}
+		return nil
+
+	case <-c.close:
+		return xerrors.ErrConnectionClosed
+	}
 }
 
 // State 获取连接状态
@@ -108,9 +122,9 @@ func (c *serverConn) State() network.ConnState {
 func (c *serverConn) Close(force ...bool) error {
 	if len(force) > 0 && force[0] {
 		return c.forceClose(true)
-	} else {
-		return c.graceClose(true)
 	}
+
+	return c.graceClose(true)
 }
 
 // LocalIP 获取本地IP
@@ -129,10 +143,7 @@ func (c *serverConn) LocalAddr() (net.Addr, error) {
 		return nil, err
 	}
 
-	c.rw.RLock()
-	conn := c.conn
-	c.rw.RUnlock()
-
+	conn := c.getConn()
 	if conn == nil {
 		return nil, xerrors.ErrConnectionClosed
 	}
@@ -156,10 +167,7 @@ func (c *serverConn) RemoteAddr() (net.Addr, error) {
 		return nil, err
 	}
 
-	c.rw.RLock()
-	conn := c.conn
-	c.rw.RUnlock()
-
+	conn := c.getConn()
 	if conn == nil {
 		return nil, xerrors.ErrConnectionClosed
 	}
@@ -169,6 +177,12 @@ func (c *serverConn) RemoteAddr() (net.Addr, error) {
 
 // 初始化连接
 func (c *serverConn) init(cm *serverConnMgr, id int64, conn *websocket.Conn) {
+	// 如果 serverConn 会被复用，锁、Once、channel 必须重新初始化。
+	c.rw = sync.RWMutex{}
+	c.sendMu = sync.Mutex{}
+	c.doneOnce = sync.Once{}
+	c.closeOnce = sync.Once{}
+
 	c.id = id
 	c.uid.Store(0)
 	c.attr = &attr{}
@@ -183,7 +197,6 @@ func (c *serverConn) init(cm *serverConnMgr, id int64, conn *websocket.Conn) {
 	c.authorizeTimer.Store((*time.Timer)(nil))
 
 	xcall.Go(c.read)
-
 	xcall.Go(c.write)
 
 	c.checkAuthorize()
@@ -212,225 +225,282 @@ func (c *serverConn) checkState() error {
 
 // 授权检查
 func (c *serverConn) checkAuthorize() {
-	if c.connMgr.server.opts.authorizeTimeout > 0 {
-		timer := c.authorizeTimer.Swap(time.AfterFunc(c.connMgr.server.opts.authorizeTimeout, func() {
-			if c.UID() != 0 {
-				return
-			}
+	if c.connMgr.server.opts.authorizeTimeout <= 0 {
+		return
+	}
 
-			c.forceClose(true)
-		}))
-		if t, ok := timer.(*time.Timer); ok && t != nil {
-			t.Stop()
+	// 连接对象可能被复用，timer 回调必须绑定当前连接ID，
+	// 防止旧连接的 timer 误关新连接。
+	connID := c.ID()
+
+	timer := c.authorizeTimer.Swap(time.AfterFunc(c.connMgr.server.opts.authorizeTimeout, func() {
+		if c.ID() != connID {
+			return
 		}
+
+		if c.UID() != 0 {
+			return
+		}
+
+		_ = c.forceCloseIfCurrent(connID, true)
+	}))
+
+	if t, ok := timer.(*time.Timer); ok && t != nil {
+		t.Stop()
 	}
 }
 
 // 取消授权检查
 func (c *serverConn) uncheckAuthorize() {
-	if c.connMgr.server.opts.authorizeTimeout > 0 {
-		timer := c.authorizeTimer.Swap((*time.Timer)(nil))
+	if c.connMgr.server.opts.authorizeTimeout <= 0 {
+		return
+	}
 
-		if t, ok := timer.(*time.Timer); ok && t != nil {
-			t.Stop()
-		}
+	timer := c.authorizeTimer.Swap((*time.Timer)(nil))
+	if t, ok := timer.(*time.Timer); ok && t != nil {
+		t.Stop()
 	}
 }
 
 // 优雅关闭
 func (c *serverConn) graceClose(isNeedRecycle bool) error {
 	if !c.state.CompareAndSwap(int32(network.ConnOpened), int32(network.ConnHanged)) {
-		return xerrors.ErrConnectionNotOpened
-	}
+		switch c.State() {
+		case network.ConnHanged:
+			<-c.done
+			return c.finishGraceClose(isNeedRecycle)
 
-	c.uncheckAuthorize()
+		case network.ConnClosed:
+			return nil
 
-	c.rw.RLock()
-	if c.conn == nil {
-		c.rw.RUnlock()
-		return xerrors.ErrConnectionClosed
-	}
-	c.chLowWrite <- chWrite{typ: closeSig}
-	c.rw.RUnlock()
-
-	<-c.done
-
-	if !c.state.CompareAndSwap(int32(network.ConnHanged), int32(network.ConnClosed)) {
-		return xerrors.ErrConnectionNotHanged
-	}
-
-	return c.doClose(isNeedRecycle)
-}
-
-// 强制关闭
-func (c *serverConn) forceClose(isNeedRecycle bool) error {
-	if !c.state.CompareAndSwap(int32(network.ConnOpened), int32(network.ConnClosed)) {
-		if !c.state.CompareAndSwap(int32(network.ConnHanged), int32(network.ConnClosed)) {
-			return xerrors.ErrConnectionClosed
+		default:
+			return xerrors.ErrConnectionNotOpened
 		}
 	}
 
 	c.uncheckAuthorize()
 
-	return c.doClose(isNeedRecycle)
+	// 等待已经进入 Send/Push 的请求完成。
+	// ConnHanged 后新的 Send/Push 会被拒绝。
+	c.sendMu.Lock()
+
+	if c.State() == network.ConnClosed {
+		c.sendMu.Unlock()
+		return nil
+	}
+
+	if c.getConn() == nil {
+		c.sendMu.Unlock()
+		return c.finishGraceClose(isNeedRecycle)
+	}
+
+	select {
+	case c.chLowWrite <- chWrite{typ: closeSig}:
+		c.sendMu.Unlock()
+
+	case <-c.close:
+		c.sendMu.Unlock()
+		return nil
+	}
+
+	<-c.done
+	return c.finishGraceClose(isNeedRecycle)
+}
+
+func (c *serverConn) finishGraceClose(isNeedRecycle bool) error {
+	if c.state.CompareAndSwap(int32(network.ConnHanged), int32(network.ConnClosed)) {
+		return c.doClose(isNeedRecycle)
+	}
+
+	if c.State() == network.ConnClosed {
+		return nil
+	}
+
+	return xerrors.ErrConnectionNotHanged
+}
+
+// 强制关闭
+func (c *serverConn) forceClose(isNeedRecycle bool) error {
+	for {
+		state := c.State()
+
+		switch state {
+		case network.ConnClosed:
+			return xerrors.ErrConnectionClosed
+
+		case network.ConnOpened, network.ConnHanged:
+			if c.state.CompareAndSwap(int32(state), int32(network.ConnClosed)) {
+				c.uncheckAuthorize()
+				return c.doClose(isNeedRecycle)
+			}
+
+		default:
+			return xerrors.ErrConnectionClosed
+		}
+	}
+}
+
+func (c *serverConn) forceCloseIfCurrent(connID int64, isNeedRecycle bool) error {
+	if c.ID() != connID {
+		return nil
+	}
+
+	return c.forceClose(isNeedRecycle)
 }
 
 // 执行关闭操作
 func (c *serverConn) doClose(isNeedRecycle bool) error {
-	c.rw.Lock()
+	var closeErr error
 
-	if c.conn == nil {
+	c.closeOnce.Do(func() {
+		c.uncheckAuthorize()
+
+		// 先关闭 close，让 Send/Push/graceClose/read/write 中的 select 退出。
+		close(c.close)
+
+		// done 使用 close 通知，避免无缓冲 channel 发送卡死。
+		c.notifyDone()
+
+		// 等待正在 Send/Push 的 goroutine 退出，然后再关闭写队列。
+		// 这样可以避免 close(channel) 和 channel <- value 并发导致 panic。
+		c.sendMu.Lock()
+		close(c.chHighWrite)
+		close(c.chLowWrite)
+		c.sendMu.Unlock()
+
+		c.rw.Lock()
+		conn := c.conn
+		c.conn = nil
 		c.rw.Unlock()
-		return xerrors.ErrConnectionClosed
-	}
 
-	close(c.chLowWrite)
-	close(c.chHighWrite)
-	close(c.close)
-	close(c.done)
-	conn := c.conn
-	c.conn = nil
+		if conn != nil {
+			closeErr = conn.Close()
+		} else {
+			closeErr = xerrors.ErrConnectionClosed
+		}
 
-	c.rw.Unlock()
+		if c.connMgr.server.disconnectHandler != nil {
+			c.connMgr.server.disconnectHandler(c)
+		}
 
-	err := conn.Close()
+		if isNeedRecycle && conn != nil {
+			c.connMgr.recycle(conn)
+		}
+	})
 
-	if c.connMgr.server.disconnectHandler != nil {
-		c.connMgr.server.disconnectHandler(c)
-	}
-
-	if isNeedRecycle {
-		c.connMgr.recycle(conn)
-	}
-
-	return err
+	return closeErr
 }
 
 // 读取消息
 func (c *serverConn) read() {
-	conn := c.conn
+	connID := c.ID()
+	conn := c.getConn()
+	closeCh := c.close
+
+	if conn == nil {
+		_ = c.forceCloseIfCurrent(connID, true)
+		return
+	}
 
 	for {
 		select {
-		case <-c.close:
+		case <-closeCh:
 			return
 		default:
-			msgType, msgData, err := conn.ReadMessage()
-			if err != nil {
-				if !xerrors.Is(err, net.ErrClosed) {
-					if _, ok := err.(*websocket.CloseError); !ok {
-						log.Warnf("read message failed: %d %v", c.id, err)
-					}
-				}
-				_ = c.forceClose(true)
-				return
-			}
+		}
 
-			if msgType != websocket.BinaryMessage {
-				continue
-			}
-
-			if c.connMgr.server.opts.heartbeatInterval > 0 {
-				c.lastHeartbeatTime.Store(xtime.Now().UnixNano())
-			}
-
-			switch c.State() {
-			case network.ConnHanged:
-				continue
-			case network.ConnClosed:
-				return
-			default:
-				// ignore
-			}
-
-			// ignore empty packet
-			if len(msgData) == 0 {
-				continue
-			}
-
-			// check heartbeat packet
-			isHeartbeat, err := packet.CheckHeartbeat(msgData)
-			if err != nil {
-				log.Errorf("check heartbeat message error: %v", err)
-				continue
-			}
-
-			// ignore heartbeat packet
-			if isHeartbeat {
-				// responsive heartbeat
-				if c.connMgr.server.opts.heartbeatMechanism == RespHeartbeat {
-					c.rw.RLock()
-					if c.conn != nil {
-						c.chHighWrite <- chWrite{typ: heartbeatPacket}
-					}
-					c.rw.RUnlock()
-				}
-			} else {
-				if c.connMgr.server.receiveHandler != nil {
-					c.connMgr.server.receiveHandler(c, msgData)
+		msgType, msgData, err := conn.ReadMessage()
+		if err != nil {
+			if !xerrors.Is(err, net.ErrClosed) {
+				if _, ok := err.(*websocket.CloseError); !ok {
+					log.Warnf("read message failed: %d %v", c.id, err)
 				}
 			}
+
+			_ = c.forceCloseIfCurrent(connID, true)
+			return
+		}
+
+		if msgType != websocket.BinaryMessage {
+			continue
+		}
+
+		switch c.State() {
+		case network.ConnHanged:
+			continue
+
+		case network.ConnClosed:
+			return
+
+		default:
+			// ignore
+		}
+
+		// ignore empty packet
+		if len(msgData) == 0 {
+			continue
+		}
+
+		if c.connMgr.server.receiveHandler != nil {
+			c.connMgr.server.receiveHandler(c, msgData)
 		}
 	}
 }
 
 // 写入消息
-// 由于gorilla/websocket库并发写入的限制，同时为了保证心跳能够优先下发到客户端，故而实现一个优先队列
+// gorilla/websocket 不允许并发写入。
+// 所有写入统一进入一个 write goroutine。
+// chHighWrite 优先级高，适合心跳、关键控制包。
+// chLowWrite 优先级低，适合普通业务消息。
 func (c *serverConn) write() {
-	var (
-		conn   = c.conn
-		ticker *time.Ticker
-	)
-
-	if c.connMgr.server.opts.heartbeatInterval > 0 {
-		ticker = time.NewTicker(c.connMgr.server.opts.heartbeatInterval)
-		defer ticker.Stop()
-	} else {
-		ticker = &time.Ticker{C: make(chan time.Time, 1)}
-	}
+	connID := c.ID()
+	closeCh := c.close
+	chHighWrite := c.chHighWrite
+	chLowWrite := c.chLowWrite
 
 	for {
+		// 优先处理 close，避免强关时卡在写队列。
 		select {
-		case r, ok := <-c.chHighWrite:
-			if !ok {
-				return
-			}
-
-			if !c.doWrite(conn, r) {
-				return
-			}
-		case t, ok := <-ticker.C:
-			if !ok {
-				return
-			}
-
-			if !c.doHandleHeartbeat(conn, t) {
-				return
-			}
+		case <-closeCh:
+			return
 		default:
+		}
+
+		// 第一层：非阻塞优先取高优先级消息。
+		select {
+		case r, ok := <-chHighWrite:
+			if !ok {
+				c.notifyDone()
+				return
+			}
+
+			if !c.doWrite(connID, r) {
+				return
+			}
+
+		default:
+			// 第二层：高低队列同时等待，但高优先级仍然有机会先被取到。
 			select {
-			case r, ok := <-c.chHighWrite:
+			case <-closeCh:
+				return
+
+			case r, ok := <-chHighWrite:
 				if !ok {
+					c.notifyDone()
 					return
 				}
 
-				if !c.doWrite(conn, r) {
-					return
-				}
-			case r, ok := <-c.chLowWrite:
-				if !ok {
+				if !c.doWrite(connID, r) {
 					return
 				}
 
-				if !c.doWrite(conn, r) {
-					return
-				}
-			case t, ok := <-ticker.C:
+			case r, ok := <-chLowWrite:
 				if !ok {
+					c.notifyDone()
 					return
 				}
 
-				if !c.doHandleHeartbeat(conn, t) {
+				if !c.doWrite(connID, r) {
 					return
 				}
 			}
@@ -439,27 +509,28 @@ func (c *serverConn) write() {
 }
 
 // 执行写入操作
-func (c *serverConn) doWrite(conn *websocket.Conn, r chWrite) bool {
+func (c *serverConn) doWrite(connID int64, r chWrite) bool {
 	if r.typ == closeSig {
-		c.rw.RLock()
-		if c.conn != nil {
-			c.done <- struct{}{}
-		}
-		c.rw.RUnlock()
+		c.notifyDone()
 		return false
+	}
+
+	if r.typ != dataPacket {
+		return true
+	}
+
+	if len(r.msg) == 0 {
+		return true
 	}
 
 	if c.isClosed() {
 		return false
 	}
 
-	if r.typ == heartbeatPacket {
-		if msg, err := packet.PackHeartbeat(); err != nil {
-			log.Errorf("pack heartbeat message error: %v", err)
-			return true
-		} else {
-			r.msg = msg
-		}
+	conn := c.getConn()
+	if conn == nil {
+		_ = c.forceCloseIfCurrent(connID, true)
+		return false
 	}
 
 	if err := conn.WriteMessage(websocket.BinaryMessage, r.msg); err != nil {
@@ -468,34 +539,9 @@ func (c *serverConn) doWrite(conn *websocket.Conn, r chWrite) bool {
 				log.Errorf("write message error: %v", err)
 			}
 		}
-	}
 
-	return true
-}
-
-// 处理心跳
-func (c *serverConn) doHandleHeartbeat(conn *websocket.Conn, t time.Time) bool {
-	deadline := t.Add(-2 * c.connMgr.server.opts.heartbeatInterval).UnixNano()
-
-	if c.lastHeartbeatTime.Load() < deadline {
-		log.Debugf("connection heartbeat timeout, cid: %d", c.id)
-		_ = c.forceClose(true)
+		_ = c.forceCloseIfCurrent(connID, true)
 		return false
-	} else {
-		if c.connMgr.server.opts.heartbeatMechanism == TickHeartbeat {
-			if c.isClosed() {
-				return false
-			}
-
-			if heartbeat, err := packet.PackHeartbeat(); err != nil {
-				log.Errorf("pack heartbeat message error: %v", err)
-			} else {
-				// send heartbeat packet
-				if err := conn.WriteMessage(websocket.BinaryMessage, heartbeat); err != nil {
-					log.Errorf("write heartbeat message error: %v", err)
-				}
-			}
-		}
 	}
 
 	return true
@@ -504,4 +550,17 @@ func (c *serverConn) doHandleHeartbeat(conn *websocket.Conn, t time.Time) bool {
 // 是否已关闭
 func (c *serverConn) isClosed() bool {
 	return c.State() == network.ConnClosed
+}
+
+func (c *serverConn) getConn() *websocket.Conn {
+	c.rw.RLock()
+	conn := c.conn
+	c.rw.RUnlock()
+	return conn
+}
+
+func (c *serverConn) notifyDone() {
+	c.doneOnce.Do(func() {
+		close(c.done)
+	})
 }

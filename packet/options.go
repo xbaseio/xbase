@@ -7,37 +7,20 @@ import (
 	"github.com/xbaseio/xbase/etc"
 )
 
-// heartbeat packet
-// ------------------------------------------------------------------------------
-// | size(4 byte) = (1 byte + 8 byte) | header(1 byte) | heartbeat time(8 byte) |
-// ------------------------------------------------------------------------------
-
-// data packet
-// -----------------------------------------------------------------------------------------------------------------------
-// | size(4 byte) = (1 byte + n byte + m byte + x byte) | header(1 byte) | route(n byte) | seq(m byte) | message(x byte) |
-// -----------------------------------------------------------------------------------------------------------------------
-
 const (
 	littleEndian = "little"
 	bigEndian    = "big"
 )
 
 const (
-	defaultSizeBytes          = 4
-	defaultHeaderBytes        = 4
-	defaultNodeIDBytes        = 4
-	defaultMessageIDBytes     = 4
-	defaultSeqBytes           = 4
-	defaultBufferBytes        = 5000
-	defaultHeartbeatTime      = false
-	defaultHeartbeatTimeBytes = 8
-	defaultHeaderSize         = 16
+	defaultSizeBytes   = 4
+	defaultBufferBytes = 65535
+	defaultHeaderSize  = 16
 )
 
 const (
-	defaultEndianKey        = "etc.packet.byteOrder"
-	defaultBufferBytesKey   = "etc.packet.bufferBytes"
-	defaultHeartbeatTimeKey = "etc.packet.heartbeatTime"
+	defaultEndianKey      = "etc.packet.byteOrder"
+	defaultBufferBytesKey = "etc.packet.bufferBytes"
 )
 
 type options struct {
@@ -48,19 +31,14 @@ type options struct {
 	// 消息字节数
 	// 默认为5000字节
 	bufferBytes int
-
-	// 是否携带心跳时间
-	// 默认为false
-	heartbeatTime bool
 }
 
 type Option func(o *options)
 
 func defaultOptions() *options {
 	opts := &options{
-		byteOrder:     binary.BigEndian,
-		bufferBytes:   etc.Get(defaultBufferBytesKey, defaultBufferBytes).Int(),
-		heartbeatTime: etc.Get(defaultHeartbeatTimeKey, defaultHeartbeatTime).Bool(),
+		byteOrder:   binary.BigEndian,
+		bufferBytes: etc.Get(defaultBufferBytesKey, defaultBufferBytes).Int(),
 	}
 
 	endian := etc.Get(defaultEndianKey, bigEndian).String()
@@ -82,9 +60,4 @@ func WithByteOrder(byteOrder binary.ByteOrder) Option {
 // WithBufferBytes 设置消息字节数
 func WithBufferBytes(bufferBytes int) Option {
 	return func(o *options) { o.bufferBytes = bufferBytes }
-}
-
-// WithHeartbeatTime 是否携带心跳时间
-func WithHeartbeatTime(heartbeatTime bool) Option {
-	return func(o *options) { o.heartbeatTime = heartbeatTime }
 }

@@ -100,7 +100,7 @@ func (c *Conn) Push(message *cluster.Message) error {
 
 	msg, err := packet.PackMessage(&packet.Message{
 		Seq:       message.Seq,
-		NodeID:    message.NodeID,
+		GameID:    message.GameID,
 		MessageID: message.MessageID,
 		Buffer:    buffer,
 	})

@@ -1,10 +1,10 @@
 package kcp
 
 import (
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
@@ -17,17 +17,21 @@ import (
 )
 
 type clientConn struct {
-	rw                sync.RWMutex
-	id                int64           // 连接ID
-	uid               int64           // 用户ID
-	attr              *attr           // 连接属性
-	conn              *kcp.UDPSession // UDP源连接
-	state             atomic.Int32    // 连接状态
-	client            *client         // 客户端
-	chWrite           chan chWrite    // 写入队列
-	done              chan struct{}   // 写入完成信号
-	close             chan struct{}   // 关闭信号
-	lastHeartbeatTime atomic.Int64    // 上次心跳时间
+	id     int64        // 连接ID
+	uid    atomic.Int64 // 用户ID
+	attr   *attr        // 连接属性
+	conn   atomic.Pointer[kcp.UDPSession]
+	state  atomic.Int32 // 连接状态
+	client *client      // 客户端
+
+	chWrite chan chWrite  // 写入队列
+	done    chan struct{} // 写入完成信号，使用 close 通知
+	close   chan struct{} // 关闭信号
+
+	doneOnce  sync.Once
+	closeOnce sync.Once
+
+	lastHeartbeatTime atomic.Int64 // 上次心跳时间
 }
 
 var _ network.Conn = &clientConn{}
@@ -36,22 +40,44 @@ func newClientConn(client *client, id int64, conn *kcp.UDPSession) network.Conn 
 	c := &clientConn{
 		id:      id,
 		attr:    &attr{},
-		conn:    conn,
 		client:  client,
 		chWrite: make(chan chWrite, 4096),
 		done:    make(chan struct{}),
 		close:   make(chan struct{}),
 	}
 
+	c.conn.Store(conn)
 	c.state.Store(int32(network.ConnOpened))
 	c.lastHeartbeatTime.Store(xtime.Now().UnixNano())
+
+	c.applyKCPOptions(conn)
+
+	xcall.Go(c.read)
+	xcall.Go(c.write)
+
+	if c.client.connectHandler != nil {
+		c.client.connectHandler(c)
+	}
+
+	return c
+}
+
+func (c *clientConn) applyKCPOptions(conn *kcp.UDPSession) {
+	if conn == nil {
+		return
+	}
 
 	if c.client.opts.mtu > 0 {
 		conn.SetMtu(c.client.opts.mtu)
 	}
 
 	if len(c.client.opts.noDelay) == 4 {
-		conn.SetNoDelay(c.client.opts.noDelay[0], c.client.opts.noDelay[1], c.client.opts.noDelay[2], c.client.opts.noDelay[3])
+		conn.SetNoDelay(
+			c.client.opts.noDelay[0],
+			c.client.opts.noDelay[1],
+			c.client.opts.noDelay[2],
+			c.client.opts.noDelay[3],
+		)
 	}
 
 	if c.client.opts.ackNoDelay {
@@ -63,7 +89,10 @@ func newClientConn(client *client, id int64, conn *kcp.UDPSession) network.Conn 
 	}
 
 	if len(c.client.opts.windowSize) == 2 {
-		conn.SetWindowSize(c.client.opts.windowSize[0], c.client.opts.windowSize[1])
+		conn.SetWindowSize(
+			c.client.opts.windowSize[0],
+			c.client.opts.windowSize[1],
+		)
 	}
 
 	if c.client.opts.readBuffer > 0 {
@@ -73,16 +102,6 @@ func newClientConn(client *client, id int64, conn *kcp.UDPSession) network.Conn 
 	if c.client.opts.writeBuffer > 0 {
 		conn.SetWriteBuffer(c.client.opts.writeBuffer)
 	}
-
-	xcall.Go(c.read)
-
-	xcall.Go(c.write)
-
-	if c.client.connectHandler != nil {
-		c.client.connectHandler(c)
-	}
-
-	return c
 }
 
 // ID 获取连接ID
@@ -92,7 +111,7 @@ func (c *clientConn) ID() int64 {
 
 // UID 获取用户ID
 func (c *clientConn) UID() int64 {
-	return atomic.LoadInt64(&c.uid)
+	return c.uid.Load()
 }
 
 // Attr 获取属性接口
@@ -102,48 +121,51 @@ func (c *clientConn) Attr() network.Attr {
 
 // Bind 绑定用户ID
 func (c *clientConn) Bind(uid int64) {
-	atomic.StoreInt64(&c.uid, uid)
+	c.uid.Store(uid)
 }
 
 // Unbind 解绑用户ID
 func (c *clientConn) Unbind() {
-	atomic.StoreInt64(&c.uid, 0)
+	c.uid.Store(0)
 }
 
-// Send 发送消息（同步）
+// Send 发送消息。
+// 无锁版里 Send 不直接写 conn，而是进入写队列。
+// 真正写 KCP 的地方只有 write() 一个 goroutine。
 func (c *clientConn) Send(msg []byte) error {
-	if err := c.checkState(); err != nil {
-		return err
-	}
-
-	c.rw.RLock()
-	conn := c.conn
-	c.rw.RUnlock()
-
-	if conn == nil {
-		return xerrors.ErrConnectionClosed
-	}
-
-	_, err := conn.Write(msg)
-	return err
+	return c.enqueueWrite(msg)
 }
 
 // Push 发送消息（异步）
 func (c *clientConn) Push(msg []byte) error {
-	if err := c.checkState(); err != nil {
-		return err
+	return c.enqueueWrite(msg)
+}
+
+func (c *clientConn) enqueueWrite(msg []byte) error {
+	if len(msg) == 0 {
+		return nil
 	}
 
-	c.rw.RLock()
-	defer c.rw.RUnlock()
+	if c.State() != network.ConnOpened {
+		return c.checkState()
+	}
 
-	if c.conn == nil {
+	if c.getConn() == nil {
 		return xerrors.ErrConnectionClosed
 	}
 
-	c.chWrite <- chWrite{typ: dataPacket, msg: msg}
+	select {
+	case c.chWrite <- chWrite{typ: dataPacket, msg: msg}:
+		// 无锁版本不保证关闭瞬间的强一致。
+		// 入队后如果连接状态已经变化，返回关闭错误。
+		if c.State() != network.ConnOpened {
+			return xerrors.ErrConnectionClosed
+		}
+		return nil
 
-	return nil
+	case <-c.close:
+		return xerrors.ErrConnectionClosed
+	}
 }
 
 // State 获取连接状态
@@ -155,9 +177,9 @@ func (c *clientConn) State() network.ConnState {
 func (c *clientConn) Close(force ...bool) error {
 	if len(force) > 0 && force[0] {
 		return c.forceClose()
-	} else {
-		return c.graceClose()
 	}
+
+	return c.graceClose()
 }
 
 // LocalIP 获取本地IP
@@ -176,10 +198,7 @@ func (c *clientConn) LocalAddr() (net.Addr, error) {
 		return nil, err
 	}
 
-	c.rw.RLock()
-	conn := c.conn
-	c.rw.RUnlock()
-
+	conn := c.getConn()
 	if conn == nil {
 		return nil, xerrors.ErrConnectionClosed
 	}
@@ -203,10 +222,7 @@ func (c *clientConn) RemoteAddr() (net.Addr, error) {
 		return nil, err
 	}
 
-	c.rw.RLock()
-	conn := c.conn
-	c.rw.RUnlock()
-
+	conn := c.getConn()
 	if conn == nil {
 		return nil, xerrors.ErrConnectionClosed
 	}
@@ -229,172 +245,180 @@ func (c *clientConn) checkState() error {
 // 优雅关闭
 func (c *clientConn) graceClose() error {
 	if !c.state.CompareAndSwap(int32(network.ConnOpened), int32(network.ConnHanged)) {
-		return xerrors.ErrConnectionNotOpened
+		switch c.State() {
+		case network.ConnHanged:
+			<-c.done
+			return c.finishGraceClose()
+
+		case network.ConnClosed:
+			return nil
+
+		default:
+			return xerrors.ErrConnectionNotOpened
+		}
 	}
 
-	c.rw.RLock()
-	if c.conn == nil {
-		c.rw.RUnlock()
-		return xerrors.ErrConnectionClosed
+	if c.getConn() == nil {
+		return c.finishGraceClose()
 	}
-	c.chWrite <- chWrite{typ: closeSig}
-	c.rw.RUnlock()
+
+	select {
+	case c.chWrite <- chWrite{typ: closeSig}:
+
+	case <-c.close:
+		return nil
+	}
 
 	<-c.done
+	return c.finishGraceClose()
+}
 
-	if !c.state.CompareAndSwap(int32(network.ConnHanged), int32(network.ConnClosed)) {
-		return xerrors.ErrConnectionNotHanged
+func (c *clientConn) finishGraceClose() error {
+	if c.state.CompareAndSwap(int32(network.ConnHanged), int32(network.ConnClosed)) {
+		return c.doClose()
 	}
 
-	return c.doClose()
+	if c.State() == network.ConnClosed {
+		return nil
+	}
+
+	return xerrors.ErrConnectionNotHanged
 }
 
 // 强制关闭
 func (c *clientConn) forceClose() error {
-	if !c.state.CompareAndSwap(int32(network.ConnOpened), int32(network.ConnClosed)) {
-		if !c.state.CompareAndSwap(int32(network.ConnHanged), int32(network.ConnClosed)) {
+	for {
+		state := c.State()
+
+		switch state {
+		case network.ConnClosed:
+			return xerrors.ErrConnectionClosed
+
+		case network.ConnOpened, network.ConnHanged:
+			if c.state.CompareAndSwap(int32(state), int32(network.ConnClosed)) {
+				return c.doClose()
+			}
+
+		default:
 			return xerrors.ErrConnectionClosed
 		}
 	}
-
-	return c.doClose()
 }
 
 // 执行关闭操作
 func (c *clientConn) doClose() error {
-	c.rw.Lock()
+	var closeErr error
 
-	if c.conn == nil {
-		c.rw.Unlock()
-		return xerrors.ErrConnectionClosed
-	}
+	c.closeOnce.Do(func() {
+		// 先关闭 close，让 Push/graceClose/read/write 里的 select 尽快退出。
+		close(c.close)
 
-	close(c.chWrite)
-	close(c.close)
-	close(c.done)
-	conn := c.conn
-	c.conn = nil
-	c.rw.Unlock()
+		// done 用 close 通知，避免无缓冲 channel 发送阻塞。
+		c.notifyDone()
 
-	err := conn.Close()
+		conn := c.conn.Swap(nil)
+		if conn != nil {
+			closeErr = conn.Close()
+		} else {
+			closeErr = xerrors.ErrConnectionClosed
+		}
 
-	if c.client.disconnectHandler != nil {
-		c.client.disconnectHandler(c)
-	}
+		if c.client.disconnectHandler != nil {
+			c.client.disconnectHandler(c)
+		}
+	})
 
-	return err
+	return closeErr
 }
 
 // 读取消息
 func (c *clientConn) read() {
-	conn := c.conn
+	conn := c.getConn()
+	closeCh := c.close
+
+	if conn == nil {
+		_ = c.forceClose()
+		return
+	}
 
 	for {
 		select {
-		case <-c.close:
+		case <-closeCh:
 			return
 		default:
-			data, err := packet.ReadMessage(conn)
-			if err != nil {
-				_ = c.forceClose()
-				return
-			}
+		}
 
-			if c.client.opts.heartbeatInterval > 0 {
-				c.lastHeartbeatTime.Store(xtime.Now().UnixNano())
-			}
+		data, err := packet.ReadMessage(conn)
+		if err != nil {
+			_ = c.forceClose()
+			return
+		}
 
-			switch c.State() {
-			case network.ConnHanged:
-				continue
-			case network.ConnClosed:
-				return
-			default:
-				// ignore
-			}
+		switch c.State() {
+		case network.ConnHanged:
+			continue
 
-			// ignore empty packet
-			if len(data) == 0 {
-				continue
-			}
+		case network.ConnClosed:
+			return
 
-			isHeartbeat, err := packet.CheckHeartbeat(data)
-			if err != nil {
-				log.Errorf("check heartbeat message error: %v", err)
-				continue
-			}
+		default:
+			// ignore
+		}
 
-			// ignore heartbeat packet
-			if isHeartbeat {
-				continue
-			}
+		// ignore empty packet
+		if len(data) == 0 {
+			continue
+		}
 
-			if c.client.receiveHandler != nil {
-				c.client.receiveHandler(c, data)
-			}
+		if c.client.receiveHandler != nil {
+			c.client.receiveHandler(c, data)
 		}
 	}
 }
 
 // 写入消息
 func (c *clientConn) write() {
-	var (
-		conn   = c.conn
-		ticker *time.Ticker
-	)
-
-	if c.client.opts.heartbeatInterval > 0 {
-		ticker = time.NewTicker(c.client.opts.heartbeatInterval)
-		defer ticker.Stop()
-	} else {
-		ticker = &time.Ticker{C: make(chan time.Time, 1)}
-	}
+	closeCh := c.close
+	chWrite := c.chWrite
 
 	for {
 		select {
-		case r, ok := <-c.chWrite:
+		case <-closeCh:
+			return
+
+		case r, ok := <-chWrite:
 			if !ok {
+				c.notifyDone()
 				return
 			}
 
 			if r.typ == closeSig {
-				c.rw.RLock()
-				c.done <- struct{}{}
-				c.rw.RUnlock()
+				c.notifyDone()
 				return
+			}
+
+			if r.typ != dataPacket {
+				continue
+			}
+
+			if len(r.msg) == 0 {
+				continue
 			}
 
 			if c.isClosed() {
 				return
 			}
 
-			if _, err := conn.Write(r.msg); err != nil {
-				log.Errorf("write data message error: %v", err)
-			}
-		case t, ok := <-ticker.C:
-			if !ok {
-				return
-			}
-
-			deadline := t.Add(-2 * c.client.opts.heartbeatInterval).UnixNano()
-
-			if c.lastHeartbeatTime.Load() < deadline {
-				log.Debugf("connection heartbeat timeout")
+			conn := c.getConn()
+			if conn == nil {
 				_ = c.forceClose()
 				return
-			} else {
-				if c.isClosed() {
-					return
-				}
+			}
 
-				if heartbeat, err := packet.PackHeartbeat(); err != nil {
-					log.Errorf("pack heartbeat message error: %v", err)
-				} else {
-					// send heartbeat packet
-					if _, err := conn.Write(heartbeat); err != nil {
-						log.Errorf("write heartbeat message error: %v", err)
-					}
-				}
+			if err := c.writeFull(conn, r.msg); err != nil {
+				log.Errorf("write data message error: %v", err)
+				_ = c.forceClose()
+				return
 			}
 		}
 	}
@@ -402,5 +426,32 @@ func (c *clientConn) write() {
 
 // 是否已关闭
 func (c *clientConn) isClosed() bool {
-	return network.ConnState(c.state.Load()) == network.ConnClosed
+	return c.State() == network.ConnClosed
+}
+
+func (c *clientConn) getConn() *kcp.UDPSession {
+	return c.conn.Load()
+}
+
+func (c *clientConn) notifyDone() {
+	c.doneOnce.Do(func() {
+		close(c.done)
+	})
+}
+
+func (c *clientConn) writeFull(conn net.Conn, data []byte) error {
+	for len(data) > 0 {
+		n, err := conn.Write(data)
+		if err != nil {
+			return err
+		}
+
+		if n <= 0 {
+			return io.ErrShortWrite
+		}
+
+		data = data[n:]
+	}
+
+	return nil
 }

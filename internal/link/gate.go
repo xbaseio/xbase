@@ -32,7 +32,7 @@ func NewGateLinker(ctx context.Context, opts *Options) *GateLinker {
 	l := &GateLinker{
 		ctx:        ctx,
 		opts:       opts,
-		builder:    gate.NewBuilder(&gate.Options{InsID: opts.InsID, InsKind: opts.InsKind}),
+		builder:    gate.NewBuilder(&gate.Options{InsID: opts.InsID, InsKind: opts.InsKind, NodeKind: opts.NodeKind, GameID: opts.GameID}),
 		dispatcher: dispatcher.NewDispatcher(opts.Dispatch),
 	}
 
@@ -767,7 +767,7 @@ func (l *GateLinker) PackMessage(message *Message, encrypt bool) (*buffer.Nocopy
 
 	return packet.PackBuffer(&packet.Message{
 		Seq:       message.Seq,
-		NodeID:    message.NodeID,
+		GameID:    message.GameID,
 		MessageID: message.MessageID,
 		Buffer:    buf,
 	})

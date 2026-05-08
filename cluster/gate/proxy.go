@@ -23,6 +23,8 @@ func newProxy(gate *Gate) *proxy {
 		Locator:  gate.opts.locator,
 		Registry: gate.opts.registry,
 		Dispatch: gate.opts.dispatch,
+		NodeKind: gate.opts.nodeKind,
+		GameID:   gate.opts.gameID,
 	})}
 }
 
@@ -79,19 +81,19 @@ func (p *proxy) deliver(ctx context.Context, cid, uid int64, data []byte) {
 	if err = p.nodeLinker.Deliver(ctx, &link.DeliverArgs{
 		CID:       cid,
 		UID:       uid,
-		NodeID:    message.NodeID,
+		GameID:    message.GameID,
 		MessageID: message.MessageID,
 		Buffer:    data,
 	}); err != nil {
 		switch {
 		case xerrors.Is(err, xerrors.ErrNotFoundRoute), xerrors.Is(err, xerrors.ErrNotFoundEndpoint):
-			log.Warnf("deliver message failed, cid: %d uid: %d seq: %d node: %d message: %d err: %v", cid, uid, message.Seq, message.NodeID, message.MessageID, err)
+			log.Warnf("deliver message failed, cid: %d uid: %d seq: %d game: %d message: %d err: %v", cid, uid, message.Seq, message.GameID, message.MessageID, err)
 		default:
-			log.Errorf("deliver message failed, cid: %d uid: %d seq: %d node: %d message: %d err: %v", cid, uid, message.Seq, message.NodeID, message.MessageID, err)
+			log.Errorf("deliver message failed, cid: %d uid: %d seq: %d game: %d message: %d err: %v", cid, uid, message.Seq, message.GameID, message.MessageID, err)
 		}
 	} else {
 		if mode.IsDebugMode() {
-			log.Debugf("deliver message success, cid: %d uid: %d seq: %d node: %d message: %d", cid, uid, message.Seq, message.NodeID, message.MessageID)
+			log.Debugf("deliver message success, cid: %d uid: %d seq: %d game: %d message: %d", cid, uid, message.Seq, message.GameID, message.MessageID)
 		}
 	}
 }

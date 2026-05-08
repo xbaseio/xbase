@@ -12,7 +12,7 @@ import (
 
 func TestEncodeMulticastReq(t *testing.T) {
 	message, err := packet.PackMessage(&packet.Message{
-		NodeID:    1,
+		GameID:    1,
 		MessageID: 1001,
 		Seq:       2,
 		Buffer:    []byte("hello world"),
@@ -28,7 +28,7 @@ func TestEncodeMulticastReq(t *testing.T) {
 
 func TestDecodeMulticastReq(t *testing.T) {
 	message, err := packet.PackMessage(&packet.Message{
-		NodeID:    1,
+		GameID:    1,
 		MessageID: 1001,
 		Seq:       2,
 		Buffer:    []byte("hello world"),

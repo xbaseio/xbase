@@ -1,6 +1,7 @@
 package kcp
 
 import (
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -17,18 +18,25 @@ import (
 )
 
 type serverConn struct {
-	rw                sync.RWMutex    // 锁
-	id                int64           // 连接ID
-	uid               atomic.Int64    // 用户ID
-	attr              *attr           // 连接属性
-	state             atomic.Int32    // 连接状态
-	conn              *kcp.UDPSession // UDP源连接
-	connMgr           *serverConnMgr  // 连接管理
-	chWrite           chan chWrite    // 写入队列
-	done              chan struct{}   // 写入完成信号
-	close             chan struct{}   // 关闭信号
-	lastHeartbeatTime atomic.Int64    // 上次心跳时间
-	authorizeTimer    atomic.Value    // 授权定时器
+	id      int64        // 连接ID
+	uid     atomic.Int64 // 用户ID
+	attr    *attr        // 连接属性
+	state   atomic.Int32 // 连接状态
+	conn    atomic.Pointer[kcp.UDPSession]
+	connMgr *serverConnMgr // 连接管理
+
+	chWrite chan chWrite  // 写入队列
+	done    chan struct{} // 写入完成信号，使用 close 通知
+	close   chan struct{} // 关闭信号
+
+	doneOnce  sync.Once
+	closeOnce sync.Once
+
+	// generation 用来防止 serverConn 复用后，旧 read/write/timer 误关新连接
+	generation atomic.Int64
+
+	lastHeartbeatTime atomic.Int64 // 上次心跳时间
+	authorizeTimer    atomic.Value // 授权定时器
 }
 
 var _ network.Conn = &serverConn{}
@@ -51,51 +59,52 @@ func (c *serverConn) Attr() network.Attr {
 // Bind 绑定用户ID
 func (c *serverConn) Bind(uid int64) {
 	c.uid.Store(uid)
-
 	c.uncheckAuthorize()
 }
 
 // Unbind 解绑用户ID
 func (c *serverConn) Unbind() {
 	c.uid.Store(0)
-
 	c.checkAuthorize()
 }
 
-// Send 发送消息（同步）
+// Send 发送消息。
+// 无锁版里 Send 不直接写 conn，而是进入写队列。
+// 真正写 KCP 的地方只有 write() 一个 goroutine。
 func (c *serverConn) Send(msg []byte) error {
-	if err := c.checkState(); err != nil {
-		return err
-	}
-
-	c.rw.RLock()
-	conn := c.conn
-	c.rw.RUnlock()
-
-	if conn == nil {
-		return xerrors.ErrConnectionClosed
-	}
-
-	_, err := conn.Write(msg)
-	return err
+	return c.enqueueWrite(msg)
 }
 
 // Push 发送消息（异步）
 func (c *serverConn) Push(msg []byte) error {
-	if err := c.checkState(); err != nil {
-		return err
+	return c.enqueueWrite(msg)
+}
+
+func (c *serverConn) enqueueWrite(msg []byte) error {
+	if len(msg) == 0 {
+		return nil
 	}
 
-	c.rw.RLock()
-	defer c.rw.RUnlock()
+	if c.State() != network.ConnOpened {
+		return c.checkState()
+	}
 
-	if c.conn == nil {
+	if c.getConn() == nil {
 		return xerrors.ErrConnectionClosed
 	}
 
-	c.chWrite <- chWrite{typ: dataPacket, msg: msg}
+	select {
+	case c.chWrite <- chWrite{typ: dataPacket, msg: msg}:
+		// 无锁版本不保证关闭瞬间的强一致。
+		// 入队后如果连接状态已经变化，返回关闭错误。
+		if c.State() != network.ConnOpened {
+			return xerrors.ErrConnectionClosed
+		}
+		return nil
 
-	return nil
+	case <-c.close:
+		return xerrors.ErrConnectionClosed
+	}
 }
 
 // State 获取连接状态
@@ -107,9 +116,9 @@ func (c *serverConn) State() network.ConnState {
 func (c *serverConn) Close(force ...bool) error {
 	if len(force) > 0 && force[0] {
 		return c.forceClose(true)
-	} else {
-		return c.graceClose(true)
 	}
+
+	return c.graceClose(true)
 }
 
 // LocalIP 获取本地IP
@@ -128,10 +137,7 @@ func (c *serverConn) LocalAddr() (net.Addr, error) {
 		return nil, err
 	}
 
-	c.rw.RLock()
-	conn := c.conn
-	c.rw.RUnlock()
-
+	conn := c.getConn()
 	if conn == nil {
 		return nil, xerrors.ErrConnectionClosed
 	}
@@ -155,10 +161,7 @@ func (c *serverConn) RemoteAddr() (net.Addr, error) {
 		return nil, err
 	}
 
-	c.rw.RLock()
-	conn := c.conn
-	c.rw.RUnlock()
-
+	conn := c.getConn()
 	if conn == nil {
 		return nil, xerrors.ErrConnectionClosed
 	}
@@ -168,11 +171,17 @@ func (c *serverConn) RemoteAddr() (net.Addr, error) {
 
 // 初始化连接
 func (c *serverConn) init(cm *serverConnMgr, id int64, conn *kcp.UDPSession) {
+	// 如果 serverConn 会复用，Once/channel 必须重新初始化。
+	c.doneOnce = sync.Once{}
+	c.closeOnce = sync.Once{}
+
+	c.generation.Add(1)
+
 	c.id = id
 	c.uid.Store(0)
 	c.state.Store(int32(network.ConnOpened))
 	c.attr = &attr{}
-	c.conn = conn
+	c.conn.Store(conn)
 	c.connMgr = cm
 	c.chWrite = make(chan chWrite, 4096)
 	c.done = make(chan struct{})
@@ -180,12 +189,34 @@ func (c *serverConn) init(cm *serverConnMgr, id int64, conn *kcp.UDPSession) {
 	c.lastHeartbeatTime.Store(xtime.Now().UnixNano())
 	c.authorizeTimer.Store((*time.Timer)(nil))
 
+	c.applyKCPOptions(conn)
+
+	xcall.Go(c.read)
+	xcall.Go(c.write)
+
+	c.checkAuthorize()
+
+	if c.connMgr.server.connectHandler != nil {
+		c.connMgr.server.connectHandler(c)
+	}
+}
+
+func (c *serverConn) applyKCPOptions(conn *kcp.UDPSession) {
+	if conn == nil {
+		return
+	}
+
 	if c.connMgr.server.opts.mtu > 0 {
 		conn.SetMtu(c.connMgr.server.opts.mtu)
 	}
 
 	if len(c.connMgr.server.opts.noDelay) == 4 {
-		conn.SetNoDelay(c.connMgr.server.opts.noDelay[0], c.connMgr.server.opts.noDelay[1], c.connMgr.server.opts.noDelay[2], c.connMgr.server.opts.noDelay[3])
+		conn.SetNoDelay(
+			c.connMgr.server.opts.noDelay[0],
+			c.connMgr.server.opts.noDelay[1],
+			c.connMgr.server.opts.noDelay[2],
+			c.connMgr.server.opts.noDelay[3],
+		)
 	}
 
 	if c.connMgr.server.opts.ackNoDelay {
@@ -197,7 +228,10 @@ func (c *serverConn) init(cm *serverConnMgr, id int64, conn *kcp.UDPSession) {
 	}
 
 	if len(c.connMgr.server.opts.windowSize) == 2 {
-		conn.SetWindowSize(c.connMgr.server.opts.windowSize[0], c.connMgr.server.opts.windowSize[1])
+		conn.SetWindowSize(
+			c.connMgr.server.opts.windowSize[0],
+			c.connMgr.server.opts.windowSize[1],
+		)
 	}
 
 	if c.connMgr.server.opts.readBuffer > 0 {
@@ -206,16 +240,6 @@ func (c *serverConn) init(cm *serverConnMgr, id int64, conn *kcp.UDPSession) {
 
 	if c.connMgr.server.opts.writeBuffer > 0 {
 		conn.SetWriteBuffer(c.connMgr.server.opts.writeBuffer)
-	}
-
-	xcall.Go(c.read)
-
-	xcall.Go(c.write)
-
-	c.checkAuthorize()
-
-	if c.connMgr.server.connectHandler != nil {
-		c.connMgr.server.connectHandler(c)
 	}
 }
 
@@ -238,183 +262,258 @@ func (c *serverConn) checkState() error {
 
 // 授权检查
 func (c *serverConn) checkAuthorize() {
-	if c.connMgr.server.opts.authorizeTimeout > 0 {
-		timer := c.authorizeTimer.Swap(time.AfterFunc(c.connMgr.server.opts.authorizeTimeout, func() {
-			if c.UID() != 0 {
-				return
-			}
+	if c.connMgr.server.opts.authorizeTimeout <= 0 {
+		return
+	}
 
-			c.forceClose(true)
-		}))
-		if t, ok := timer.(*time.Timer); ok && t != nil {
-			t.Stop()
+	gen := c.generation.Load()
+
+	timer := c.authorizeTimer.Swap(time.AfterFunc(c.connMgr.server.opts.authorizeTimeout, func() {
+		// serverConn 可能复用，旧 timer 不能误关新连接
+		if c.generation.Load() != gen {
+			return
 		}
+
+		if c.UID() != 0 {
+			return
+		}
+
+		_ = c.forceCloseIfCurrent(gen, true)
+	}))
+
+	if t, ok := timer.(*time.Timer); ok && t != nil {
+		t.Stop()
 	}
 }
 
 // 取消授权检查
 func (c *serverConn) uncheckAuthorize() {
-	if c.connMgr.server.opts.authorizeTimeout > 0 {
-		timer := c.authorizeTimer.Swap((*time.Timer)(nil))
+	if c.connMgr.server.opts.authorizeTimeout <= 0 {
+		return
+	}
 
-		if t, ok := timer.(*time.Timer); ok && t != nil {
-			t.Stop()
-		}
+	timer := c.authorizeTimer.Swap((*time.Timer)(nil))
+	if t, ok := timer.(*time.Timer); ok && t != nil {
+		t.Stop()
 	}
 }
 
 // 优雅关闭
 func (c *serverConn) graceClose(isNeedRecycle bool) error {
 	if !c.state.CompareAndSwap(int32(network.ConnOpened), int32(network.ConnHanged)) {
-		return xerrors.ErrConnectionNotOpened
-	}
+		switch c.State() {
+		case network.ConnHanged:
+			<-c.done
+			return c.finishGraceClose(isNeedRecycle)
 
-	c.uncheckAuthorize()
+		case network.ConnClosed:
+			return nil
 
-	c.rw.RLock()
-	if c.conn == nil {
-		c.rw.RUnlock()
-		return xerrors.ErrConnectionClosed
-	}
-	c.chWrite <- chWrite{typ: closeSig}
-	c.rw.RUnlock()
-
-	<-c.done
-
-	if !c.state.CompareAndSwap(int32(network.ConnHanged), int32(network.ConnClosed)) {
-		return xerrors.ErrConnectionNotHanged
-	}
-
-	return c.doClose(isNeedRecycle)
-}
-
-// 强制关闭
-func (c *serverConn) forceClose(isNeedRecycle bool) error {
-	if !c.state.CompareAndSwap(int32(network.ConnOpened), int32(network.ConnClosed)) {
-		if !c.state.CompareAndSwap(int32(network.ConnHanged), int32(network.ConnClosed)) {
-			return xerrors.ErrConnectionClosed
+		default:
+			return xerrors.ErrConnectionNotOpened
 		}
 	}
 
 	c.uncheckAuthorize()
+
+	if c.getConn() == nil {
+		return c.finishGraceClose(isNeedRecycle)
+	}
+
+	select {
+	case c.chWrite <- chWrite{typ: closeSig}:
+
+	case <-c.close:
+		return nil
+	}
+
+	<-c.done
+	return c.finishGraceClose(isNeedRecycle)
+}
+
+func (c *serverConn) finishGraceClose(isNeedRecycle bool) error {
+	if c.state.CompareAndSwap(int32(network.ConnHanged), int32(network.ConnClosed)) {
+		return c.doClose(isNeedRecycle)
+	}
+
+	if c.State() == network.ConnClosed {
+		return nil
+	}
+
+	return xerrors.ErrConnectionNotHanged
+}
+
+// 强制关闭
+func (c *serverConn) forceClose(isNeedRecycle bool) error {
+	for {
+		state := c.State()
+
+		switch state {
+		case network.ConnClosed:
+			return xerrors.ErrConnectionClosed
+
+		case network.ConnOpened, network.ConnHanged:
+			if c.state.CompareAndSwap(int32(state), int32(network.ConnClosed)) {
+				c.uncheckAuthorize()
+				return c.doClose(isNeedRecycle)
+			}
+
+		default:
+			return xerrors.ErrConnectionClosed
+		}
+	}
+}
+
+func (c *serverConn) forceCloseIfCurrent(gen int64, isNeedRecycle bool) error {
+	for {
+		if c.generation.Load() != gen {
+			return nil
+		}
+
+		state := c.State()
+
+		switch state {
+		case network.ConnClosed:
+			return xerrors.ErrConnectionClosed
+
+		case network.ConnOpened, network.ConnHanged:
+			if c.generation.Load() != gen {
+				return nil
+			}
+
+			if c.state.CompareAndSwap(int32(state), int32(network.ConnClosed)) {
+				c.uncheckAuthorize()
+				return c.doCloseIfCurrent(gen, isNeedRecycle)
+			}
+
+		default:
+			return xerrors.ErrConnectionClosed
+		}
+	}
+}
+
+func (c *serverConn) doCloseIfCurrent(gen int64, isNeedRecycle bool) error {
+	if c.generation.Load() != gen {
+		return nil
+	}
 
 	return c.doClose(isNeedRecycle)
 }
 
 // 执行关闭操作
 func (c *serverConn) doClose(isNeedRecycle bool) error {
-	c.rw.Lock()
+	var closeErr error
 
-	if c.conn == nil {
-		c.rw.Unlock()
-		return xerrors.ErrConnectionClosed
-	}
+	c.closeOnce.Do(func() {
+		c.uncheckAuthorize()
 
-	close(c.chWrite)
-	close(c.close)
-	close(c.done)
-	conn := c.conn
-	c.conn = nil
-	c.rw.Unlock()
+		// 先关闭 close，让 Push/graceClose/read/write 里的 select 尽快退出。
+		close(c.close)
 
-	err := conn.Close()
+		// done 用 close 通知，避免无缓冲 channel 发送阻塞。
+		c.notifyDone()
 
-	if c.connMgr.server.disconnectHandler != nil {
-		c.connMgr.server.disconnectHandler(c)
-	}
+		conn := c.conn.Swap(nil)
+		if conn != nil {
+			closeErr = conn.Close()
+		} else {
+			closeErr = xerrors.ErrConnectionClosed
+		}
 
-	if isNeedRecycle {
-		c.connMgr.recycle(conn)
-	}
+		if c.connMgr.server.disconnectHandler != nil {
+			c.connMgr.server.disconnectHandler(c)
+		}
 
-	return err
+		if isNeedRecycle && conn != nil {
+			c.connMgr.recycle(conn)
+		}
+	})
+
+	return closeErr
 }
 
 // 读取消息
 func (c *serverConn) read() {
-	conn := c.conn
+	gen := c.generation.Load()
+	conn := c.getConn()
+	closeCh := c.close
+
+	if conn == nil {
+		_ = c.forceCloseIfCurrent(gen, true)
+		return
+	}
 
 	for {
 		select {
-		case <-c.close:
+		case <-closeCh:
 			return
 		default:
-			data, err := packet.ReadMessage(conn)
-			if err != nil {
-				_ = c.forceClose(true)
-				return
-			}
+		}
 
-			if c.connMgr.server.opts.heartbeatInterval > 0 {
-				c.lastHeartbeatTime.Store(xtime.Now().UnixNano())
-			}
+		data, err := packet.ReadMessage(conn)
+		if err != nil {
+			_ = c.forceCloseIfCurrent(gen, true)
+			return
+		}
 
-			switch c.State() {
-			case network.ConnHanged:
-				continue
-			case network.ConnClosed:
-				return
-			default:
-				// ignore
-			}
+		// 当前 goroutine 属于旧连接，连接对象已经被复用，直接退出
+		if c.generation.Load() != gen {
+			return
+		}
 
-			// ignore empty packet
-			if len(data) == 0 {
-				continue
-			}
+		switch c.State() {
+		case network.ConnHanged:
+			continue
 
-			isHeartbeat, err := packet.CheckHeartbeat(data)
-			if err != nil {
-				log.Errorf("check heartbeat message error: %v", err)
-				continue
-			}
+		case network.ConnClosed:
+			return
 
-			// ignore heartbeat packet
-			if isHeartbeat {
-				// responsive heartbeat
-				if c.connMgr.server.opts.heartbeatMechanism == RespHeartbeat {
-					if heartbeat, err := packet.PackHeartbeat(); err != nil {
-						log.Errorf("pack heartbeat message error: %v", err)
-					} else {
-						if _, err = conn.Write(heartbeat); err != nil {
-							log.Errorf("write heartbeat message error: %v", err)
-						}
-					}
-				}
-			} else {
-				if c.connMgr.server.receiveHandler != nil {
-					c.connMgr.server.receiveHandler(c, data)
-				}
-			}
+		default:
+			// ignore
+		}
+
+		// ignore empty packet
+		if len(data) == 0 {
+			continue
+		}
+
+		if c.connMgr.server.receiveHandler != nil {
+			c.connMgr.server.receiveHandler(c, data)
 		}
 	}
 }
 
 // 写入消息
 func (c *serverConn) write() {
-	var (
-		conn   = c.conn
-		ticker *time.Ticker
-	)
-
-	if c.connMgr.server.opts.heartbeatInterval > 0 {
-		ticker = time.NewTicker(c.connMgr.server.opts.heartbeatInterval)
-		defer ticker.Stop()
-	} else {
-		ticker = &time.Ticker{C: make(chan time.Time, 1)}
-	}
+	gen := c.generation.Load()
+	closeCh := c.close
+	chWrite := c.chWrite
 
 	for {
 		select {
-		case r, ok := <-c.chWrite:
+		case <-closeCh:
+			return
+
+		case r, ok := <-chWrite:
 			if !ok {
+				c.notifyDone()
 				return
 			}
 
 			if r.typ == closeSig {
-				c.rw.RLock()
-				c.done <- struct{}{}
-				c.rw.RUnlock()
+				c.notifyDone()
+				return
+			}
+
+			if r.typ != dataPacket {
+				continue
+			}
+
+			if len(r.msg) == 0 {
+				continue
+			}
+
+			if c.generation.Load() != gen {
 				return
 			}
 
@@ -422,30 +521,16 @@ func (c *serverConn) write() {
 				return
 			}
 
-			if _, err := conn.Write(r.msg); err != nil {
-				log.Errorf("write data message error: %v", err)
-			}
-		case <-ticker.C:
-			deadline := xtime.Now().Add(-2 * c.connMgr.server.opts.heartbeatInterval).UnixNano()
-			if c.lastHeartbeatTime.Load() < deadline {
-				log.Debugf("connection heartbeat timeout, cid: %d", c.id)
-				_ = c.forceClose(true)
+			conn := c.getConn()
+			if conn == nil {
+				_ = c.forceCloseIfCurrent(gen, true)
 				return
-			} else {
-				if c.connMgr.server.opts.heartbeatMechanism == TickHeartbeat {
-					if c.isClosed() {
-						return
-					}
+			}
 
-					if heartbeat, err := packet.PackHeartbeat(); err != nil {
-						log.Errorf("pack heartbeat message error: %v", err)
-					} else {
-						// send heartbeat packet
-						if _, err = conn.Write(heartbeat); err != nil {
-							log.Errorf("write heartbeat message error: %v", err)
-						}
-					}
-				}
+			if err := c.writeFull(conn, r.msg); err != nil {
+				log.Errorf("write data message error: %v", err)
+				_ = c.forceCloseIfCurrent(gen, true)
+				return
 			}
 		}
 	}
@@ -454,4 +539,31 @@ func (c *serverConn) write() {
 // 是否已关闭
 func (c *serverConn) isClosed() bool {
 	return c.State() == network.ConnClosed
+}
+
+func (c *serverConn) getConn() *kcp.UDPSession {
+	return c.conn.Load()
+}
+
+func (c *serverConn) notifyDone() {
+	c.doneOnce.Do(func() {
+		close(c.done)
+	})
+}
+
+func (c *serverConn) writeFull(conn net.Conn, data []byte) error {
+	for len(data) > 0 {
+		n, err := conn.Write(data)
+		if err != nil {
+			return err
+		}
+
+		if n <= 0 {
+			return io.ErrShortWrite
+		}
+
+		data = data[n:]
+	}
+
+	return nil
 }

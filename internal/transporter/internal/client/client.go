@@ -22,7 +22,9 @@ type Options struct {
 	InsID         string       // 实例ID
 	InsKind       cluster.Kind // 实例类型
 	ConnNum       int          // 连接数
-	FaultInterval int64        // 故障间隔时间
+	FaultInterval int64        //
+	GameID        string
+	NodeKind      cluster.NodeKind // 节点类型
 }
 
 type Client struct {

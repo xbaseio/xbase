@@ -1,11 +1,9 @@
 package packet
 
 import (
-	"bytes"
 	"encoding/binary"
 	"io"
 	"math"
-	"time"
 
 	"github.com/xbaseio/xbase/core/buffer"
 	"github.com/xbaseio/xbase/log"
@@ -42,15 +40,10 @@ type Packer interface {
 	PackMessage(message *Message) ([]byte, error)
 	// UnpackMessage 解包消息
 	UnpackMessage(data []byte) (*Message, int, error)
-	// PackHeartbeat 打包心跳
-	PackHeartbeat() ([]byte, error)
-	// CheckHeartbeat 检测心跳包
-	CheckHeartbeat(data []byte) (bool, error)
 }
 
 type defaultPacker struct {
-	opts      *options
-	heartbeat []byte
+	opts *options
 }
 
 func NewPacker(opts ...Option) *defaultPacker {
@@ -64,8 +57,7 @@ func NewPacker(opts ...Option) *defaultPacker {
 	}
 
 	return &defaultPacker{
-		opts:      o,
-		heartbeat: makeHeartbeat(o.byteOrder),
+		opts: o,
 	}
 }
 
@@ -115,7 +107,7 @@ func (p *defaultPacker) PackBuffer(message *Message) (*buffer.NocopyBuffer, erro
 	writer.WriteInt32s(p.opts.byteOrder, int32(totalLen))
 	writer.WriteInt32s(p.opts.byteOrder, dataBit)
 
-	writer.WriteInt32s(p.opts.byteOrder, message.NodeID)
+	writer.WriteInt32s(p.opts.byteOrder, message.GameID)
 	writer.WriteInt32s(p.opts.byteOrder, message.MessageID)
 	writer.WriteInt32s(p.opts.byteOrder, message.Seq)
 
@@ -226,9 +218,9 @@ func (p *defaultPacker) PackMessage(message *Message) ([]byte, error) {
 	offset += 4
 
 	// -------------------------
-	// 6. NodeID
+	// 6. GameID
 	// -------------------------
-	p.opts.byteOrder.PutUint32(buf[offset:], uint32(message.NodeID))
+	p.opts.byteOrder.PutUint32(buf[offset:], uint32(message.GameID))
 	offset += 4
 
 	// -------------------------
@@ -288,9 +280,9 @@ func (p *defaultPacker) UnpackMessage(data []byte) (*Message, int, error) {
 	}
 
 	// -------------------------
-	// 4. nodeID
+	// 4. GameID
 	// -------------------------
-	nodeID := int32(p.opts.byteOrder.Uint32(data[offset:]))
+	gameID := int32(p.opts.byteOrder.Uint32(data[offset:]))
 	offset += 4
 
 	// -------------------------
@@ -314,77 +306,11 @@ func (p *defaultPacker) UnpackMessage(data []byte) (*Message, int, error) {
 	// 8. 组装 message
 	// -------------------------
 	msg := &Message{
-		NodeID:    nodeID,
+		GameID:    gameID,
 		Seq:       seq,
 		MessageID: messageID,
 		Buffer:    body,
 	}
 
 	return msg, totalLen, nil
-}
-
-// PackHeartbeat 打包心跳
-func (p *defaultPacker) PackHeartbeat() ([]byte, error) {
-	if p.opts.heartbeatTime {
-		var (
-			buf  = &bytes.Buffer{}
-			size = defaultHeaderBytes + defaultHeartbeatTimeBytes
-		)
-
-		buf.Grow(defaultSizeBytes + size)
-
-		if err := binary.Write(buf, p.opts.byteOrder, uint32(size)); err != nil {
-			return nil, err
-		}
-
-		if err := binary.Write(buf, p.opts.byteOrder, uint8(heartbeatBit)); err != nil {
-			return nil, err
-		}
-
-		if err := binary.Write(buf, p.opts.byteOrder, time.Now().UnixNano()); err != nil {
-			return nil, err
-		}
-
-		return buf.Bytes(), nil
-	} else {
-		return p.heartbeat, nil
-	}
-}
-
-// CheckHeartbeat 检测心跳包
-func (p *defaultPacker) CheckHeartbeat(data []byte) (bool, error) {
-	if len(data) < defaultSizeBytes+defaultHeaderBytes {
-		return false, xerrors.ErrInvalidMessage
-	}
-
-	var (
-		size   uint32
-		header uint8
-		reader = bytes.NewReader(data)
-	)
-
-	if err := binary.Read(reader, p.opts.byteOrder, &size); err != nil {
-		return false, err
-	}
-
-	if uint64(len(data))-defaultSizeBytes != uint64(size) {
-		return false, xerrors.ErrInvalidMessage
-	}
-
-	if err := binary.Read(reader, p.opts.byteOrder, &header); err != nil {
-		return false, err
-	}
-
-	return header&heartbeatBit == heartbeatBit, nil
-}
-
-// 构建心跳包
-func makeHeartbeat(byteOrder binary.ByteOrder) []byte {
-	buf := bytes.NewBuffer(nil)
-	buf.Grow(defaultSizeBytes + defaultHeaderBytes)
-
-	_ = binary.Write(buf, byteOrder, uint32(defaultHeaderBytes))
-	_ = binary.Write(buf, byteOrder, uint8(heartbeatBit))
-
-	return buf.Bytes()
 }

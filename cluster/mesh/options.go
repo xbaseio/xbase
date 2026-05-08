@@ -5,6 +5,7 @@ import (
 	"maps"
 	"time"
 
+	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/crypto"
 	"github.com/xbaseio/xbase/encoding"
 	"github.com/xbaseio/xbase/etc"
@@ -41,6 +42,8 @@ type options struct {
 	registry    registry.Registry     // 服务注册器
 	encryptor   crypto.Encryptor      // 消息加密器
 	transporter transport.Transporter // 消息传输器
+	nodeKind    cluster.NodeKind      // 节点类型
+	gameID      string                // 游戏ID
 	metadata    map[string]string     // 元数据
 }
 
@@ -51,6 +54,8 @@ func defaultOptions() *options {
 		codec:    encoding.Invoke(defaultCodec),
 		timeout:  defaultTimeout,
 		metadata: make(map[string]string),
+		nodeKind: cluster.Node_Normal,
+		gameID:   "",
 	}
 
 	if id := etc.Get(defaultIDKey).String(); id != "" {

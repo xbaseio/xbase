@@ -5,6 +5,7 @@ import (
 	"maps"
 	"time"
 
+	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/crypto"
 	"github.com/xbaseio/xbase/encoding"
 	"github.com/xbaseio/xbase/etc"
@@ -53,6 +54,8 @@ type options struct {
 	encryptor   crypto.Encryptor      // 消息加密器
 	transporter transport.Transporter // 消息传输器
 	metadata    map[string]string     // 元数据
+	nodeKind    cluster.NodeKind      // 节点类型
+	gameID      string                // 游戏ID
 }
 
 func defaultOptions() *options {
@@ -65,6 +68,8 @@ func defaultOptions() *options {
 		timeout:  defaultTimeout,
 		metadata: make(map[string]string),
 		expose:   etc.Get(defaultExposeKey).Bool(),
+		nodeKind: cluster.Node_Normal,
+		gameID:   "",
 	}
 
 	if id := etc.Get(defaultIDKey).String(); id != "" {
@@ -170,5 +175,16 @@ func WithMetadata(metadata map[string]string) Option {
 
 			maps.Copy(o.metadata, metadata)
 		}
+	}
+}
+
+func WithNodeKind(nodeKind cluster.NodeKind) Option {
+	return func(o *options) {
+		o.nodeKind = nodeKind
+	}
+}
+func WithGameID(gameID string) Option {
+	return func(o *options) {
+		o.gameID = gameID
 	}
 }

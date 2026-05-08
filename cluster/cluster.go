@@ -9,6 +9,7 @@ const (
 	Node                   // 节点服
 	Mesh                   // 微服务
 	Master                 // 管理服
+
 )
 
 // Kind 集群实例类型
@@ -22,6 +23,7 @@ func (k Kind) String() string {
 		return "node"
 	case Mesh:
 		return "mesh"
+
 	default:
 		return "master"
 	}
@@ -112,7 +114,7 @@ type GetIPArgs struct {
 
 type Message struct {
 	Seq       int32 // 序列号
-	NodeID    int32 // 节点ID
+	GameID    int32 // 游戏ID
 	MessageID int32 // 消息ID
 	Data      any   // 消息数据，接收json、proto、[]byte
 }
@@ -182,4 +184,26 @@ type DeliverArgs struct {
 	NID     string   // 接收节点。存在接收节点时，消息会直接投递给接收节点；不存在接收节点时，系统定位用户所在节点，然后投递。
 	UID     int64    // 用户ID
 	Message *Message // 消息
+}
+
+// Kind 集群实例类型
+type NodeKind int
+
+const (
+	Node_Normal NodeKind = iota + 1 // 正常节点服
+	Node_Lobby                      // 大厅节点服
+	Node_Game                       // 游戏节点服
+)
+
+func (k NodeKind) String() string {
+	switch k {
+	case Node_Normal:
+		return "normal"
+	case Node_Lobby:
+		return "lobby"
+	case Node_Game:
+		return "game"
+	default:
+		return "unknown"
+	}
 }

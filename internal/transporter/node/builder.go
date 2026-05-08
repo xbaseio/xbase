@@ -14,8 +14,10 @@ const (
 )
 
 type Options struct {
-	InsID   string       // 实例ID
-	InsKind cluster.Kind // 实例类型
+	InsID    string           // 实例ID
+	InsKind  cluster.Kind     // 实例类型
+	NodeKind cluster.NodeKind // 节点类型
+	GameID   string           // 游戏ID
 }
 
 type Builder struct {
@@ -46,6 +48,8 @@ func (b *Builder) Build(addr string) (*Client, error) {
 			Addr:          addr,
 			InsID:         b.opts.InsID,
 			InsKind:       b.opts.InsKind,
+			NodeKind:      b.opts.NodeKind,
+			GameID:        b.opts.GameID,
 			ConnNum:       defaultConnNum,
 			FaultInterval: defaultFaultInterval,
 		})

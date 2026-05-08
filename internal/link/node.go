@@ -31,7 +31,7 @@ func NewNodeLinker(ctx context.Context, opts *Options) *NodeLinker {
 	return &NodeLinker{
 		ctx:        ctx,
 		opts:       opts,
-		builder:    node.NewBuilder(&node.Options{InsID: opts.InsID, InsKind: opts.InsKind}),
+		builder:    node.NewBuilder(&node.Options{InsID: opts.InsID, InsKind: opts.InsKind, NodeKind: opts.NodeKind, GameID: opts.GameID}),
 		dispatcher: dispatcher.NewDispatcher(opts.Dispatch),
 		sources:    make(map[int64]map[string]string),
 	}
@@ -192,7 +192,7 @@ func (l *NodeLinker) Deliver(ctx context.Context, args *DeliverArgs) error {
 			return client.Deliver(ctx, args.CID, args.UID, buf)
 		}
 	} else {
-		if _, err = l.doRPC(ctx, args.NodeID, args.UID, func(ctx context.Context, client *node.Client) (bool, any, error) {
+		if _, err = l.doRPC(ctx, args.GameID, args.UID, func(ctx context.Context, client *node.Client) (bool, any, error) {
 			isDeliver = true
 
 			return false, nil, client.Deliver(ctx, args.CID, args.UID, buf)
@@ -337,7 +337,7 @@ func (l *NodeLinker) PackMessage(message *Message, encrypt bool) (*buffer.Nocopy
 
 	return packet.PackBuffer(&packet.Message{
 		Seq:       message.Seq,
-		NodeID:    message.NodeID,
+		GameID:    message.GameID,
 		MessageID: message.MessageID,
 		Buffer:    buffer,
 	})

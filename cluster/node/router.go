@@ -147,7 +147,7 @@ func (r *Router) deliver(gid, nid, pid string, cid, uid int64, seq, route int32,
 	req.cid = cid
 	req.uid = uid
 	req.message.Seq = seq
-	req.message.NodeID = route
+	req.message.GameID = route
 	req.message.MessageID = 0 // Set a default value or derive it from the data
 	req.message.Data = data
 	r.reqChan <- req
@@ -164,10 +164,10 @@ func (r *Router) close() {
 func (r *Router) handle(req *request) {
 	version := req.incrVersion()
 
-	route, ok := r.routes[req.message.NodeID]
+	route, ok := r.routes[req.message.GameID]
 	if !ok && r.defaultRouteHandler == nil {
 		req.compareVersionRecycle(version)
-		log.Warnf("message routing does not register handler function, route: %v", req.message.NodeID)
+		log.Warnf("message routing does not register handler function, route: %v", req.message.GameID)
 		return
 	}
 

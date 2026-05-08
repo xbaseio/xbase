@@ -131,7 +131,7 @@ func (c *Client) handleReceive(conn network.Conn, data []byte) {
 		return
 	}
 
-	handlers, ok := c.routes[message.NodeID]
+	handlers, ok := c.routes[message.GameID]
 	if ok {
 		for _, handler := range handlers {
 			xcall.Call(func() {
@@ -149,7 +149,7 @@ func (c *Client) handleReceive(conn network.Conn, data []byte) {
 			message: message,
 		})
 	} else {
-		log.Debugf("route handler is not registered, route: %v", message.NodeID)
+		log.Debugf("route handler is not registered, route: %v", message.GameID)
 	}
 }
 

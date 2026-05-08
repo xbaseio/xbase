@@ -44,6 +44,8 @@ type options struct {
 	locator  locate.Locator    // 用户定位器
 	registry registry.Registry // 服务注册器
 	dispatch cluster.Dispatch  // 无状态路由消息分发策略
+	nodeKind cluster.NodeKind  // 节点类型
+	gameID   string            // 游戏ID
 	metadata map[string]string // 元数据
 }
 
@@ -56,6 +58,8 @@ func defaultOptions() *options {
 		dispatch: defaultDispatch,
 		metadata: make(map[string]string),
 		expose:   etc.Get(defaultExposeKey).Bool(),
+		nodeKind: cluster.Node_Normal,
+		gameID:   "",
 	}
 
 	if id := etc.Get(defaultIDKey).String(); id != "" {

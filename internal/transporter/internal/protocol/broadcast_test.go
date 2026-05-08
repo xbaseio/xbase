@@ -12,7 +12,7 @@ import (
 
 func TestEncodeBroadcastReq(t *testing.T) {
 	message, err := packet.PackMessage(&packet.Message{
-		NodeID:    1,
+		GameID:    1,
 		MessageID: 1001,
 		Seq:       2,
 		Buffer:    []byte("hello world"),
@@ -28,7 +28,7 @@ func TestEncodeBroadcastReq(t *testing.T) {
 
 func TestDecodeBroadcastReq(t *testing.T) {
 	message, err := packet.PackMessage(&packet.Message{
-		NodeID:    1,
+		GameID:    1,
 		MessageID: 1001,
 		Seq:       2,
 		Buffer:    []byte("hello world"),

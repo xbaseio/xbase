@@ -37,9 +37,9 @@ func (c *Context) Seq() int32 {
 	return c.message.Seq
 }
 
-// NodeID 获取消息节点ID
-func (c *Context) NodeID() int32 {
-	return c.message.NodeID
+// GameID 获取消息游戏ID
+func (c *Context) GameID() int32 {
+	return c.message.GameID
 }
 
 // MessageID 获取消息ID

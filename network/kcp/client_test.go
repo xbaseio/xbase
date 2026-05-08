@@ -16,7 +16,7 @@ import (
 )
 
 func TestClient_Simple(t *testing.T) {
-	client := kcp.NewClient(kcp.WithClientHeartbeatInterval(0))
+	client := kcp.NewClient()
 
 	client.OnConnect(func(conn network.Conn) {
 		log.Info("connection is opened")
@@ -33,7 +33,7 @@ func TestClient_Simple(t *testing.T) {
 			return
 		}
 
-		log.Infof("receive msg from server, cid: %d, seq: %d, node id: %d, msg: %s", conn.ID(), message.Seq, message.NodeID, string(message.Buffer))
+		log.Infof("receive msg from server, cid: %d, seq: %d, game id: %d, msg: %s", conn.ID(), message.Seq, message.GameID, string(message.Buffer))
 	})
 
 	conn, err := client.Dial()
@@ -54,7 +54,7 @@ func TestClient_Simple(t *testing.T) {
 		case <-ticker.C:
 			msg, err := packet.PackMessage(&packet.Message{
 				Seq:       1,
-				NodeID:    1,
+				GameID:    1,
 				MessageID: 1001,
 				Buffer:    []byte("hello server~~"),
 			})
@@ -144,7 +144,7 @@ func doPressureTest(c int, n int, size int) {
 		totalRecv int64
 	)
 
-	client := kcp.NewClient(kcp.WithClientHeartbeatInterval(0))
+	client := kcp.NewClient()
 
 	client.OnReceive(func(conn network.Conn, data []byte) {
 		atomic.AddInt64(&totalRecv, 1)
@@ -176,7 +176,7 @@ func doPressureTest(c int, n int, size int) {
 
 					msg, err := packet.PackMessage(&packet.Message{
 						Seq:       1,
-						NodeID:    1,
+						GameID:    1,
 						MessageID: 1001,
 						Buffer:    buffer,
 					})

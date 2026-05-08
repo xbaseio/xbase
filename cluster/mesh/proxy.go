@@ -24,6 +24,8 @@ func newProxy(mesh *Mesh) *Proxy {
 		Locator:   mesh.opts.locator,
 		Registry:  mesh.opts.registry,
 		Encryptor: mesh.opts.encryptor,
+		NodeKind:  mesh.opts.nodeKind,
+		GameID:    mesh.opts.gameID,
 	}
 
 	return &Proxy{
@@ -205,7 +207,7 @@ func (p *Proxy) Deliver(ctx context.Context, args *cluster.DeliverArgs) error {
 	return p.nodeLinker.Deliver(ctx, &link.DeliverArgs{
 		NID:       args.NID,
 		UID:       args.UID,
-		NodeID:    args.Message.NodeID,
+		GameID:    args.Message.GameID,
 		MessageID: args.Message.MessageID,
 		Buffer:    args.Message,
 	})

@@ -33,7 +33,7 @@ func TestClient_Dial(t *testing.T) {
 					return
 				}
 
-				t.Logf("receive msg from server, connection id: %d, seq: %d, node id: %d, msg: %s", conn.ID(), message.Seq, message.NodeID, string(message.Buffer))
+				t.Logf("receive msg from server, connection id: %d, seq: %d, game id: %d, msg: %s", conn.ID(), message.Seq, message.GameID, string(message.Buffer))
 			})
 
 			defer wg.Done()
@@ -50,7 +50,7 @@ func TestClient_Dial(t *testing.T) {
 			times := 0
 			msg, _ := packet.PackMessage(&packet.Message{
 				Seq:       1,
-				NodeID:    1,
+				GameID:    1,
 				MessageID: 1001,
 				Buffer:    []byte("hello server~~"),
 			})
@@ -89,7 +89,7 @@ func TestNewClient(t *testing.T) {
 			return
 		}
 
-		t.Logf("receive msg from server, connection id: %d, seq: %d, node id: %d, msg: %s", conn.ID(), message.Seq, message.NodeID, string(message.Buffer))
+		t.Logf("receive msg from server, connection id: %d, seq: %d, game id: %d, msg: %s", conn.ID(), message.Seq, message.GameID, string(message.Buffer))
 	})
 
 	conn, err := client.Dial()
@@ -104,7 +104,7 @@ func TestNewClient(t *testing.T) {
 	times := 0
 	data, _ := packet.PackMessage(&packet.Message{
 		Seq:       1,
-		NodeID:    1,
+		GameID:    1,
 		MessageID: 1001,
 		Buffer:    []byte("hello server~~"),
 	})
@@ -136,7 +136,7 @@ func TestClient_Benchmark(t *testing.T) {
 	// 准备消息
 	msg, err := packet.PackMessage(&packet.Message{
 		Seq:       1,
-		NodeID:    1,
+		GameID:    1,
 		MessageID: 1001,
 		Buffer:    []byte("hello server~~"),
 	})

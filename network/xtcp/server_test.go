@@ -37,11 +37,11 @@ func TestServer_Simple(t *testing.T) {
 			return
 		}
 
-		log.Infof("receive message from client, cid: %d, seq: %d, node id: %d, msg: %s", conn.ID(), message.Seq, message.NodeID, string(message.Buffer))
+		log.Infof("receive message from client, cid: %d, seq: %d, game id: %d, msg: %s", conn.ID(), message.Seq, message.GameID, string(message.Buffer))
 
 		msg, err := packet.PackMessage(&packet.Message{
 			Seq:       1,
-			NodeID:    1,
+			GameID:    1,
 			MessageID: 1001,
 			Buffer:    []byte("I'm fine~~"),
 		})
@@ -63,9 +63,7 @@ func TestServer_Simple(t *testing.T) {
 }
 
 func TestServer_Benchmark(t *testing.T) {
-	server := xtcp.NewServer(
-		xtcp.WithServerHeartbeatInterval(0),
-	)
+	server := xtcp.NewServer()
 
 	server.OnStart(func() {
 		log.Info("server is started")
@@ -80,7 +78,7 @@ func TestServer_Benchmark(t *testing.T) {
 
 		msg, err := packet.PackMessage(&packet.Message{
 			Seq:       message.Seq,
-			NodeID:    message.NodeID,
+			GameID:    message.GameID,
 			MessageID: message.MessageID,
 			Buffer:    message.Buffer,
 		})

@@ -29,6 +29,8 @@ func newProxy(node *Node) *Proxy {
 			Locator:   node.opts.locator,
 			Registry:  node.opts.registry,
 			Encryptor: node.opts.encryptor,
+			NodeKind:  node.opts.nodeKind,
+			GameID:    node.opts.gameID,
 		}),
 		nodeLinker: link.NewNodeLinker(node.opts.ctx, &link.Options{
 			InsID:       node.opts.id,
@@ -37,6 +39,8 @@ func newProxy(node *Node) *Proxy {
 			Locator:     node.opts.locator,
 			Registry:    node.opts.registry,
 			Encryptor:   node.opts.encryptor,
+			NodeKind:    node.opts.nodeKind,
+			GameID:      node.opts.gameID,
 			WaitHandler: node.addWait,
 			DoneHandler: node.doneWait,
 		}),
@@ -285,7 +289,7 @@ func (p *Proxy) Deliver(ctx context.Context, args *cluster.DeliverArgs) error {
 	return p.nodeLinker.Deliver(ctx, &link.DeliverArgs{
 		NID:       args.NID,
 		UID:       args.UID,
-		NodeID:    args.Message.NodeID,
+		GameID:    args.Message.GameID,
 		MessageID: args.Message.MessageID,
 		Buffer:    args.Message,
 	})
