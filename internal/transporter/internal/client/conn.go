@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -17,23 +18,34 @@ import (
 )
 
 const (
-	maxRetryTimes = 3                      // 最大重试次数
-	dialTimeout   = 500 * time.Millisecond // 拨号超时时间
+	maxRetryTimes = 3
+	dialTimeout   = 500 * time.Millisecond
+	writeTimeout  = 3 * time.Second
 )
 
 type conn struct {
-	cli               *Client            // 客户端
-	rw                sync.RWMutex       // 读写锁
-	conn              net.Conn           // 连接
-	state             atomic.Int32       // 连接状态
-	queue             chan *message      // 有序队列
-	pending           *pending           // 等待队列
-	failure           chan struct{}      // 重试失败通道
-	success           chan struct{}      // 重试成功通道
-	ctx               context.Context    // 上下文
-	cancel            context.CancelFunc // 取消函数
-	lastFaultTime     atomic.Int64       // 上次故障时间
-	lastHeartbeatTime atomic.Int64       // 上次心跳时间
+	cli *Client
+
+	// 保护 conn / ctx / cancel / success / failure
+	rw sync.RWMutex
+
+	// 保护 close/drain 与 send 入队，避免 message 入队后无人释放
+	sendMu sync.RWMutex
+
+	conn  net.Conn
+	state atomic.Int32
+
+	queue   chan *message
+	pending *pending
+
+	failure chan struct{}
+	success chan struct{}
+
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	lastFaultTime     atomic.Int64
+	lastHeartbeatTime atomic.Int64
 }
 
 func newConn(cli *Client) *conn {
@@ -58,21 +70,18 @@ func (c *conn) dial() error {
 		return nil
 	}
 
-	if err := c.doDial(); err != nil {
-		close(c.failure)
-		c.failure = make(chan struct{})
-
+	if err := c.doDialLocked(); err != nil {
+		c.markClosedLocked()
+		c.signalFailureLocked()
 		return err
-	} else {
-		close(c.success)
-		c.success = make(chan struct{})
-
-		return nil
 	}
+
+	c.signalSuccessLocked()
+	return nil
 }
 
-// 执行拨号
-func (c *conn) doDial() error {
+// 执行拨号，调用方必须持有 c.rw.Lock()
+func (c *conn) doDialLocked() error {
 	var (
 		retry int
 		delay time.Duration
@@ -82,170 +91,270 @@ func (c *conn) doDial() error {
 		conn, err := net.DialTimeout("tcp", c.cli.opts.Addr, dialTimeout)
 		if err != nil {
 			retry++
-
 			if retry >= maxRetryTimes {
-				c.close()
 				return err
-			} else {
-				if delay == 0 {
-					delay = 5 * time.Millisecond
-				} else {
-					delay *= 2
-				}
-
-				if delay > time.Second {
-					delay = time.Second
-				}
-
-				time.Sleep(delay)
-				continue
 			}
+
+			if delay == 0 {
+				delay = 5 * time.Millisecond
+			} else {
+				delay *= 2
+			}
+
+			if delay > time.Second {
+				delay = time.Second
+			}
+
+			time.Sleep(delay)
+			continue
 		}
 
-		return c.process(conn)
+		if err = c.processLocked(conn); err != nil {
+			_ = conn.Close()
+			return err
+		}
+
+		return nil
 	}
 }
 
-// 处理连接
-func (c *conn) process(conn net.Conn) error {
+// 处理连接，调用方必须持有 c.rw.Lock()
+func (c *conn) processLocked(conn net.Conn) error {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	c.conn = conn
-	c.ctx, c.cancel = context.WithCancel(context.Background())
+	c.ctx = ctx
+	c.cancel = cancel
 	c.state.Store(def.ConnOpened)
 	c.lastHeartbeatTime.Store(xtime.Now().Unix())
 
-	go c.read(conn)
+	if err := c.handshake(ctx, conn); err != nil {
+		cancel()
+		_ = conn.Close()
 
-	if err := c.handshake(conn); err != nil {
-		c.close()
+		if c.conn == conn {
+			c.conn = nil
+		}
 
+		c.state.Store(def.ConnClosed)
 		return err
-	} else {
-		go c.write(conn)
-
-		return nil
 	}
+
+	go c.read(ctx, conn)
+	go c.write(ctx, conn)
+
+	return nil
 }
 
 // 握手
-func (c *conn) handshake(conn net.Conn) error {
-	var (
-		seq  = uint64(1)
-		buf  = protocol.EncodeHandshakeReq(seq, c.cli.opts.InsKind, c.cli.opts.InsID)
-		call = make(chan buffer.Buffer)
-	)
+func (c *conn) handshake(ctx context.Context, conn net.Conn) error {
+	const seq = uint64(1)
 
-	c.pending.store(seq, call)
+	buf := protocol.EncodeHandshakeReq(seq, c.cli.opts.InsKind, c.cli.opts.InsID)
+	if buf == nil {
+		return xerrors.ErrInvalidMessage
+	}
+	defer buf.Release()
 
-	if _, err := conn.Write(buf.Bytes()); err != nil {
-		buf.Release()
-
-		close(call)
-
-		c.pending.delete(seq)
-
+	if err := writeAllWithDeadline(conn, buf.Bytes(), writeTimeout); err != nil {
 		return err
-	} else {
-		buf.Release()
 	}
 
-	ctx, cancel := context.WithTimeout(c.ctx, defaultTimeout)
-	defer cancel()
+	// 握手阶段直接读取握手响应，不依赖 pending，避免无缓冲 call 卡住 read goroutine。
+	_ = conn.SetDeadline(time.Now().Add(defaultTimeout))
+	defer func() {
+		_ = conn.SetDeadline(time.Time{})
+	}()
 
-	select {
-	case <-ctx.Done():
-		c.pending.delete(seq)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
 
-		return ctx.Err()
-	case buf := <-call:
-		buf.Release()
+		default:
+		}
 
-		return nil
+		resp, err := protocol.ReaderBuffer(conn)
+		if err != nil {
+			return err
+		}
+
+		isHeartbeat, _, respSeq := protocol.ParseBuffer(resp.Bytes())
+		resp.Release()
+
+		if isHeartbeat {
+			continue
+		}
+
+		if respSeq == seq {
+			return nil
+		}
 	}
 }
 
 // 发送消息
 func (c *conn) send(msg *message) error {
-	switch c.state.Load() {
-	case def.ConnClosed:
-		if mode.IsReleaseMode() && xtime.Now().Unix()-c.lastFaultTime.Load() < c.cli.opts.FaultInterval {
-			return xerrors.ErrConnectionClosed
-		}
-
-		if err := c.dial(); err != nil {
-			return err
-		}
-	case def.ConnHanged:
-		if err := c.wait(); err != nil {
-			return err
-		}
+	if msg == nil {
+		return nil
 	}
 
-	c.queue <- msg
+	for {
+		switch c.state.Load() {
+		case def.ConnClosed:
+			if mode.IsReleaseMode() && xtime.Now().Unix()-c.lastFaultTime.Load() < c.cli.opts.FaultInterval {
+				return xerrors.ErrConnectionClosed
+			}
 
-	return nil
+			if err := c.dial(); err != nil {
+				return err
+			}
+
+		case def.ConnHanged:
+			if err := c.wait(); err != nil {
+				return err
+			}
+
+		case def.ConnOpened:
+			return c.enqueue(msg)
+
+		default:
+			return xerrors.ErrConnectionClosed
+		}
+	}
+}
+
+func (c *conn) enqueue(msg *message) error {
+	c.sendMu.RLock()
+
+	if c.state.Load() != def.ConnOpened {
+		c.sendMu.RUnlock()
+		return xerrors.ErrConnectionClosed
+	}
+
+	ctx := c.getContext()
+	if ctx == nil {
+		c.sendMu.RUnlock()
+		return xerrors.ErrConnectionClosed
+	}
+
+	// 快路径：队列没满，不创建 timer。
+	select {
+	case c.queue <- msg:
+		c.sendMu.RUnlock()
+		return nil
+
+	case <-ctx.Done():
+		c.sendMu.RUnlock()
+		return xerrors.ErrConnectionClosed
+
+	default:
+	}
+
+	// 慢路径：队列满了才等待 writeTimeout。
+	timer := time.NewTimer(writeTimeout)
+
+	var retErr error
+	var needClose bool
+
+	select {
+	case c.queue <- msg:
+		retErr = nil
+
+	case <-ctx.Done():
+		retErr = xerrors.ErrConnectionClosed
+
+	case <-timer.C:
+		retErr = xerrors.ErrConnectionClosed
+		needClose = true
+	}
+
+	stopTimer(timer)
+	c.sendMu.RUnlock()
+
+	if needClose {
+		log.Warn("transporter client write queue timeout")
+		c.close()
+	}
+
+	return retErr
 }
 
 // 读取数据
-func (c *conn) read(conn net.Conn) {
+func (c *conn) read(ctx context.Context, conn net.Conn) {
 	for {
 		select {
-		case <-c.ctx.Done():
+		case <-ctx.Done():
 			return
+
 		default:
-			buf, err := protocol.ReaderBuffer(conn)
-			if err != nil {
-				c.retry(conn)
-				return
-			}
+		}
 
-			c.lastHeartbeatTime.Store(xtime.Now().Unix())
+		buf, err := protocol.ReaderBuffer(conn)
+		if err != nil {
+			c.retry(conn)
+			return
+		}
 
-			if isHeartbeat, _, seq := protocol.ParseBuffer(buf.Bytes()); isHeartbeat {
-				buf.Release()
-			} else {
-				if call, ok := c.pending.extract(seq); ok {
-					call <- buf
-				} else {
-					buf.Release()
-				}
-			}
+		c.lastHeartbeatTime.Store(xtime.Now().Unix())
+
+		isHeartbeat, _, seq := protocol.ParseBuffer(buf.Bytes())
+		if isHeartbeat {
+			buf.Release()
+			continue
+		}
+
+		call, ok := c.pending.extract(seq)
+		if !ok {
+			buf.Release()
+			continue
+		}
+
+		select {
+		case call <- buf:
+		case <-ctx.Done():
+			buf.Release()
 		}
 	}
 }
 
 // 写入数据
-func (c *conn) write(conn net.Conn) {
+func (c *conn) write(ctx context.Context, conn net.Conn) {
 	ticker := time.NewTicker(def.HeartbeatInterval)
-	defer ticker.Stop()
+
+	defer func() {
+		ticker.Stop()
+
+		// write 协程退出时兜底清理队列，避免 message 泄漏。
+		c.sendMu.Lock()
+		c.drainQueue()
+		c.sendMu.Unlock()
+	}()
 
 	for {
 		select {
-		case <-c.ctx.Done():
+		case <-ctx.Done():
 			return
-		case t, ok := <-ticker.C:
-			if !ok {
-				return
-			}
 
+		case t := <-ticker.C:
 			deadline := t.Add(-2 * def.HeartbeatInterval).Unix()
-
 			if c.lastHeartbeatTime.Load() < deadline {
 				log.Warn("connection heartbeat timeout")
 				c.retry(conn)
 				return
-			} else {
-				if _, err := conn.Write(protocol.Heartbeat()); err != nil {
-					log.Warnf("write heartbeat message error: %v", err)
-					c.retry(conn)
-					return
-				}
 			}
-		case msg, ok := <-c.queue: // 有序队列
-			if !ok {
+
+			if err := writeAllWithDeadline(conn, protocol.Heartbeat(), writeTimeout); err != nil {
+				log.Warnf("write heartbeat message error: %v", err)
+				c.retry(conn)
 				return
 			}
 
-			if ok = c.doWrite(conn, msg); !ok {
+		case msg := <-c.queue:
+			if msg == nil {
+				continue
+			}
+
+			if ok := c.doWrite(conn, msg); !ok {
 				return
 			}
 		}
@@ -256,28 +365,44 @@ func (c *conn) write(conn net.Conn) {
 func (c *conn) doWrite(conn net.Conn, msg *message) bool {
 	if msg.seq != 0 {
 		if !msg.state.CompareAndSwap(statePending, stateSent) {
+			// 说明这个消息已经被取消，不应该导致 write goroutine 退出。
 			c.cli.release(msg)
-			return false
+			return true
 		}
 
 		c.pending.store(msg.seq, msg.call)
 	}
 
 	ok := msg.buf.Visit(func(node *buffer.NocopyNode) bool {
-		if _, err := conn.Write(node.Bytes()); err != nil {
-			return false
-		} else {
+		if node == nil {
 			return true
 		}
+
+		data := node.Bytes()
+		if len(data) == 0 {
+			return true
+		}
+
+		if err := writeAllWithDeadline(conn, data, writeTimeout); err != nil {
+			log.Warnf("write transporter message error: %v", err)
+			return false
+		}
+
+		return true
 	})
+
+	if !ok && msg.seq != 0 {
+		c.pending.delete(msg.seq)
+	}
 
 	c.cli.release(msg)
 
 	if !ok {
 		c.retry(conn)
+		return false
 	}
 
-	return ok
+	return true
 }
 
 // 重试拨号
@@ -286,10 +411,17 @@ func (c *conn) retry(conn net.Conn) {
 		return
 	}
 
-	_ = conn.Close()
+	c.rw.RLock()
+	curConn := c.conn
+	cancel := c.cancel
+	c.rw.RUnlock()
 
-	if c.cancel != nil {
-		c.cancel()
+	if curConn == conn {
+		_ = conn.Close()
+	}
+
+	if cancel != nil {
+		cancel()
 	}
 
 	if err := c.dial(); err != nil {
@@ -305,28 +437,46 @@ func (c *conn) close() {
 
 	c.lastFaultTime.Store(xtime.Now().Unix())
 
-	if c.conn != nil {
-		_ = c.conn.Close()
+	c.rw.Lock()
+	conn := c.conn
+	cancel := c.cancel
+	c.conn = nil
+	c.cancel = nil
+	c.rw.Unlock()
+
+	if cancel != nil {
+		cancel()
 	}
 
-	if c.cancel != nil {
-		c.cancel()
+	if conn != nil {
+		_ = conn.Close()
 	}
+
+	c.sendMu.Lock()
+	c.drainQueue()
+	c.sendMu.Unlock()
+
+	c.signalFailure()
 }
 
 // 等待重连
 func (c *conn) wait() error {
 	c.rw.RLock()
-	defer c.rw.RUnlock()
+	state := c.state.Load()
+	failure := c.failure
+	success := c.success
+	c.rw.RUnlock()
 
-	switch c.state.Load() {
+	switch state {
 	case def.ConnOpened:
 		return nil
+
 	case def.ConnHanged:
 		select {
-		case <-c.failure:
+		case <-failure:
 			return xerrors.ErrConnectionClosed
-		case <-c.success:
+
+		case <-success:
 			return nil
 		}
 	}
@@ -336,7 +486,110 @@ func (c *conn) wait() error {
 
 // 删除发送消息
 func (c *conn) delete(msg *message) {
+	if msg == nil {
+		return
+	}
+
 	if !msg.state.CompareAndSwap(statePending, stateCanceled) {
 		c.pending.delete(msg.seq)
 	}
+}
+
+func (c *conn) markClosedLocked() {
+	if c.state.Swap(def.ConnClosed) != def.ConnClosed {
+		c.lastFaultTime.Store(xtime.Now().Unix())
+	}
+
+	if c.cancel != nil {
+		c.cancel()
+		c.cancel = nil
+	}
+
+	if c.conn != nil {
+		_ = c.conn.Close()
+		c.conn = nil
+	}
+}
+
+func (c *conn) signalSuccessLocked() {
+	close(c.success)
+	c.success = make(chan struct{})
+}
+
+func (c *conn) signalFailureLocked() {
+	close(c.failure)
+	c.failure = make(chan struct{})
+}
+
+func (c *conn) signalFailure() {
+	c.rw.Lock()
+	c.signalFailureLocked()
+	c.rw.Unlock()
+}
+
+func (c *conn) getContext() context.Context {
+	c.rw.RLock()
+	ctx := c.ctx
+	c.rw.RUnlock()
+	return ctx
+}
+
+func (c *conn) drainQueue() {
+	for {
+		select {
+		case msg := <-c.queue:
+			if msg != nil {
+				c.cli.release(msg)
+			}
+
+		default:
+			return
+		}
+	}
+}
+
+func stopTimer(timer *time.Timer) {
+	if timer == nil {
+		return
+	}
+
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+}
+
+func writeAllWithDeadline(conn net.Conn, data []byte, timeout time.Duration) error {
+	if conn == nil {
+		return xerrors.ErrConnectionClosed
+	}
+
+	if len(data) == 0 {
+		return nil
+	}
+
+	if timeout > 0 {
+		_ = conn.SetWriteDeadline(time.Now().Add(timeout))
+	}
+
+	return writeAll(conn, data)
+}
+
+func writeAll(conn net.Conn, data []byte) error {
+	for len(data) > 0 {
+		n, err := conn.Write(data)
+		if err != nil {
+			return err
+		}
+
+		if n <= 0 {
+			return io.ErrShortWrite
+		}
+
+		data = data[n:]
+	}
+
+	return nil
 }
