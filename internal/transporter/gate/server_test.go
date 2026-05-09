@@ -36,7 +36,7 @@ func (p *provider) Bind(ctx context.Context, cid, uid int64) error {
 }
 
 // Unbind 解绑用户与网关间的关系
-func (p *provider) Unbind(ctx context.Context, uid int64) error {
+func (p *provider) Unbind(ctx context.Context, uid, cid int64) error {
 	return nil
 }
 
@@ -90,7 +90,7 @@ func (p *provider) Stat(ctx context.Context, kind session.Kind) (total int64, er
 }
 
 // Disconnect 断开连接
-func (p *provider) Disconnect(ctx context.Context, kind session.Kind, target int64, force bool) error {
+func (p *provider) Disconnect(ctx context.Context, cid, uid int64, force bool) error {
 	return nil
 }
 

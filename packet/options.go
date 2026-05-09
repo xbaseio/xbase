@@ -15,7 +15,7 @@ const (
 const (
 	defaultSizeBytes   = 4
 	defaultBufferBytes = 65535
-	defaultHeaderSize  = 16
+	defaultHeaderSize  = 20
 )
 
 const (

@@ -192,9 +192,9 @@ func (e *event) BindGate(uid ...int64) error {
 func (e *event) UnbindGate(uid ...int64) error {
 	switch {
 	case len(uid) > 0:
-		return e.node.proxy.UnbindGate(e.ctx, uid[0])
+		return e.node.proxy.UnbindGate(e.ctx, e.cid, uid[0])
 	case e.uid != 0:
-		return e.node.proxy.UnbindGate(e.ctx, e.uid)
+		return e.node.proxy.UnbindGate(e.ctx, e.cid, e.uid)
 	default:
 		return xerrors.ErrIllegalOperation
 	}
@@ -367,10 +367,10 @@ func (e *event) Response(message any) error {
 // Disconnect 关闭来自网关的连接
 func (e *event) Disconnect(force ...bool) error {
 	return e.node.proxy.Disconnect(e.ctx, &cluster.DisconnectArgs{
-		GID:    e.gid,
-		Kind:   session.Conn,
-		Target: e.cid,
-		Force:  len(force) > 0 && force[0],
+		GID:   e.gid,
+		UID:   e.uid,
+		CID:   e.cid,
+		Force: len(force) > 0 && force[0],
 	})
 }
 

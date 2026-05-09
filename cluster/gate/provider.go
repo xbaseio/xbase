@@ -25,7 +25,7 @@ func (p *provider) Bind(ctx context.Context, cid, uid int64) error {
 	}
 
 	if err := p.gate.proxy.bindGate(ctx, cid, uid); err != nil {
-		_, _ = p.gate.session.Unbind(uid)
+		_, _ = p.gate.session.Unbind(cid, uid)
 		return err
 	}
 
@@ -33,12 +33,12 @@ func (p *provider) Bind(ctx context.Context, cid, uid int64) error {
 }
 
 // Unbind 解绑用户与网关间的关系
-func (p *provider) Unbind(ctx context.Context, uid int64) error {
+func (p *provider) Unbind(ctx context.Context, cid, uid int64) error {
 	if uid == 0 {
 		return xerrors.ErrInvalidArgument
 	}
 
-	cid, err := p.gate.session.Unbind(uid)
+	cid, err := p.gate.session.Unbind(cid, uid)
 	if err != nil {
 		return err
 	}
@@ -62,8 +62,8 @@ func (p *provider) Stat(ctx context.Context, kind session.Kind) (int64, error) {
 }
 
 // Disconnect 断开连接
-func (p *provider) Disconnect(ctx context.Context, kind session.Kind, target int64, force bool) error {
-	return p.gate.session.Close(kind, target, force)
+func (p *provider) Disconnect(ctx context.Context, cid, uid int64, force bool) error {
+	return p.gate.session.Close(cid, uid, force)
 }
 
 // Push 发送消息

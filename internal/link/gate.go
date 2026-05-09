@@ -98,9 +98,9 @@ func (l *GateLinker) BindGate(ctx context.Context, gid string, cid, uid int64) e
 }
 
 // UnbindGate 解绑网关
-func (l *GateLinker) UnbindGate(ctx context.Context, uid int64) error {
+func (l *GateLinker) UnbindGate(ctx context.Context, cid, uid int64) error {
 	if _, err := l.doRPC(ctx, uid, func(client *gate.Client, index, total int) (bool, any, error) {
-		if err := client.Unbind(ctx, uid); err != nil {
+		if err := client.Unbind(ctx, uid, cid); err != nil {
 			return xerrors.Is(err, xerrors.ErrNotFoundSession), nil, err
 		} else {
 			return false, nil, nil
@@ -278,18 +278,17 @@ func (l *GateLinker) doIndirectIsOnline(ctx context.Context, args *IsOnlineArgs)
 
 // Disconnect 断开连接
 func (l *GateLinker) Disconnect(ctx context.Context, args *DisconnectArgs) error {
-	switch args.Kind {
-	case session.Conn:
+	switch {
+	case args.CID > 0:
 		return l.doDirectDisconnect(ctx, args)
-	case session.User:
-		if args.GID == "" {
-			return l.doIndirectDisconnect(ctx, args.Target, args.Force)
-		} else {
-			return l.doDirectDisconnect(ctx, args)
-		}
+
+	case args.GID == "":
+		return l.doIndirectDisconnect(ctx, args.UID, args.CID, args.Force)
+
 	default:
-		return xerrors.ErrInvalidSessionKind
+		return l.doDirectDisconnect(ctx, args)
 	}
+
 }
 
 // 直接断开连接
@@ -299,13 +298,13 @@ func (l *GateLinker) doDirectDisconnect(ctx context.Context, args *DisconnectArg
 		return err
 	}
 
-	return client.Disconnect(ctx, args.Kind, args.Target, args.Force)
+	return client.Disconnect(ctx, args.UID, args.CID, args.Force)
 }
 
 // 间接断开连接
-func (l *GateLinker) doIndirectDisconnect(ctx context.Context, uid int64, force bool) error {
+func (l *GateLinker) doIndirectDisconnect(ctx context.Context, uid, cid int64, force bool) error {
 	_, err := l.doRPC(ctx, uid, func(client *gate.Client, index, total int) (bool, any, error) {
-		if err := client.Disconnect(ctx, session.User, uid, force); err != nil {
+		if err := client.Disconnect(ctx, uid, cid, force); err != nil {
 			return xerrors.Is(err, xerrors.ErrNotFoundSession), nil, err
 		} else {
 			return false, nil, nil

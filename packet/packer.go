@@ -247,7 +247,7 @@ func (p *defaultPacker) UnpackMessage(data []byte) (*Message, int, error) {
 	// -------------------------
 	// 1. 至少要有 size
 	// -------------------------
-	if len(data) < 4 {
+	if len(data) < defaultHeaderSize {
 		return nil, 0, nil // half packet
 	}
 
@@ -259,13 +259,8 @@ func (p *defaultPacker) UnpackMessage(data []byte) (*Message, int, error) {
 	size := int(p.opts.byteOrder.Uint32(data[offset:]))
 	offset += 4
 
-	if size <= 0 || size > p.opts.bufferBytes {
+	if size <= defaultHeaderSize || size > p.opts.bufferBytes {
 		return nil, 0, xerrors.ErrInvalidMessage
-	}
-
-	totalLen := 4 + size
-	if len(data) < totalLen {
-		return nil, 0, nil // half packet
 	}
 
 	// -------------------------
@@ -299,7 +294,7 @@ func (p *defaultPacker) UnpackMessage(data []byte) (*Message, int, error) {
 	// -------------------------
 	// 7. body（zero-copy）
 	// -------------------------
-	body := data[offset:totalLen]
+	body := data[offset:size]
 
 	// -------------------------
 	// 8. 组装 message
@@ -311,5 +306,5 @@ func (p *defaultPacker) UnpackMessage(data []byte) (*Message, int, error) {
 		Buffer:    body,
 	}
 
-	return msg, totalLen, nil
+	return msg, size, nil
 }

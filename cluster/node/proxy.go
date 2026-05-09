@@ -141,8 +141,9 @@ func (p *Proxy) BindGate(ctx context.Context, gid string, cid, uid int64) error 
 }
 
 // UnbindGate 解绑网关
-func (p *Proxy) UnbindGate(ctx context.Context, uid int64) error {
-	return p.gateLinker.UnbindGate(ctx, uid)
+func (p *Proxy) UnbindGate(ctx context.Context, cid, uid int64) error {
+	return p.gateLinker.UnbindGate(ctx, cid, uid)
+
 }
 
 // FetchGateList 拉取网关列表

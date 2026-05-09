@@ -63,12 +63,12 @@ func (s *Server) bind(conn *server.Conn, data []byte) error {
 
 // 解绑用户
 func (s *Server) unbind(conn *server.Conn, data []byte) error {
-	seq, uid, err := protocol.DecodeUnbindReq(data)
+	seq, uid,cid, err := protocol.DecodeUnbindReq(data)
 	if err != nil {
 		return err
 	}
 
-	err = s.provider.Unbind(context.Background(), uid)
+	err = s.provider.Unbind(context.Background(), uid, cid)
 
 	if seq == 0 {
 		return err

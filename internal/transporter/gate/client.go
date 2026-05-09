@@ -44,9 +44,9 @@ func (c *Client) Bind(ctx context.Context, cid, uid int64) error {
 }
 
 // Unbind 解绑用户与连接
-func (c *Client) Unbind(ctx context.Context, uid int64) error {
+func (c *Client) Unbind(ctx context.Context, uid, cid int64) error {
 	seq := c.doGenSequence()
-	buf := protocol.EncodeUnbindReq(seq, uid)
+	buf := protocol.EncodeUnbindReq(seq, uid, cid)
 
 	res, err := c.cli.Call(ctx, seq, buf)
 	if err != nil {
@@ -120,9 +120,9 @@ func (c *Client) IsOnline(ctx context.Context, kind session.Kind, target int64) 
 }
 
 // Disconnect 断开连接
-func (c *Client) Disconnect(ctx context.Context, kind session.Kind, target int64, force bool) error {
+func (c *Client) Disconnect(ctx context.Context, uid, cid int64, force bool) error {
 	seq := c.doGenSequence()
-	buf := protocol.EncodeDisconnectReq(seq, kind, target, force)
+	buf := protocol.EncodeDisconnectReq(seq, uid, cid, force)
 
 	res, err := c.cli.Call(ctx, seq, buf)
 	if err != nil {

@@ -5,26 +5,25 @@ import (
 
 	"github.com/xbaseio/xbase/internal/transporter/internal/codes"
 	"github.com/xbaseio/xbase/internal/transporter/internal/protocol"
-	"github.com/xbaseio/xbase/session"
 )
 
 func TestEncodeDisconnectReq(t *testing.T) {
-	buffer := protocol.EncodeDisconnectReq(1, session.User, 3, true)
+	buffer := protocol.EncodeDisconnectReq(1, 2, 3, true)
 
 	t.Log(buffer.Bytes())
 }
 
 func TestDecodeDisconnectReq(t *testing.T) {
-	buffer := protocol.EncodeDisconnectReq(1, session.User, 3, false)
+	buffer := protocol.EncodeDisconnectReq(1, 2, 3, false)
 
-	seq, kind, target, force, err := protocol.DecodeDisconnectReq(buffer.Bytes())
+	seq, uid, cid, force, err := protocol.DecodeDisconnectReq(buffer.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Logf("seq: %v", seq)
-	t.Logf("kind: %v", kind)
-	t.Logf("target: %v", target)
+	t.Logf("uid: %v", uid)
+	t.Logf("cid: %v", cid)
 	t.Logf("force: %v", force)
 }
 

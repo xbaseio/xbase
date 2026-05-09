@@ -6,25 +6,24 @@ import (
 
 	"github.com/xbaseio/xbase/core/buffer"
 	"github.com/xbaseio/xbase/internal/transporter/internal/route"
-	"github.com/xbaseio/xbase/session"
 	"github.com/xbaseio/xbase/xerrors"
 )
 
 const (
-	disconnectReqBytes = defaultSizeBytes + defaultHeaderBytes + defaultRouteBytes + defaultSeqBytes + b8 + b64 + b8
+	disconnectReqBytes = defaultSizeBytes + defaultHeaderBytes + defaultSeqBytes + defaultSeqBytes + b8 + b64 + b8
 	disconnectResBytes = defaultSizeBytes + defaultHeaderBytes + defaultRouteBytes + defaultSeqBytes + defaultCodeBytes
 )
 
 // EncodeDisconnectReq 编码断连请求
 // 协议：size + header + route + seq + session kind + target + force
-func EncodeDisconnectReq(seq uint64, kind session.Kind, target int64, force bool) *buffer.NocopyBuffer {
+func EncodeDisconnectReq(seq uint64, uid, cid int64, force bool) *buffer.NocopyBuffer {
 	writer := buffer.MallocWriter(disconnectReqBytes)
 	writer.WriteUint32s(binary.BigEndian, uint32(disconnectReqBytes-defaultSizeBytes))
 	writer.WriteUint8s(dataBit)
 	writer.WriteUint8s(route.Disconnect)
 	writer.WriteUint64s(binary.BigEndian, seq)
-	writer.WriteUint8s(uint8(kind))
-	writer.WriteInt64s(binary.BigEndian, target)
+	writer.WriteInt64s(binary.BigEndian, uid)
+	writer.WriteInt64s(binary.BigEndian, cid)
 	writer.WriteBools(force)
 
 	return buffer.NewNocopyBuffer(writer)
@@ -32,7 +31,7 @@ func EncodeDisconnectReq(seq uint64, kind session.Kind, target int64, force bool
 
 // DecodeDisconnectReq 解码端连请求
 // 协议：size + header + route + seq + session kind + target + force
-func DecodeDisconnectReq(data []byte) (seq uint64, kind session.Kind, target int64, force bool, err error) {
+func DecodeDisconnectReq(data []byte) (seq uint64, uid, cid int64, force bool, err error) {
 	if len(data) != disconnectReqBytes {
 		err = xerrors.ErrInvalidMessage
 		return
@@ -47,15 +46,10 @@ func DecodeDisconnectReq(data []byte) (seq uint64, kind session.Kind, target int
 	if seq, err = reader.ReadUint64(binary.BigEndian); err != nil {
 		return
 	}
-
-	var k uint8
-	if k, err = reader.ReadUint8(); err != nil {
+	if uid, err = reader.ReadInt64(binary.BigEndian); err != nil {
 		return
-	} else {
-		kind = session.Kind(k)
 	}
-
-	if target, err = reader.ReadInt64(binary.BigEndian); err != nil {
+	if cid, err = reader.ReadInt64(binary.BigEndian); err != nil {
 		return
 	}
 

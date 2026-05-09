@@ -11,10 +11,10 @@ import (
 )
 
 type Dispatcher struct {
-	dispatch  cluster.Dispatch
-	rw        sync.RWMutex
-	routes    map[int32]*Route
-	events    map[int]*Event
+	dispatch cluster.Dispatch
+	rw       sync.RWMutex
+	//routes    map[int32]*Route
+	events     map[int]*Event
 	endpoints map[string]*endpoint.Endpoint
 	instances map[string]*registry.ServiceInstance
 }
@@ -84,7 +84,7 @@ func (d *Dispatcher) FindEvent(event int) (*Event, error) {
 
 // ReplaceServices 替换服务
 func (d *Dispatcher) ReplaceServices(services ...*registry.ServiceInstance) {
-	routes := make(map[int32]*Route, len(services))
+	//routes := make(map[int32]*Route, len(services))
 	events := make(map[int]*Event, len(services))
 	endpoints := make(map[string]*endpoint.Endpoint)
 	instances := make(map[string]*registry.ServiceInstance, len(services))
@@ -130,7 +130,7 @@ func (d *Dispatcher) ReplaceServices(services ...*registry.ServiceInstance) {
 	}
 
 	d.rw.Lock()
-	d.routes = routes
+	//d.routes = routes
 	d.events = events
 	d.endpoints = endpoints
 	d.instances = instances

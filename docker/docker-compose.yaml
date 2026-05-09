@@ -99,26 +99,33 @@ services:
   consul:
     image: hashicorp/consul:1.17.2
     container_name: server-consul
+    platform: linux/x86_64
+    restart: always
+
+    command:
+      - agent
+      - -dev
+      - -ui
+      - -client=0.0.0.0
+
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-    platform: linux/x86_64
-    restart: always
+
     environment:
       - CONSUL_LIMITS_HTTP_MAX_CONNS_PER_CLIENT=8192
       - CONSUL_LIMITS_RPC_RATE=128
       - CONSUL_LIMITS_RPC_MAX_BURST=256
-    volumes:
-      - ./server-consul:/data
+
     ports:
-      - '8300:8300'
-      - '8301:8301'
-      - '8301:8301/udp'
-      - '8500:8500'
-      - '18600:8600'
-      - '18600:8600/udp'
+      - "8300:8300"
+      - "8301:8301"
+      - "8301:8301/udp"
+      - "8500:8500"
+      - "18600:8600"
+      - "18600:8600/udp"
   nats:
     image: nats:latest
     container_name: server-nats

@@ -77,6 +77,11 @@ func (p *proxy) deliver(ctx context.Context, cid, uid int64, data []byte) {
 		log.Errorf("unpack message failed: %v", err)
 		return
 	}
+	if message == nil {
+		log.Warnf("unpack message failed: half packet")
+
+		return
+	}
 
 	if err = p.nodeLinker.Deliver(ctx, &link.DeliverArgs{
 		CID:       cid,

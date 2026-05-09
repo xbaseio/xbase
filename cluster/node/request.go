@@ -224,9 +224,9 @@ func (r *request) BindGate(uid ...int64) error {
 func (r *request) UnbindGate(uid ...int64) error {
 	switch {
 	case len(uid) > 0:
-		return r.node.proxy.UnbindGate(r.ctx, uid[0])
+		return r.node.proxy.UnbindGate(r.ctx, r.cid, uid[0])
 	case r.uid != 0:
-		return r.node.proxy.UnbindGate(r.ctx, r.uid)
+		return r.node.proxy.UnbindGate(r.ctx, r.cid, r.uid)
 	default:
 		return xerrors.ErrIllegalOperation
 	}
@@ -424,10 +424,10 @@ func (r *request) Disconnect(force ...bool) error {
 	}
 
 	return r.node.proxy.Disconnect(r.ctx, &cluster.DisconnectArgs{
-		GID:    r.gid,
-		Kind:   session.Conn,
-		Target: r.cid,
-		Force:  len(force) > 0 && force[0],
+		GID:   r.gid,
+		UID:   r.uid,
+		CID:   r.cid,
+		Force: len(force) > 0 && force[0],
 	})
 }
 

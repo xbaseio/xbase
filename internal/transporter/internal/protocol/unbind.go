@@ -10,26 +10,26 @@ import (
 )
 
 const (
-	unbindReqBytes = defaultSizeBytes + defaultHeaderBytes + defaultRouteBytes + defaultSeqBytes + b64
+	unbindReqBytes = defaultSizeBytes + defaultHeaderBytes + defaultRouteBytes + defaultSeqBytes + defaultSeqBytes + b64
 	unbindResBytes = defaultSizeBytes + defaultHeaderBytes + defaultRouteBytes + defaultSeqBytes + defaultCodeBytes
 )
 
 // EncodeUnbindReq 编码解绑请求
 // 协议：size + header + route + seq + uid
-func EncodeUnbindReq(seq uint64, uid int64) *buffer.NocopyBuffer {
+func EncodeUnbindReq(seq uint64, uid, cid int64) *buffer.NocopyBuffer {
 	writer := buffer.MallocWriter(unbindReqBytes)
 	writer.WriteUint32s(binary.BigEndian, uint32(unbindReqBytes-defaultSizeBytes))
 	writer.WriteUint8s(dataBit)
 	writer.WriteUint8s(route.Unbind)
 	writer.WriteUint64s(binary.BigEndian, seq)
 	writer.WriteInt64s(binary.BigEndian, uid)
-
+	writer.WriteInt64s(binary.BigEndian, cid)
 	return buffer.NewNocopyBuffer(writer)
 }
 
 // DecodeUnbindReq 解码解绑请求
 // 协议：size + header + route + seq + uid
-func DecodeUnbindReq(data []byte) (seq uint64, uid int64, err error) {
+func DecodeUnbindReq(data []byte) (seq uint64, uid, cid int64, err error) {
 	if len(data) != unbindReqBytes {
 		err = xerrors.ErrInvalidMessage
 		return
@@ -49,6 +49,9 @@ func DecodeUnbindReq(data []byte) (seq uint64, uid int64, err error) {
 		return
 	}
 
+	if cid, err = reader.ReadInt64(binary.BigEndian); err != nil {
+		return
+	}
 	return
 }
 
