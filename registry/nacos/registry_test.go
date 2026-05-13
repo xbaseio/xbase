@@ -176,12 +176,13 @@ func newNode(id string) *node {
 		Kind:  cluster.Node.String(),
 		Alias: fmt.Sprintf("node-%s", id),
 		State: cluster.Work.String(),
-		Routes: []registry.Route{
+		/*Routes: []registry.Route{
 			{ID: 1, Stateful: true, Internal: false},
 			{ID: 2, Stateful: true, Internal: false},
 			{ID: 3, Stateful: true, Internal: false},
 			{ID: 4, Stateful: true, Internal: false},
 		},
+		*/
 		Endpoint: fmt.Sprintf("grpc://%s:%d", id, port),
 	})
 

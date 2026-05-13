@@ -6,21 +6,21 @@ import (
 
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/core/endpoint"
-	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/xerrors"
 )
 
-type Route struct {
+type GameRoute struct {
 	abstract
-	route      registry.Route // 路由信息
-	group      string         // 路由所属组
-	counter    atomic.Uint64  // 轮询计数器
-	dispatcher *Dispatcher    // 分发器
+	//route      registry.Route // 路由信息
+	group      string        // 路由所属组
+	counter    atomic.Uint64 // 轮询计数器
+	dispatcher *Dispatcher   // 分发器
+	gameID     int32         // 游戏ID
 }
 
-func newRoute(dispatcher *Dispatcher, group string, route registry.Route) *Route {
-	return &Route{
-		route:      route,
+func newRoute_001(dispatcher *Dispatcher, group string, gameID int32) *GameRoute {
+	return &GameRoute{
+		gameID:     gameID,
 		group:      group,
 		dispatcher: dispatcher,
 		abstract:   newAbstract(),
@@ -28,32 +28,17 @@ func newRoute(dispatcher *Dispatcher, group string, route registry.Route) *Route
 }
 
 // ID 获取路由ID
-func (r *Route) ID() int32 {
-	return r.route.ID
+func (r *GameRoute) ID() int32 {
+	return r.gameID
 }
 
 // Group 路由所属组
-func (r *Route) Group() string {
+func (r *GameRoute) Group() string {
 	return r.group
 }
 
-// Internal 是否内部路由
-func (r *Route) Internal() bool {
-	return r.route.Internal
-}
-
-// Stateful 是否有状态路由
-func (r *Route) Stateful() bool {
-	return r.route.Stateful
-}
-
-// Authorized 是否授权路由
-func (r *Route) Authorized() bool {
-	return r.route.Authorized
-}
-
 // FindEndpoint 查询路由服务端点
-func (r *Route) FindEndpoint(insID ...string) (*endpoint.Endpoint, error) {
+func (r *GameRoute) FindEndpoint(insID ...string) (*endpoint.Endpoint, error) {
 	if len(insID) == 0 || insID[0] == "" {
 		switch r.dispatcher.dispatch {
 		case cluster.RoundRobin:
@@ -69,7 +54,7 @@ func (r *Route) FindEndpoint(insID ...string) (*endpoint.Endpoint, error) {
 }
 
 // 直接分配
-func (r *Route) directDispatch(insID string) (*endpoint.Endpoint, error) {
+func (r *GameRoute) directDispatch(insID string) (*endpoint.Endpoint, error) {
 	sep, ok := r.endpoints5[insID]
 	if !ok {
 		return nil, xerrors.ErrNotFoundEndpoint
@@ -79,7 +64,7 @@ func (r *Route) directDispatch(insID string) (*endpoint.Endpoint, error) {
 }
 
 // 随机分配
-func (r *Route) randomDispatch() (*endpoint.Endpoint, error) {
+func (r *GameRoute) randomDispatch() (*endpoint.Endpoint, error) {
 	if n := len(r.endpoints1); n > 0 {
 		return r.endpoints1[rand.IntN(n)].endpoint, nil
 	}
@@ -92,7 +77,7 @@ func (r *Route) randomDispatch() (*endpoint.Endpoint, error) {
 }
 
 // 轮询分配
-func (r *Route) roundRobinDispatch() (*endpoint.Endpoint, error) {
+func (r *GameRoute) roundRobinDispatch() (*endpoint.Endpoint, error) {
 	if n := len(r.endpoints1); n > 0 {
 		index := int(r.counter.Add(1) % uint64(n))
 
@@ -109,7 +94,7 @@ func (r *Route) roundRobinDispatch() (*endpoint.Endpoint, error) {
 }
 
 // 加权轮询分配
-func (r *Route) weightRoundRobinDispatch() (*endpoint.Endpoint, error) {
+func (r *GameRoute) weightRoundRobinDispatch() (*endpoint.Endpoint, error) {
 	var (
 		selected    *serviceEndpoint
 		totalWeight int

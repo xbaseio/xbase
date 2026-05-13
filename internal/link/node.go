@@ -256,19 +256,19 @@ func (l *NodeLinker) SetState(ctx context.Context, nid string, state cluster.Sta
 }
 
 // 执行节点RPC调用
-func (l *NodeLinker) doRPC(ctx context.Context, routeID int32, uid int64, fn func(ctx context.Context, client *node.Client) (bool, any, error)) (any, error) {
+func (l *NodeLinker) doRPC_V2(ctx context.Context, gameID int32, uid int64, fn func(ctx context.Context, client *node.Client) (bool, any, error)) (any, error) {
 	var (
 		err       error
 		nid       string
 		prev      string
-		route     *dispatcher.Route
+		route     *dispatcher.GameRoute
 		client    *node.Client
 		ep        *endpoint.Endpoint
 		continued bool
 		reply     any
 	)
 
-	if route, err = l.dispatcher.FindRoute(routeID); err != nil {
+	if route, err = l.dispatcher.FindGameRoute(gameID); err != nil {
 		return nil, err
 	}
 

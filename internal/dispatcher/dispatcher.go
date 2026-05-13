@@ -14,7 +14,7 @@ type Dispatcher struct {
 	dispatch cluster.Dispatch
 	rw       sync.RWMutex
 	//routes    map[int32]*Route
-	events     map[int]*Event
+	events    map[int]*Event
 	endpoints map[string]*endpoint.Endpoint
 	instances map[string]*registry.ServiceInstance
 }
@@ -57,7 +57,7 @@ func (d *Dispatcher) VisitEndpoints(fn func(insID string, ep *endpoint.Endpoint)
 }
 
 // FindRoute 查找节点路由
-func (d *Dispatcher) FindRoute(route int32) (*Route, error) {
+func (d *Dispatcher) FindRoute_001(route int32) (*Route, error) {
 	d.rw.RLock()
 	defer d.rw.RUnlock()
 
@@ -84,7 +84,7 @@ func (d *Dispatcher) FindEvent(event int) (*Event, error) {
 
 // ReplaceServices 替换服务
 func (d *Dispatcher) ReplaceServices(services ...*registry.ServiceInstance) {
-	//routes := make(map[int32]*Route, len(services))
+	routes := make(map[int32]*GameRoute, len(services))
 	events := make(map[int]*Event, len(services))
 	endpoints := make(map[string]*endpoint.Endpoint)
 	instances := make(map[string]*registry.ServiceInstance, len(services))
@@ -99,13 +99,11 @@ func (d *Dispatcher) ReplaceServices(services ...*registry.ServiceInstance) {
 
 		endpoints[service.ID] = ep
 		instances[service.ID] = service
-
-		for _, item := range service.Routes {
-			route, ok := routes[item.ID]
-			if !ok {
-				route = newRoute(d, service.Alias, item)
-				routes[item.ID] = route
-			}
+		route, ok := routes[service.GameID]
+		if !ok {
+			route = newRoute_001(d, service.Alias, service.GameID)
+			routes[service.GameID] = route
+		} else {
 			route.addServiceEndpoint(&serviceEndpoint{
 				insID:    service.ID,
 				state:    service.State,
@@ -130,7 +128,7 @@ func (d *Dispatcher) ReplaceServices(services ...*registry.ServiceInstance) {
 	}
 
 	d.rw.Lock()
-	//d.routes = routes
+	d.routes = routes
 	d.events = events
 	d.endpoints = endpoints
 	d.instances = instances

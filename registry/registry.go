@@ -45,7 +45,7 @@ type ServiceInstance struct {
 	// 服务事件集合
 	Events []int `json:"events,omitempty"`
 	// 服务路由ID
-	Routes []Route `json:"routes,omitempty"`
+	//Routes []Route `json:"routes,omitempty"`
 	// 服务路由列表
 	Services []string `json:"services,omitempty"`
 	// 微服务实体暴露端口
@@ -58,6 +58,7 @@ type ServiceInstance struct {
 	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
+/*
 type Route struct {
 	// 路由ID
 	ID int32 `json:"i,omitempty"`
@@ -68,3 +69,4 @@ type Route struct {
 	// 是否授权路由
 	Authorized bool `json:"a,omitempty"`
 }
+*/

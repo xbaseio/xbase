@@ -6,25 +6,26 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 	"github.com/xbaseio/xbase/encoding/json"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/utils/xconv"
 	"github.com/xbaseio/xbase/xerrors"
-	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 )
 
 const (
-	metaFieldID       = "id"
-	metaFieldName     = "name"
-	metaFieldKind     = "kind"
-	metaFieldAlias    = "alias"
-	metaFieldState    = "state"
-	metaFieldRoutes   = "routes"
+	metaFieldID    = "id"
+	metaFieldName  = "name"
+	metaFieldKind  = "kind"
+	metaFieldAlias = "alias"
+	metaFieldState = "state"
+	//metaFieldRoutes   = "routes"
 	metaFieldEvents   = "events"
 	metaFieldWeight   = "weight"
 	metaFieldServices = "services"
 	metaFieldEndpoint = "endpoint"
 	metaFieldMetadata = "metadata"
+	metaFieldGameID   = "gameID"
 )
 
 type registrar struct {

@@ -278,10 +278,10 @@ func (n *Node) stopTransportServer() {
 
 // 注册服务实例
 func (n *Node) registerServiceInstances() {
-	routes := make([]registry.Route, 0, len(n.router.routes))
+	//routes := make([]registry.Route, 0, len(n.router.routes))
 	events := make([]int, 0, len(n.trigger.events))
 
-	for _, entity := range n.router.routes {
+	/*for _, entity := range n.router.routes {
 		routes = append(routes, registry.Route{
 			ID:         entity.route,
 			Internal:   entity.options.Internal,
@@ -289,22 +289,23 @@ func (n *Node) registerServiceInstances() {
 			Authorized: entity.options.Authorized,
 		})
 	}
-
+	*/
 	for evt := range n.trigger.events {
 		events = append(events, int(evt))
 	}
 
 	n.instances = append(n.instances, &registry.ServiceInstance{
-		ID:       n.opts.id,
-		Name:     cluster.Node.String(),
-		Kind:     cluster.Node.String(),
-		Alias:    n.opts.name,
-		State:    n.getState().String(),
-		Routes:   routes,
+		ID:    n.opts.id,
+		Name:  cluster.Node.String(),
+		Kind:  cluster.Node.String(),
+		Alias: n.opts.name,
+		State: n.getState().String(),
+		//Routes:   routes,
 		Events:   events,
 		Endpoint: n.linker.Endpoint().String(),
 		Weight:   n.opts.weight,
 		Metadata: n.opts.metadata,
+		GameID:   n.opts.gameID,
 	})
 
 	if n.transporter != nil {
