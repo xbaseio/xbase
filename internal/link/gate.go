@@ -757,19 +757,24 @@ func (l *GateLinker) doBuildClient(gid string) (*gate.Client, error) {
 	return l.builder.Build(ep.Address())
 }
 
-// PackMessage 打包消息
+// PackMessage 打包消息（客户端 TCP/WS 线格式，含 4 字节外层 length 前缀）
 func (l *GateLinker) PackMessage(message *Message, encrypt bool) (*buffer.NocopyBuffer, error) {
 	buf, err := l.PackBuffer(message.Data, encrypt)
 	if err != nil {
 		return nil, err
 	}
 
-	return packet.PackBuffer(&packet.Message{
+	wire, err := packet.PackMessage(&packet.Message{
 		Seq:       message.Seq,
 		GameID:    message.GameID,
 		MessageID: message.MessageID,
 		Buffer:    buf,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return buffer.NewNocopyBuffer(wire), nil
 }
 
 // PackBuffer 消息转buffer

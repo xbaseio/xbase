@@ -1,0 +1,21 @@
+{
+  "name": "xbase-nodejs-client",
+  "version": "1.0.0",
+  "description": "Node.js test client for xbase Gate (TCP / WebSocket)",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "xbase-client": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test:tcp": "node src/index.js --host 127.0.0.1 --port 3553 --game 1 --message 1001 --body hello",
+    "test:ws": "node src/index.js --ws --host 127.0.0.1 --port 3653 --game 1 --message 1001 --body hello"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

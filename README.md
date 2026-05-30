@@ -432,7 +432,19 @@ msg := &packet.Message{
 
 ---
 
-## 可插拔能力概览
+## Node.js 测试客户端
+
+仓库提供 Node.js 版 Gate 连接测试工具，协议与 `packet` 包一致：
+
+```bash
+cd examples/nodejs-client
+npm install
+node src/index.js --host 127.0.0.1 --port 3553 --game 1 --message 1001 --body hello
+```
+
+详见 [examples/nodejs-client/README.md](examples/nodejs-client/README.md)。
+
+---
 
 框架各层均通过接口注入，可按项目替换实现：
 

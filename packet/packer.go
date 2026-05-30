@@ -245,22 +245,26 @@ func (p *defaultPacker) PackMessage(message *Message) ([]byte, error) {
 func (p *defaultPacker) UnpackMessage(data []byte) (*Message, int, error) {
 
 	// -------------------------
-	// 1. 至少要有 size
+	// 1. 至少要有 size 字段
 	// -------------------------
-	if len(data) < defaultHeaderSize {
+	if len(data) < defaultSizeBytes {
 		return nil, 0, nil // half packet
 	}
 
 	offset := 0
 
 	// -------------------------
-	// 2. size（payload长度，不含4字节本身）
+	// 2. size（PackBuffer 内层长度；ReadMessage 首 4 字节与之相同）
 	// -------------------------
 	size := int(p.opts.byteOrder.Uint32(data[offset:]))
 	offset += 4
 
-	if size <= defaultHeaderSize || size > p.opts.bufferBytes {
+	if size < defaultHeaderSize || size > p.opts.bufferBytes {
 		return nil, 0, xerrors.ErrInvalidMessage
+	}
+
+	if len(data) < size {
+		return nil, 0, nil // half packet
 	}
 
 	// -------------------------
