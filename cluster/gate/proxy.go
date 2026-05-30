@@ -7,6 +7,7 @@ import (
 	"github.com/xbaseio/xbase/internal/link"
 	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/mode"
+	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/packet"
 	"github.com/xbaseio/xbase/xerrors"
 )
@@ -76,7 +77,7 @@ func (p *proxy) trigger(ctx context.Context, event cluster.Event, cid, uid int64
 }
 
 // 投递消息
-func (p *proxy) deliver(ctx context.Context, cid, uid int64, data []byte) {
+func (p *proxy) deliver(ctx context.Context, conn network.Conn, cid, uid int64, data []byte) {
 	message, _, err := packet.UnpackMessage(data)
 	if err != nil {
 		log.Errorf("unpack message failed: %v", err)
@@ -85,6 +86,11 @@ func (p *proxy) deliver(ctx context.Context, cid, uid int64, data []byte) {
 	if message == nil {
 		log.Warnf("unpack message failed: half packet")
 
+		return
+	}
+
+	if p.isLoginMessage(message) {
+		p.handleLogin(ctx, conn, message)
 		return
 	}
 

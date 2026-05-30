@@ -73,6 +73,14 @@ func (g *Gate) Init() {
 	if g.opts.registry == nil {
 		log.Fatal("registry component is not injected")
 	}
+
+	if err := initGateJWT(g.opts); err != nil {
+		log.Fatalf("init gate jwt failed: %v", err)
+	}
+
+	if g.opts.loginMessageID > 0 && g.opts.jwt == nil {
+		log.Warn("gate login is enabled but jwt is not configured")
+	}
 }
 
 // Start 启动组件
@@ -148,7 +156,7 @@ func (g *Gate) deliverWorker() {
 
 			cid, uid := msg.conn.ID(), msg.conn.UID()
 			ctx, cancel := context.WithTimeout(g.ctx, g.opts.timeout)
-			g.proxy.deliver(ctx, cid, uid, msg.data)
+			g.proxy.deliver(ctx, msg.conn, cid, uid, msg.data)
 			cancel()
 		}
 	}

@@ -12,17 +12,21 @@ import (
 	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/registry"
+	"github.com/xbaseio/xbase/utils/xjwt"
 	"github.com/xbaseio/xbase/utils/xuuid"
 )
 
 const (
-	defaultName        = "gate"          // 默认名称
-	defaultAddr        = ":0"            // 连接器监听地址
-	defaultTimeout     = 3 * time.Second // 默认超时时间
-	defaultDispatch    = cluster.Random  // 默认的无状态路由分发策略
-	defaultVersion     = "1"
-	defaultRetireDelay = 10 * time.Minute
-	defaultReceiveQueue  = 8192
+	defaultName           = "gate"          // 默认名称
+	defaultAddr           = ":0"            // 连接器监听地址
+	defaultTimeout        = 3 * time.Second // 默认超时时间
+	defaultDispatch       = cluster.Random  // 默认的无状态路由分发策略
+	defaultVersion        = "1"
+	defaultRetireDelay    = 10 * time.Minute
+	defaultReceiveQueue   = 8192
+	defaultLoginMessageID = 1000
+	defaultLobbyGameID    = 0
+	defaultJWTIdentityKey = "uid"
 )
 
 const (
@@ -35,8 +39,13 @@ const (
 	defaultMetadataKey    = "etc.cluster.gate.metadata"
 	defaultVersionKey     = "etc.cluster.gate.version"
 	defaultRetireDelayKey = "etc.cluster.gate.retireDelay"
-	defaultReceiveQueueKey  = "etc.cluster.gate.receiveQueue"
+	defaultReceiveQueueKey   = "etc.cluster.gate.receiveQueue"
 	defaultDeliverWorkersKey = "etc.cluster.gate.deliverWorkers"
+	defaultLoginMessageIDKey = "etc.cluster.gate.login.messageID"
+	defaultLobbyGameIDKey    = "etc.cluster.gate.login.lobbyGameID"
+	defaultJWTSecretKey      = "etc.cluster.gate.jwt.secretKey"
+	defaultJWTIdentityKeyKey = "etc.cluster.gate.jwt.identityKey"
+	defaultJWTSignAlgorithmKey = "etc.cluster.gate.jwt.signAlgorithm"
 )
 
 type Option func(o *options)
@@ -56,8 +65,14 @@ type options struct {
 	gameID   int32             // 游戏ID
 	version  string            // 服务版本号
 	retireDelay time.Duration  // 低版本退出等待时间
-	receiveQueue int           // 收包队列容量
-	deliverWorkers int         // deliver worker 数量
+	receiveQueue   int           // 收包队列容量
+	deliverWorkers int           // deliver worker 数量
+	loginMessageID int32         // Gate 登录消息 ID，<=0 表示关闭
+	lobbyGameID    int32         // 大厅 GameID，默认 0
+	jwt            *xjwt.JWT     // JWT 解析器
+	jwtSecretKey   string        // JWT 密钥（etc 注入）
+	jwtIdentityKey string        // JWT 用户 ID 字段名
+	jwtSignAlgorithm xjwt.SignAlgorithm // JWT 签名算法
 	metadata map[string]string // 元数据
 }
 
@@ -74,8 +89,12 @@ func defaultOptions() *options {
 		gameID:      -1,
 		version:     defaultVersion,
 		retireDelay: defaultRetireDelay,
-		receiveQueue: defaultReceiveQueue,
+		receiveQueue:   defaultReceiveQueue,
 		deliverWorkers: max(runtime.NumCPU(), 1),
+		loginMessageID: defaultLoginMessageID,
+		lobbyGameID:    defaultLobbyGameID,
+		jwtIdentityKey: defaultJWTIdentityKey,
+		jwtSignAlgorithm: xjwt.HS256,
 	}
 
 	if id := etc.Get(defaultIDKey).String(); id != "" {
@@ -118,6 +137,24 @@ func defaultOptions() *options {
 
 	if n := etc.Get(defaultDeliverWorkersKey).Int(); n > 0 {
 		opts.deliverWorkers = n
+	}
+
+	if etc.Has(defaultLoginMessageIDKey) {
+		opts.loginMessageID = int32(etc.Get(defaultLoginMessageIDKey).Int())
+	}
+
+	if etc.Has(defaultLobbyGameIDKey) {
+		opts.lobbyGameID = int32(etc.Get(defaultLobbyGameIDKey).Int())
+	}
+
+	opts.jwtSecretKey = etc.Get(defaultJWTSecretKey).String()
+
+	if identityKey := etc.Get(defaultJWTIdentityKeyKey).String(); identityKey != "" {
+		opts.jwtIdentityKey = identityKey
+	}
+
+	if signAlgorithm := etc.Get(defaultJWTSignAlgorithmKey).String(); signAlgorithm != "" {
+		opts.jwtSignAlgorithm = xjwt.SignAlgorithm(signAlgorithm)
 	}
 
 	return opts
@@ -200,4 +237,34 @@ func WithReceiveQueue(size int) Option {
 
 func WithDeliverWorkers(n int) Option {
 	return func(o *options) { o.deliverWorkers = n }
+}
+
+// WithLoginMessageID 设置 Gate 登录消息 ID；<=0 关闭 Gate 登录
+func WithLoginMessageID(messageID int32) Option {
+	return func(o *options) { o.loginMessageID = messageID }
+}
+
+// WithLobbyGameID 设置大厅 GameID，登录包与大厅绑定均使用该值
+func WithLobbyGameID(gameID int32) Option {
+	return func(o *options) { o.lobbyGameID = gameID }
+}
+
+// WithJWT 注入 JWT 解析器（HTTP 登录签发 token，Gate 校验并绑定用户）
+func WithJWT(jwt *xjwt.JWT) Option {
+	return func(o *options) { o.jwt = jwt }
+}
+
+// WithJWTSecretKey 设置 JWT 密钥（与 HTTP 服一致）
+func WithJWTSecretKey(secretKey string) Option {
+	return func(o *options) { o.jwtSecretKey = secretKey }
+}
+
+// WithJWTIdentityKey 设置 JWT 中用户 ID 字段名
+func WithJWTIdentityKey(identityKey string) Option {
+	return func(o *options) { o.jwtIdentityKey = identityKey }
+}
+
+// WithJWTSignAlgorithm 设置 JWT 签名算法
+func WithJWTSignAlgorithm(signAlgorithm xjwt.SignAlgorithm) Option {
+	return func(o *options) { o.jwtSignAlgorithm = signAlgorithm }
 }
