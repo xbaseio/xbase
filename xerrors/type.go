@@ -162,6 +162,24 @@ var (
 	// ErrConnectionNotHanged 表示连接并未处于挂起状态。
 	ErrConnectionNotHanged = errText("connection is not hanged")
 
+	// ErrReceiveQueueFull 表示收包队列已满。
+	ErrReceiveQueueFull = errText("receive queue is full")
+
+	// ErrWriteQueueTimeout 表示写队列入队超时。
+	ErrWriteQueueTimeout = errText("write queue enqueue timeout")
+
+	// ErrDeliverQueueFull 表示业务投递队列已满。
+	ErrDeliverQueueFull = errText("deliver queue is full")
+
+	// ErrMailboxFull 表示 Actor 邮箱已满。
+	ErrMailboxFull = errText("actor mailbox is full")
+
+	// ErrUnauthorizedRoute 表示未授权连接访问需授权路由。
+	ErrUnauthorizedRoute = errText("unauthorized route")
+
+	// ErrInvalidGameID 表示消息 GameID 与节点不匹配。
+	ErrInvalidGameID = errText("invalid game id")
+
 	// ErrTooManyConnection 表示连接数过多。
 	ErrTooManyConnection = errText("too many connection")
 

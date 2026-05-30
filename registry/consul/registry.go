@@ -172,6 +172,10 @@ func (r *Registry) services(ctx context.Context, serviceName string, waitIndex u
 				ins.GameID = xconv.Int32(v)
 			case metaFieldVersion:
 				ins.Version = v
+			case metaFieldRoutes:
+				if err = json.Unmarshal(xconv.StringToBytes(v), &ins.Routes); err != nil {
+					continue
+				}
 			default:
 				if len(k) > 0 && string(k[0]) == defaultMetadataPrefix {
 					ins.Metadata[string(k[1:])] = v

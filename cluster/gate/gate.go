@@ -28,6 +28,9 @@ type Gate struct {
 	session  *session.Session
 	linker   *gate.Server
 	wg       *sync.WaitGroup
+	recvWg   sync.WaitGroup
+	recvStop sync.Once
+	inbound  chan *inboundMessage
 }
 
 func NewGate(opts ...Option) *Gate {
@@ -43,6 +46,7 @@ func NewGate(opts ...Option) *Gate {
 	g.session = session.NewSession()
 	g.state.Store(int32(cluster.Shut))
 	g.wg = &sync.WaitGroup{}
+	g.inbound = make(chan *inboundMessage, o.receiveQueue)
 
 	return g
 }
@@ -76,6 +80,8 @@ func (g *Gate) Start() {
 	if !g.state.CompareAndSwap(int32(cluster.Shut), int32(cluster.Work)) {
 		return
 	}
+
+	g.startReceiveWorkers()
 
 	g.startNetworkServer()
 
@@ -113,9 +119,46 @@ func (g *Gate) Destroy() {
 
 	g.stopNetworkServer()
 
+	g.stopReceiveWorkers()
+
 	g.stopLinkerServer()
 
 	g.cancel()
+}
+
+// 启动收包 worker
+func (g *Gate) startReceiveWorkers() {
+	for range g.opts.deliverWorkers {
+		g.recvWg.Add(1)
+		go g.deliverWorker()
+	}
+}
+
+func (g *Gate) deliverWorker() {
+	defer g.recvWg.Done()
+
+	for {
+		select {
+		case <-g.ctx.Done():
+			return
+		case msg, ok := <-g.inbound:
+			if !ok {
+				return
+			}
+
+			cid, uid := msg.conn.ID(), msg.conn.UID()
+			ctx, cancel := context.WithTimeout(g.ctx, g.opts.timeout)
+			g.proxy.deliver(ctx, cid, uid, msg.data)
+			cancel()
+		}
+	}
+}
+
+func (g *Gate) stopReceiveWorkers() {
+	g.recvStop.Do(func() {
+		close(g.inbound)
+	})
+	g.recvWg.Wait()
 }
 
 // 启动网络服务器
@@ -167,12 +210,19 @@ func (g *Gate) handleDisconnect(conn network.Conn) {
 	g.wg.Done()
 }
 
-// 处理接收到的消息
+// 处理接收到的消息（仅入队，避免阻塞 network read）
 func (g *Gate) handleReceive(conn network.Conn, data []byte) {
-	cid, uid := conn.ID(), conn.UID()
-	ctx, cancel := context.WithTimeout(g.ctx, g.opts.timeout)
-	g.proxy.deliver(ctx, cid, uid, data)
-	cancel()
+	msg := &inboundMessage{
+		conn: conn,
+		data: append([]byte(nil), data...),
+	}
+
+	select {
+	case g.inbound <- msg:
+	default:
+		log.Warnf("gate receive queue full, close conn: %d", conn.ID())
+		_ = conn.Close(true)
+	}
 }
 
 // 启动传输服务器

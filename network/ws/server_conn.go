@@ -26,6 +26,7 @@ type serverConn struct {
 	sendMu sync.Mutex   // 发送锁，保护 Send/Push/closeSig 和 channel close 的并发安全
 
 	conn        *websocket.Conn // WS源连接
+	recvQ       chan []byte     // 收包队列
 	chLowWrite  chan chWrite    // 低优先级队列
 	chHighWrite chan chWrite    // 高优先级队列
 	done        chan struct{}   // 写入完成信号，使用 close 通知
@@ -110,6 +111,38 @@ func (c *serverConn) enqueueWrite(ch chan chWrite, msg []byte) error {
 
 	case <-c.close:
 		return xerrors.ErrConnectionClosed
+
+	default:
+	}
+
+	timer := time.NewTimer(network.DefaultWriteEnqueueTimeout)
+	connID := c.ID()
+	defer func() {
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+	}()
+
+	select {
+	case ch <- chWrite{typ: dataPacket, msg: msg}:
+		if c.isClosed() {
+			return xerrors.ErrConnectionClosed
+		}
+		return nil
+
+	case <-c.close:
+		return xerrors.ErrConnectionClosed
+
+	case <-timer.C:
+		go func() {
+			if c.ID() == connID {
+				_ = c.forceClose(true)
+			}
+		}()
+		return xerrors.ErrWriteQueueTimeout
 	}
 }
 
@@ -189,13 +222,15 @@ func (c *serverConn) init(cm *serverConnMgr, id int64, conn *websocket.Conn) {
 	c.state.Store(int32(network.ConnOpened))
 	c.conn = conn
 	c.connMgr = cm
-	c.chLowWrite = make(chan chWrite, 4096)
-	c.chHighWrite = make(chan chWrite, 1024)
+	c.recvQ = make(chan []byte, network.DefaultRecvQueueSize)
+	c.chLowWrite = make(chan chWrite, network.DefaultWriteQueueSize)
+	c.chHighWrite = make(chan chWrite, network.DefaultWriteQueueSize/4)
 	c.done = make(chan struct{})
 	c.close = make(chan struct{})
 	c.lastHeartbeatTime.Store(xtime.Now().UnixNano())
 	c.authorizeTimer.Store((*time.Timer)(nil))
 
+	xcall.Go(func() { c.receiveLoop(c.ID(), c.recvQ) })
 	xcall.Go(c.read)
 	xcall.Go(c.write)
 
@@ -361,6 +396,10 @@ func (c *serverConn) doClose(isNeedRecycle bool) error {
 		// done 使用 close 通知，避免无缓冲 channel 发送卡死。
 		c.notifyDone()
 
+		if c.recvQ != nil {
+			close(c.recvQ)
+		}
+
 		// 等待正在 Send/Push 的 goroutine 退出，然后再关闭写队列。
 		// 这样可以避免 close(channel) 和 channel <- value 并发导致 panic。
 		c.sendMu.Lock()
@@ -441,8 +480,27 @@ func (c *serverConn) read() {
 			continue
 		}
 
-		if c.connMgr.server.receiveHandler != nil {
-			c.connMgr.server.receiveHandler(c, msgData)
+		if !network.TryEnqueueRecv(c.recvQ, msgData) {
+			log.Warnf("ws receive queue full, close conn: %d", c.id)
+			_ = c.forceCloseIfCurrent(connID, true)
+			return
+		}
+	}
+}
+
+func (c *serverConn) receiveLoop(connID int64, recvQ <-chan []byte) {
+	s := c.connMgr.server
+	for data := range recvQ {
+		if c.ID() != connID {
+			return
+		}
+
+		if c.State() != network.ConnOpened {
+			return
+		}
+
+		if s != nil && s.receiveHandler != nil {
+			s.receiveHandler(c, data)
 		}
 	}
 }

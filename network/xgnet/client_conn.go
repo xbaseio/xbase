@@ -46,7 +46,7 @@ func newGnetClientConn(client *client, id int64) *gnetClientConn {
 		id:      id,
 		attr:    &attr{},
 		client:  client,
-		recvQ:   make(chan []byte, 1024),
+		recvQ:   make(chan []byte, network.DefaultRecvQueueSize),
 		inbound: make([]byte, 0, 4096),
 	}
 
@@ -271,12 +271,7 @@ func (c *gnetClientConn) feed(raw []byte) bool {
 
 		c.inbound = c.inbound[consumed:]
 
-		frame := append([]byte(nil), data...)
-
-		select {
-		case c.recvQ <- frame:
-		default:
-			// 业务处理太慢，避免 event-loop 堆积。
+		if !network.TryEnqueueRecv(c.recvQ, data) {
 			return false
 		}
 	}

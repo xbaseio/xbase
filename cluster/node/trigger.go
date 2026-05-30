@@ -2,10 +2,12 @@ package node
 
 import (
 	"context"
+	"time"
 
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xcall"
+	"github.com/xbaseio/xbase/xerrors"
 )
 
 type EventHandler func(ctx Context)
@@ -24,14 +26,32 @@ func newTrigger(node *Node) *Trigger {
 	}
 }
 
-func (e *Trigger) trigger(kind cluster.Event, gid string, cid, uid int64) {
+func (e *Trigger) trigger(kind cluster.Event, gid string, cid, uid int64) error {
 	evt := e.node.evtPool.Get().(*event)
 	evt.ctx = context.Background()
 	evt.event = kind
 	evt.gid = gid
 	evt.cid = cid
 	evt.uid = uid
-	e.evtChan <- evt
+
+	timeout := e.node.opts.deliverTimeout
+	if timeout <= 0 {
+		e.evtChan <- evt
+		return nil
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case e.evtChan <- evt:
+		return nil
+	case <-timer.C:
+		evt.reset()
+		e.node.evtPool.Put(evt)
+		log.Warnf("node event queue full, drop event: %v uid: %d", kind.String(), uid)
+		return xerrors.ErrDeliverQueueFull
+	}
 }
 
 func (e *Trigger) receive() <-chan *event {

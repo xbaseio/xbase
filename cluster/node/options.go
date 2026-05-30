@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"maps"
+	"runtime"
 	"time"
 
 	"github.com/xbaseio/xbase/cluster"
@@ -38,6 +39,10 @@ const (
 	defaultGameIDKey     = "etc.cluster.node.gameID"
 	defaultVersionKey  = "etc.cluster.node.version"
 	defaultRetireDelayKey = "etc.cluster.node.retireDelay"
+	defaultRequestWorkersKey = "etc.cluster.node.requestWorkers"
+	defaultEventWorkersKey   = "etc.cluster.node.eventWorkers"
+	defaultDeliverTimeoutKey = "etc.cluster.node.deliverTimeout"
+	defaultMailboxTimeoutKey = "etc.cluster.node.mailboxTimeout"
 )
 
 // SchedulingModel 调度模型
@@ -63,6 +68,10 @@ type options struct {
 	gameID      int32                 // 游戏ID
 	version     string                // 服务版本号
 	retireDelay time.Duration         // 低版本节点退出等待时间
+	requestWorkers int               // 请求 dispatch worker 数
+	eventWorkers   int               // 事件 dispatch worker 数
+	deliverTimeout time.Duration     // 投递 reqChan 超时
+	mailboxTimeout time.Duration     // Actor 邮箱入队超时
 }
 
 func defaultOptions() *options {
@@ -79,6 +88,10 @@ func defaultOptions() *options {
 		gameID:      0,
 		version:     defaultVersion,
 		retireDelay: defaultRetireDelay,
+		requestWorkers: max(runtime.NumCPU(), 1),
+		eventWorkers:   2,
+		deliverTimeout: defaultTimeout,
+		mailboxTimeout: defaultTimeout,
 	}
 
 	if id := etc.Get(defaultIDKey).String(); id != "" {
@@ -121,6 +134,22 @@ func defaultOptions() *options {
 
 	if delay := etc.Get(defaultRetireDelayKey).Duration(); delay > 0 {
 		opts.retireDelay = delay
+	}
+
+	if n := etc.Get(defaultRequestWorkersKey).Int(); n > 0 {
+		opts.requestWorkers = n
+	}
+
+	if n := etc.Get(defaultEventWorkersKey).Int(); n > 0 {
+		opts.eventWorkers = n
+	}
+
+	if d := etc.Get(defaultDeliverTimeoutKey).Duration(); d > 0 {
+		opts.deliverTimeout = d
+	}
+
+	if d := etc.Get(defaultMailboxTimeoutKey).Duration(); d > 0 {
+		opts.mailboxTimeout = d
 	}
 
 	return opts
@@ -220,4 +249,20 @@ func WithRetireDelay(delay time.Duration) Option {
 	return func(o *options) {
 		o.retireDelay = delay
 	}
+}
+
+func WithRequestWorkers(n int) Option {
+	return func(o *options) { o.requestWorkers = n }
+}
+
+func WithEventWorkers(n int) Option {
+	return func(o *options) { o.eventWorkers = n }
+}
+
+func WithDeliverTimeout(timeout time.Duration) Option {
+	return func(o *options) { o.deliverTimeout = timeout }
+}
+
+func WithMailboxTimeout(timeout time.Duration) Option {
+	return func(o *options) { o.mailboxTimeout = timeout }
 }

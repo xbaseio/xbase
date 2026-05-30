@@ -29,6 +29,7 @@ type serverConn struct {
 
 	conn atomic.Pointer[serverConnBox] // TCP源连接
 
+	recvQ   chan []byte   // 收包队列
 	chWrite chan chWrite  // 写入队列
 	done    chan struct{} // 写入完成信号，使用 close 通知
 	close   chan struct{} // 关闭信号
@@ -99,8 +100,6 @@ func (c *serverConn) enqueueWrite(msg []byte) error {
 
 	select {
 	case c.chWrite <- chWrite{typ: dataPacket, msg: msg}:
-		// 去锁版本不保证关闭瞬间的强一致。
-		// 入队后如果连接状态已经变化，返回对应错误。
 		if c.State() != network.ConnOpened {
 			return c.checkState()
 		}
@@ -108,6 +107,34 @@ func (c *serverConn) enqueueWrite(msg []byte) error {
 
 	case <-c.close:
 		return xerrors.ErrConnectionClosed
+
+	default:
+	}
+
+	timer := time.NewTimer(network.DefaultWriteEnqueueTimeout)
+	defer func() {
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+	}()
+
+	select {
+	case c.chWrite <- chWrite{typ: dataPacket, msg: msg}:
+		if c.State() != network.ConnOpened {
+			return c.checkState()
+		}
+		return nil
+
+	case <-c.close:
+		return xerrors.ErrConnectionClosed
+
+	case <-timer.C:
+		log.Warnf("tcp write queue timeout, close conn: %d", c.id)
+		_ = c.forceClose(true)
+		return xerrors.ErrWriteQueueTimeout
 	}
 }
 
@@ -237,12 +264,15 @@ func (c *serverConn) init(cm *serverConnMgr, id int64, conn net.Conn) {
 	c.state.Store(int32(network.ConnOpened))
 	c.conn.Store(&serverConnBox{conn: conn})
 	c.connMgr = cm
-	c.chWrite = make(chan chWrite, 4096)
+	c.recvQ = make(chan []byte, network.DefaultRecvQueueSize)
+	c.chWrite = make(chan chWrite, network.DefaultWriteQueueSize)
 	c.done = make(chan struct{})
 	c.close = make(chan struct{})
 	c.lastHeartbeatTime.Store(xtime.Now().UnixNano())
 	c.authorizeTimer.Store((*time.Timer)(nil))
 
+	gen := c.generation.Load()
+	xcall.Go(func() { c.receiveLoop(gen, c.recvQ) })
 	xcall.Go(c.read)
 	xcall.Go(c.write)
 
@@ -373,6 +403,10 @@ func (c *serverConn) doClose(isNeedRecycle bool) error {
 		// done 用 close 通知，避免无缓冲 channel 发送阻塞。
 		c.notifyDone()
 
+		if c.recvQ != nil {
+			close(c.recvQ)
+		}
+
 		box := c.conn.Swap(nil)
 		if box != nil && box.conn != nil {
 			closeErr = box.conn.Close()
@@ -416,7 +450,6 @@ func (c *serverConn) read() {
 			return
 		}
 
-		// 当前 goroutine 属于旧连接，连接对象已经被复用，直接退出
 		if c.generation.Load() != gen {
 			return
 		}
@@ -429,16 +462,33 @@ func (c *serverConn) read() {
 			return
 
 		default:
-			// ignore
 		}
 
-		// ignore empty packet
 		if len(data) == 0 {
 			continue
 		}
 
-		if c.connMgr.server.receiveHandler != nil {
-			c.connMgr.server.receiveHandler(c, data)
+		if !network.TryEnqueueRecv(c.recvQ, data) {
+			log.Warnf("tcp receive queue full, close conn: %d", c.id)
+			_ = c.forceCloseIfCurrent(gen, true)
+			return
+		}
+	}
+}
+
+func (c *serverConn) receiveLoop(gen int64, recvQ <-chan []byte) {
+	s := c.connMgr.server
+	for data := range recvQ {
+		if c.generation.Load() != gen {
+			return
+		}
+
+		if c.State() != network.ConnOpened {
+			return
+		}
+
+		if s != nil && s.receiveHandler != nil {
+			s.receiveHandler(c, data)
 		}
 	}
 }

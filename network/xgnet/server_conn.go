@@ -67,7 +67,7 @@ func (c *gnetConn) init(cm *serverConnMgr, id int64, conn xnet.Conn) {
 		c.remoteAddr.Store(addr)
 	}
 
-	c.recvQ = make(chan []byte, 1024)
+	c.recvQ = make(chan []byte, network.DefaultRecvQueueSize)
 	c.inbound = make([]byte, 0, 4096)
 	c.closeOnce = sync.Once{}
 
@@ -290,12 +290,7 @@ func (c *gnetConn) feed(raw []byte) bool {
 		c.inbound = c.inbound[consumed:]
 
 		// data 需要复制，避免底层缓冲复用带来的问题
-		frame := append([]byte(nil), data...)
-
-		select {
-		case c.recvQ <- frame:
-		default:
-			// 业务处理太慢，避免 event-loop 堆积
+		if !network.TryEnqueueRecv(c.recvQ, data) {
 			return false
 		}
 	}

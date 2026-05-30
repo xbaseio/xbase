@@ -25,6 +25,7 @@ type serverConn struct {
 	conn    atomic.Pointer[kcp.UDPSession]
 	connMgr *serverConnMgr // 连接管理
 
+	recvQ   chan []byte   // 收包队列
 	chWrite chan chWrite  // 写入队列
 	done    chan struct{} // 写入完成信号，使用 close 通知
 	close   chan struct{} // 关闭信号
@@ -95,8 +96,6 @@ func (c *serverConn) enqueueWrite(msg []byte) error {
 
 	select {
 	case c.chWrite <- chWrite{typ: dataPacket, msg: msg}:
-		// 无锁版本不保证关闭瞬间的强一致。
-		// 入队后如果连接状态已经变化，返回关闭错误。
 		if c.State() != network.ConnOpened {
 			return xerrors.ErrConnectionClosed
 		}
@@ -104,6 +103,34 @@ func (c *serverConn) enqueueWrite(msg []byte) error {
 
 	case <-c.close:
 		return xerrors.ErrConnectionClosed
+
+	default:
+	}
+
+	timer := time.NewTimer(network.DefaultWriteEnqueueTimeout)
+	defer func() {
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+	}()
+
+	select {
+	case c.chWrite <- chWrite{typ: dataPacket, msg: msg}:
+		if c.State() != network.ConnOpened {
+			return xerrors.ErrConnectionClosed
+		}
+		return nil
+
+	case <-c.close:
+		return xerrors.ErrConnectionClosed
+
+	case <-timer.C:
+		log.Warnf("kcp write queue timeout, close conn: %d", c.id)
+		_ = c.forceClose(true)
+		return xerrors.ErrWriteQueueTimeout
 	}
 }
 
@@ -183,7 +210,8 @@ func (c *serverConn) init(cm *serverConnMgr, id int64, conn *kcp.UDPSession) {
 	c.attr = &attr{}
 	c.conn.Store(conn)
 	c.connMgr = cm
-	c.chWrite = make(chan chWrite, 4096)
+	c.recvQ = make(chan []byte, network.DefaultRecvQueueSize)
+	c.chWrite = make(chan chWrite, network.DefaultWriteQueueSize)
 	c.done = make(chan struct{})
 	c.close = make(chan struct{})
 	c.lastHeartbeatTime.Store(xtime.Now().UnixNano())
@@ -191,6 +219,8 @@ func (c *serverConn) init(cm *serverConnMgr, id int64, conn *kcp.UDPSession) {
 
 	c.applyKCPOptions(conn)
 
+	gen := c.generation.Load()
+	xcall.Go(func() { c.receiveLoop(gen, c.recvQ) })
 	xcall.Go(c.read)
 	xcall.Go(c.write)
 
@@ -413,6 +443,10 @@ func (c *serverConn) doClose(isNeedRecycle bool) error {
 		// done 用 close 通知，避免无缓冲 channel 发送阻塞。
 		c.notifyDone()
 
+		if c.recvQ != nil {
+			close(c.recvQ)
+		}
+
 		conn := c.conn.Swap(nil)
 		if conn != nil {
 			closeErr = conn.Close()
@@ -477,8 +511,27 @@ func (c *serverConn) read() {
 			continue
 		}
 
-		if c.connMgr.server.receiveHandler != nil {
-			c.connMgr.server.receiveHandler(c, data)
+		if !network.TryEnqueueRecv(c.recvQ, data) {
+			log.Warnf("kcp receive queue full, close conn: %d", c.id)
+			_ = c.forceCloseIfCurrent(gen, true)
+			return
+		}
+	}
+}
+
+func (c *serverConn) receiveLoop(gen int64, recvQ <-chan []byte) {
+	s := c.connMgr.server
+	for data := range recvQ {
+		if c.generation.Load() != gen {
+			return
+		}
+
+		if c.State() != network.ConnOpened {
+			return
+		}
+
+		if s != nil && s.receiveHandler != nil {
+			s.receiveHandler(c, data)
 		}
 	}
 }

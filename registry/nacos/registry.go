@@ -221,7 +221,7 @@ func parseInstances(instances []model.Instance) ([]*registry.ServiceInstance, er
 		ins.Alias = instance.Metadata[metaFieldAlias]
 		ins.State = instance.Metadata[metaFieldState]
 		ins.Endpoint = instance.Metadata[metaFieldEndpoint]
-		//ins.Routes = make([]registry.Route, 0)
+		ins.Routes = make([]registry.Route, 0)
 		ins.Events = make([]int, 0)
 		ins.Services = make([]string, 0)
 		ins.Weight = xconv.Int(instance.Metadata[metaFieldWeight])
@@ -229,11 +229,11 @@ func parseInstances(instances []model.Instance) ([]*registry.ServiceInstance, er
 		ins.GameID = xconv.Int32(instance.Metadata[metaFieldGameID])
 		ins.Version = instance.Metadata[metaFieldVersion]
 
-		/*if v := instance.Metadata[metaFieldRoutes]; v != "" {
+		if v := instance.Metadata[metaFieldRoutes]; v != "" {
 			if err := json.Unmarshal([]byte(v), &ins.Routes); err != nil {
 				return nil, err
 			}
-		}*/
+		}
 
 		if v := instance.Metadata[metaFieldEvents]; v != "" {
 			if err := json.Unmarshal([]byte(v), &ins.Events); err != nil {

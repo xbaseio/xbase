@@ -14,9 +14,7 @@ type provider struct {
 
 // Trigger 触发事件
 func (p *provider) Trigger(ctx context.Context, gid string, cid, uid int64, event cluster.Event) error {
-	p.node.trigger.trigger(event, gid, cid, uid)
-
-	return nil
+	return p.node.trigger.trigger(event, gid, cid, uid)
 }
 
 // Deliver 投递消息
@@ -24,6 +22,10 @@ func (p *provider) Deliver(ctx context.Context, gid, nid string, cid, uid int64,
 	msg, _, err := packet.UnpackMessage(message)
 	if err != nil {
 		return err
+	}
+
+	if msg.GameID != p.node.opts.gameID {
+		return xerrors.ErrInvalidGameID
 	}
 
 	stateful, ok := p.node.router.CheckRouteStateful(msg.MessageID)
@@ -48,9 +50,7 @@ func (p *provider) Deliver(ctx context.Context, gid, nid string, cid, uid int64,
 		}
 	}
 
-	p.node.router.deliver(gid, nid, "", cid, uid, msg.Seq, msg.GameID, msg.MessageID, msg.Buffer)
-
-	return nil
+	return p.node.router.deliver(gid, nid, "", cid, uid, msg.Seq, msg.GameID, msg.MessageID, msg.Buffer)
 }
 
 // GetState 获取状态

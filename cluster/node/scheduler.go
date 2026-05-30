@@ -225,16 +225,16 @@ func (s *Scheduler) dispatchRequest(ctx Context) error {
 		return xerrors.ErrNotBindActor
 	}
 
-	act.Next(ctx)
-
-	return nil
+	return act.Next(ctx)
 }
 
 // 分发事件
 func (s *Scheduler) dispatchEvent(ctx Context) error {
 	s.actors.Range(func(_, actor any) bool {
 		if act := actor.(*Actor); act.opts.dispatch {
-			act.Next(ctx)
+			if err := act.Next(ctx); err != nil {
+				log.Warnf("dispatch event to actor failed: %v", err)
+			}
 		}
 
 		return true

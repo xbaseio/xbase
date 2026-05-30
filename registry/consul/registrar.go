@@ -28,6 +28,7 @@ const (
 	metaFieldEndpoint = "endpoint"
 	metaFieldGameID   = "gameID"
 	metaFieldVersion  = "version"
+	metaFieldRoutes   = "routes"
 )
 
 const (
@@ -103,6 +104,14 @@ func (r *registrar) register(_ context.Context, ins *registry.ServiceInstance) e
 			return err
 		} else {
 			registration.Meta[metaFieldServices] = xconv.BytesToString(services)
+		}
+	}
+
+	if len(ins.Routes) > 0 {
+		if routes, err := json.Marshal(ins.Routes); err != nil {
+			return err
+		} else {
+			registration.Meta[metaFieldRoutes] = xconv.BytesToString(routes)
 		}
 	}
 

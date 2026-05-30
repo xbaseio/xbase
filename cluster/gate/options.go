@@ -3,6 +3,7 @@ package gate
 import (
 	"context"
 	"maps"
+	"runtime"
 	"time"
 
 	"github.com/xbaseio/xbase/cluster"
@@ -21,6 +22,7 @@ const (
 	defaultDispatch    = cluster.Random  // 默认的无状态路由分发策略
 	defaultVersion     = "1"
 	defaultRetireDelay = 10 * time.Minute
+	defaultReceiveQueue  = 8192
 )
 
 const (
@@ -33,6 +35,8 @@ const (
 	defaultMetadataKey    = "etc.cluster.gate.metadata"
 	defaultVersionKey     = "etc.cluster.gate.version"
 	defaultRetireDelayKey = "etc.cluster.gate.retireDelay"
+	defaultReceiveQueueKey  = "etc.cluster.gate.receiveQueue"
+	defaultDeliverWorkersKey = "etc.cluster.gate.deliverWorkers"
 )
 
 type Option func(o *options)
@@ -52,6 +56,8 @@ type options struct {
 	gameID   int32             // 游戏ID
 	version  string            // 服务版本号
 	retireDelay time.Duration  // 低版本退出等待时间
+	receiveQueue int           // 收包队列容量
+	deliverWorkers int         // deliver worker 数量
 	metadata map[string]string // 元数据
 }
 
@@ -68,6 +74,8 @@ func defaultOptions() *options {
 		gameID:      -1,
 		version:     defaultVersion,
 		retireDelay: defaultRetireDelay,
+		receiveQueue: defaultReceiveQueue,
+		deliverWorkers: max(runtime.NumCPU(), 1),
 	}
 
 	if id := etc.Get(defaultIDKey).String(); id != "" {
@@ -102,6 +110,14 @@ func defaultOptions() *options {
 
 	if delay := etc.Get(defaultRetireDelayKey).Duration(); delay > 0 {
 		opts.retireDelay = delay
+	}
+
+	if n := etc.Get(defaultReceiveQueueKey).Int(); n > 0 {
+		opts.receiveQueue = n
+	}
+
+	if n := etc.Get(defaultDeliverWorkersKey).Int(); n > 0 {
+		opts.deliverWorkers = n
 	}
 
 	return opts
@@ -176,4 +192,12 @@ func WithVersion(version string) Option {
 
 func WithRetireDelay(delay time.Duration) Option {
 	return func(o *options) { o.retireDelay = delay }
+}
+
+func WithReceiveQueue(size int) Option {
+	return func(o *options) { o.receiveQueue = size }
+}
+
+func WithDeliverWorkers(n int) Option {
+	return func(o *options) { o.deliverWorkers = n }
 }

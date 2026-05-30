@@ -113,6 +113,11 @@ func (n *Node) Init() {
 	}
 
 	n.runHookFunc(cluster.Init)
+
+	if n.router.StatefulRouteCount() > 0 {
+		log.Warnf("node %s has %d stateful routes; ensure BindNode is called before stateful traffic",
+			n.opts.name, n.router.StatefulRouteCount())
+	}
 }
 
 // Start 启动节点
@@ -131,7 +136,7 @@ func (n *Node) Start() {
 
 	n.watchVersionRetire()
 
-	go n.dispatch()
+	go n.startDispatch()
 
 	n.printInfo()
 
@@ -181,31 +186,35 @@ func (n *Node) Proxy() *Proxy {
 	return n.proxy
 }
 
-// 分发处理消息
-func (n *Node) dispatch() {
-	for {
-		select {
-		case evt, ok := <-n.trigger.receive():
-			if !ok {
-				return
-			}
+// 启动 dispatch worker 池
+func (n *Node) startDispatch() {
+	go n.dispatchFn()
 
-			n.trigger.handle(evt)
-		case req, ok := <-n.router.receive():
-			if !ok {
-				return
-			}
+	for range n.opts.eventWorkers {
+		go n.dispatchEvents()
+	}
 
-			n.router.handle(req)
-		case handle, ok := <-n.fnChan:
-			if !ok {
-				return
-			}
+	for range n.opts.requestWorkers {
+		go n.dispatchRequests()
+	}
+}
 
-			xcall.Call(handle)
+func (n *Node) dispatchFn() {
+	for handle := range n.fnChan {
+		xcall.Call(handle)
+		n.doneWait()
+	}
+}
 
-			n.doneWait()
-		}
+func (n *Node) dispatchEvents() {
+	for evt := range n.trigger.receive() {
+		n.trigger.handle(evt)
+	}
+}
+
+func (n *Node) dispatchRequests() {
+	for req := range n.router.receive() {
+		n.router.handle(req)
 	}
 }
 
@@ -280,18 +289,9 @@ func (n *Node) stopTransportServer() {
 
 // 注册服务实例
 func (n *Node) registerServiceInstances() {
-	//routes := make([]registry.Route, 0, len(n.router.routes))
+	routes := n.router.CollectRoutes()
 	events := make([]int, 0, len(n.trigger.events))
 
-	/*for _, entity := range n.router.routes {
-		routes = append(routes, registry.Route{
-			ID:         entity.route,
-			Internal:   entity.options.Internal,
-			Stateful:   entity.options.Stateful,
-			Authorized: entity.options.Authorized,
-		})
-	}
-	*/
 	for evt := range n.trigger.events {
 		events = append(events, int(evt))
 	}
@@ -303,6 +303,7 @@ func (n *Node) registerServiceInstances() {
 		Alias:    n.opts.name,
 		State:    n.getState().String(),
 		Events:   events,
+		Routes:   routes,
 		Endpoint: n.linker.Endpoint().String(),
 		Weight:   n.opts.weight,
 		Metadata: n.opts.metadata,

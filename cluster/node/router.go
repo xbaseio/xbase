@@ -2,10 +2,13 @@ package node
 
 import (
 	"context"
+	"time"
 
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/utils/xcall"
+	"github.com/xbaseio/xbase/xerrors"
 )
 
 type RouteHandler func(ctx Context)
@@ -121,6 +124,39 @@ func (r *Router) CheckRouteStateful(messageID int32) (stateful bool, exist bool)
 	return
 }
 
+// CheckRouteAuthorized 是否为需授权路由
+func (r *Router) CheckRouteAuthorized(messageID int32) (authorized bool, exist bool) {
+	if entity, ok := r.routes[messageID]; ok {
+		exist, authorized = ok, entity.options.Authorized
+	}
+	return
+}
+
+// CollectRoutes 收集路由元数据用于注册中心同步
+func (r *Router) CollectRoutes() []registry.Route {
+	routes := make([]registry.Route, 0, len(r.routes))
+	for _, entity := range r.routes {
+		routes = append(routes, registry.Route{
+			ID:         entity.messageID,
+			Internal:   entity.options.Internal,
+			Stateful:   entity.options.Stateful,
+			Authorized: entity.options.Authorized,
+		})
+	}
+	return routes
+}
+
+// StatefulRouteCount 有状态路由数量
+func (r *Router) StatefulRouteCount() int {
+	n := 0
+	for _, entity := range r.routes {
+		if entity.options.Stateful {
+			n++
+		}
+	}
+	return n
+}
+
 // Group 路由组
 func (r *Router) Group(groups ...func(group *RouterGroup)) *RouterGroup {
 	group := &RouterGroup{
@@ -135,7 +171,7 @@ func (r *Router) Group(groups ...func(group *RouterGroup)) *RouterGroup {
 	return group
 }
 
-func (r *Router) deliver(gid, nid, pid string, cid, uid int64, seq, gameID, messageID int32, data any) {
+func (r *Router) deliver(gid, nid, pid string, cid, uid int64, seq, gameID, messageID int32, data any) error {
 	req := r.node.reqPool.Get().(*request)
 	req.ctx = context.Background()
 	req.gid = gid
@@ -147,7 +183,25 @@ func (r *Router) deliver(gid, nid, pid string, cid, uid int64, seq, gameID, mess
 	req.message.GameID = gameID
 	req.message.MessageID = messageID
 	req.message.Data = data
-	r.reqChan <- req
+
+	timeout := r.node.opts.deliverTimeout
+	if timeout <= 0 {
+		r.reqChan <- req
+		return nil
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case r.reqChan <- req:
+		return nil
+	case <-timer.C:
+		req.reset()
+		r.node.reqPool.Put(req)
+		log.Warnf("node request queue full, drop message: %d uid: %d", messageID, uid)
+		return xerrors.ErrDeliverQueueFull
+	}
 }
 
 func (r *Router) receive() <-chan *request {

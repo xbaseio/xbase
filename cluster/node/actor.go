@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/xbaseio/xbase/cluster"
+	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xcall"
+	"github.com/xbaseio/xbase/xerrors"
 )
 
 type Creator func(actor *Actor, args ...any) Processor
@@ -164,12 +166,12 @@ func (a *Actor) AddEventHandler(event cluster.Event, handler EventHandler) {
 }
 
 // Next 投递消息到Actor中进行处理
-func (a *Actor) Next(ctx Context) {
+func (a *Actor) Next(ctx Context) error {
 	a.rw.RLock()
 	defer a.rw.RUnlock()
 
 	if a.state.Load() != started {
-		return
+		return xerrors.ErrNotFoundActor
 	}
 
 	ctx.storeActor(a)
@@ -178,7 +180,23 @@ func (a *Actor) Next(ctx Context) {
 
 	ctx.Cancel()
 
-	a.mailbox <- ctx
+	timeout := a.scheduler.node.opts.mailboxTimeout
+	if timeout <= 0 {
+		a.mailbox <- ctx
+		return nil
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case a.mailbox <- ctx:
+		return nil
+	case <-timer.C:
+		log.Warnf("actor mailbox full, drop message: %d uid: %d kind: %s id: %s",
+			ctx.MessageID(), ctx.UID(), a.Kind(), a.ID())
+		return xerrors.ErrMailboxFull
+	}
 }
 
 // Deliver 投递消息到当前Actor中进行处理
@@ -196,9 +214,7 @@ func (a *Actor) Deliver(uid int64, message *cluster.Message) error {
 	req.message.MessageID = message.MessageID
 	req.message.Data = buf
 
-	a.Next(req)
-
-	return nil
+	return a.Next(req)
 }
 
 // Push 推送消息到本地Node队列上进行处理
@@ -208,9 +224,7 @@ func (a *Actor) Push(uid int64, message *cluster.Message) error {
 		return err
 	}
 
-	a.scheduler.node.router.deliver("", a.scheduler.node.opts.id, a.PID(), 0, uid, message.Seq, message.GameID, message.MessageID, buf)
-
-	return nil
+	return a.scheduler.node.router.deliver("", a.scheduler.node.opts.id, a.PID(), 0, uid, message.Seq, message.GameID, message.MessageID, buf)
 }
 
 // Destroy 销毁Actor

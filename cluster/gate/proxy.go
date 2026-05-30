@@ -12,20 +12,25 @@ import (
 )
 
 type proxy struct {
-	gate       *Gate            // 网关服
-	nodeLinker *link.NodeLinker // 节点链接器
+	gate         *Gate            // 网关服
+	nodeLinker   *link.NodeLinker // 节点链接器
+	routeWatcher *routeWatcher    // 路由策略
 }
 
 func newProxy(gate *Gate) *proxy {
-	return &proxy{gate: gate, nodeLinker: link.NewNodeLinker(gate.ctx, &link.Options{
-		InsID:    gate.opts.id,
-		InsKind:  cluster.Gate,
-		Locator:  gate.opts.locator,
-		Registry: gate.opts.registry,
-		Dispatch: gate.opts.dispatch,
-		NodeKind: gate.opts.nodeKind,
-		GameID:   gate.opts.gameID,
-	})}
+	return &proxy{
+		gate: gate,
+		nodeLinker: link.NewNodeLinker(gate.ctx, &link.Options{
+			InsID:    gate.opts.id,
+			InsKind:  cluster.Gate,
+			Locator:  gate.opts.locator,
+			Registry: gate.opts.registry,
+			Dispatch: gate.opts.dispatch,
+			NodeKind: gate.opts.nodeKind,
+			GameID:   gate.opts.gameID,
+		}),
+		routeWatcher: newRouteWatcher(gate.ctx, gate.opts.registry),
+	}
 }
 
 // 绑定用户与网关间的关系
@@ -83,6 +88,11 @@ func (p *proxy) deliver(ctx context.Context, cid, uid int64, data []byte) {
 		return
 	}
 
+	if uid == 0 && p.routeWatcher.requiresAuth(message.GameID, message.MessageID) {
+		log.Warnf("unauthorized route rejected, cid: %d message: %d game: %d", cid, message.MessageID, message.GameID)
+		return
+	}
+
 	if err = p.nodeLinker.Deliver(ctx, &link.DeliverArgs{
 		CID:       cid,
 		UID:       uid,
@@ -105,6 +115,8 @@ func (p *proxy) deliver(ctx context.Context, cid, uid int64, data []byte) {
 
 // 开始监听
 func (p *proxy) watch() {
+	p.routeWatcher.start()
+
 	p.nodeLinker.WatchUserLocate()
 
 	p.nodeLinker.WatchClusterInstance()
