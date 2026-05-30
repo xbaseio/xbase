@@ -3,7 +3,6 @@ package gate
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/log"
