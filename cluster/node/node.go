@@ -129,6 +129,8 @@ func (n *Node) Start() {
 
 	n.proxy.watch()
 
+	n.watchVersionRetire()
+
 	go n.dispatch()
 
 	n.printInfo()
@@ -295,17 +297,17 @@ func (n *Node) registerServiceInstances() {
 	}
 
 	n.instances = append(n.instances, &registry.ServiceInstance{
-		ID:    n.opts.id,
-		Name:  cluster.Node.String(),
-		Kind:  cluster.Node.String(),
-		Alias: n.opts.name,
-		State: n.getState().String(),
-		//Routes:   routes,
+		ID:       n.opts.id,
+		Name:     cluster.Node.String(),
+		Kind:     cluster.Node.String(),
+		Alias:    n.opts.name,
+		State:    n.getState().String(),
 		Events:   events,
 		Endpoint: n.linker.Endpoint().String(),
 		Weight:   n.opts.weight,
 		Metadata: n.opts.metadata,
 		GameID:   n.opts.gameID,
+		Version:  n.opts.version,
 	})
 
 	if n.transporter != nil {
@@ -324,6 +326,7 @@ func (n *Node) registerServiceInstances() {
 			Endpoint: n.transporter.Endpoint().String(),
 			Weight:   n.opts.weight,
 			Metadata: n.opts.metadata,
+			Version:  n.opts.version,
 		})
 	}
 

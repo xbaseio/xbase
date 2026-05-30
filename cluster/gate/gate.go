@@ -85,6 +85,8 @@ func (g *Gate) Start() {
 
 	g.proxy.watch()
 
+	g.watchVersionRetire()
+
 	g.printInfo()
 }
 
@@ -208,6 +210,7 @@ func (g *Gate) registerServiceInstance() {
 		Alias:    g.opts.name,
 		State:    g.getState().String(),
 		Endpoint: g.linker.Endpoint().String(),
+		Version:  g.opts.version,
 		Metadata: g.opts.metadata,
 	}
 

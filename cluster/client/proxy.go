@@ -23,9 +23,9 @@ func (p *Proxy) Name() string {
 	return p.client.opts.name
 }
 
-// AddRouteHandler 添加路由处理器
-func (p *Proxy) AddRouteHandler(route int32, handler RouteHandler) {
-	p.client.addRouteHandler(route, handler)
+// AddRouteHandler 添加路由处理器，按 MessageID 注册
+func (p *Proxy) AddRouteHandler(messageID int32, handler RouteHandler) {
+	p.client.addRouteHandler(messageID, handler)
 }
 
 // SetDefaultRouteHandler 设置默认路由处理器，所有未注册的路由均走默认路由处理器

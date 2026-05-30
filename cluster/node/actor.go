@@ -208,7 +208,7 @@ func (a *Actor) Push(uid int64, message *cluster.Message) error {
 		return err
 	}
 
-	a.scheduler.node.router.deliver("", a.scheduler.node.opts.id, a.PID(), 0, uid, message.Seq, message.GameID, buf)
+	a.scheduler.node.router.deliver("", a.scheduler.node.opts.id, a.PID(), 0, uid, message.Seq, message.GameID, message.MessageID, buf)
 
 	return nil
 }
@@ -285,7 +285,7 @@ func (a *Actor) dispatch() {
 					ctx.compareVersionExecDefer(version)
 				}
 			} else {
-				if handler, ok := a.routes[ctx.GameID()]; ok {
+				if handler, ok := a.routes[ctx.MessageID()]; ok {
 					xcall.Call(func() { handler(ctx) })
 
 					ctx.compareVersionExecDefer(version)

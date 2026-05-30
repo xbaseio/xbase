@@ -227,6 +227,7 @@ func parseInstances(instances []model.Instance) ([]*registry.ServiceInstance, er
 		ins.Weight = xconv.Int(instance.Metadata[metaFieldWeight])
 		ins.Metadata = make(map[string]string)
 		ins.GameID = xconv.Int32(instance.Metadata[metaFieldGameID])
+		ins.Version = instance.Metadata[metaFieldVersion]
 
 		/*if v := instance.Metadata[metaFieldRoutes]; v != "" {
 			if err := json.Unmarshal([]byte(v), &ins.Routes); err != nil {

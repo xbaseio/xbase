@@ -19,7 +19,7 @@ type Context interface {
 	UID() int64
 	// Seq 获取消息序列号
 	Seq() int32
-	// GameID 获取消息节点ID
+	// GameID 获取消息游戏ID
 	GameID() int32
 	// MessageID 获取消息ID
 	MessageID() int32

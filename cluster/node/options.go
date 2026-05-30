@@ -17,11 +17,13 @@ import (
 )
 
 const (
-	defaultName    = "node"          // 默认节点名称
-	defaultAddr    = ":0"            // 连接器监听地址
-	defaultCodec   = "proto"         // 默认编解码器名称
-	defaultTimeout = 3 * time.Second // 默认超时时间
-	defaultWeight  = 1               // 默认权重
+	defaultName        = "node"          // 默认节点名称
+	defaultAddr        = ":0"            // 连接器监听地址
+	defaultCodec       = "proto"         // 默认编解码器名称
+	defaultTimeout     = 3 * time.Second // 默认超时时间
+	defaultWeight      = 1               // 默认权重
+	defaultVersion     = "1"             // 默认版本号
+	defaultRetireDelay = 10 * time.Minute
 )
 
 const (
@@ -33,6 +35,9 @@ const (
 	defaultWeightKey   = "etc.cluster.node.weight"
 	defaultTimeoutKey  = "etc.cluster.node.timeout"
 	defaultMetadataKey = "etc.cluster.node.metadata"
+	defaultGameIDKey     = "etc.cluster.node.gameID"
+	defaultVersionKey  = "etc.cluster.node.version"
+	defaultRetireDelayKey = "etc.cluster.node.retireDelay"
 )
 
 // SchedulingModel 调度模型
@@ -56,6 +61,8 @@ type options struct {
 	metadata    map[string]string     // 元数据
 	nodeKind    cluster.NodeKind      // 节点类型
 	gameID      int32                 // 游戏ID
+	version     string                // 服务版本号
+	retireDelay time.Duration         // 低版本节点退出等待时间
 }
 
 func defaultOptions() *options {
@@ -68,8 +75,10 @@ func defaultOptions() *options {
 		timeout:  defaultTimeout,
 		metadata: make(map[string]string),
 		expose:   etc.Get(defaultExposeKey).Bool(),
-		nodeKind: cluster.Node_Normal,
-		gameID:   -1,
+		nodeKind:    cluster.Node_Normal,
+		gameID:      0,
+		version:     defaultVersion,
+		retireDelay: defaultRetireDelay,
 	}
 
 	if id := etc.Get(defaultIDKey).String(); id != "" {
@@ -100,6 +109,18 @@ func defaultOptions() *options {
 
 	if err := etc.Get(defaultMetadataKey).Scan(&opts.metadata); err != nil {
 		log.Warnf("scan node metadata failed: %v", err)
+	}
+
+	if etc.Has(defaultGameIDKey) {
+		opts.gameID = int32(etc.Get(defaultGameIDKey).Int())
+	}
+
+	if version := etc.Get(defaultVersionKey).String(); version != "" {
+		opts.version = version
+	}
+
+	if delay := etc.Get(defaultRetireDelayKey).Duration(); delay > 0 {
+		opts.retireDelay = delay
 	}
 
 	return opts
@@ -186,5 +207,17 @@ func WithNodeKind(nodeKind cluster.NodeKind) Option {
 func WithGameID(gameID int32) Option {
 	return func(o *options) {
 		o.gameID = gameID
+	}
+}
+
+func WithVersion(version string) Option {
+	return func(o *options) {
+		o.version = version
+	}
+}
+
+func WithRetireDelay(delay time.Duration) Option {
+	return func(o *options) {
+		o.retireDelay = delay
 	}
 }

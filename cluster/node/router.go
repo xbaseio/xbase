@@ -47,9 +47,9 @@ type Router struct {
 }
 
 type routeEntity struct {
-	route   int32        // 路由
-	handler RouteHandler // 路由处理器
-	options RouteOptions // 路由选项
+	messageID int32        // 消息ID
+	handler   RouteHandler // 路由处理器
+	options   RouteOptions // 路由选项
 }
 
 func newRouter(node *Node) *Router {
@@ -60,25 +60,22 @@ func newRouter(node *Node) *Router {
 	}
 }
 
-// AddRouteHandler 添加路由处理器
-func (r *Router) AddRouteHandler(route int32, handler RouteHandler, opts ...RouteOptions) {
+// AddRouteHandler 添加路由处理器，按 MessageID 注册（GameID 已在网关层完成节点选址）
+func (r *Router) AddRouteHandler(messageID int32, handler RouteHandler, opts ...RouteOptions) {
 	if r.node.getState() != cluster.Shut {
 		log.Warnf("the node server is working, can't add route handler")
 		return
 	}
 
-	if len(opts) > 0 {
-		r.routes[route] = &routeEntity{
-			route:   route,
-			handler: handler,
-			options: opts[0],
-		}
-	} else {
-		r.routes[route] = &routeEntity{
-			route:   route,
-			handler: handler,
-		}
+	entity := &routeEntity{
+		messageID: messageID,
+		handler:   handler,
 	}
+	if len(opts) > 0 {
+		entity.options = opts[0]
+	}
+
+	r.routes[messageID] = entity
 }
 
 // SetDefaultRouteHandler 设置默认路由处理器，所有未注册的路由均走默认路由处理器
@@ -117,8 +114,8 @@ func (r *Router) SetPostRouteHandler(handler RouteHandler) {
 }
 
 // CheckRouteStateful 是否为有状态路由
-func (r *Router) CheckRouteStateful(nodeID, messageID int32) (stateful bool, exist bool) {
-	if entity, ok := r.routes[nodeID]; ok {
+func (r *Router) CheckRouteStateful(messageID int32) (stateful bool, exist bool) {
+	if entity, ok := r.routes[messageID]; ok {
 		exist, stateful = ok, entity.options.Stateful
 	}
 	return
@@ -138,7 +135,7 @@ func (r *Router) Group(groups ...func(group *RouterGroup)) *RouterGroup {
 	return group
 }
 
-func (r *Router) deliver(gid, nid, pid string, cid, uid int64, seq, route int32, data any) {
+func (r *Router) deliver(gid, nid, pid string, cid, uid int64, seq, gameID, messageID int32, data any) {
 	req := r.node.reqPool.Get().(*request)
 	req.ctx = context.Background()
 	req.gid = gid
@@ -147,8 +144,8 @@ func (r *Router) deliver(gid, nid, pid string, cid, uid int64, seq, route int32,
 	req.cid = cid
 	req.uid = uid
 	req.message.Seq = seq
-	req.message.GameID = route
-	req.message.MessageID = 0 // Set a default value or derive it from the data
+	req.message.GameID = gameID
+	req.message.MessageID = messageID
 	req.message.Data = data
 	r.reqChan <- req
 }
@@ -164,10 +161,10 @@ func (r *Router) close() {
 func (r *Router) handle(req *request) {
 	version := req.incrVersion()
 
-	route, ok := r.routes[req.message.GameID]
+	route, ok := r.routes[req.message.MessageID]
 	if !ok && r.defaultRouteHandler == nil {
 		req.compareVersionRecycle(version)
-		log.Warnf("message routing does not register handler function, route: %v", req.message.GameID)
+		log.Warnf("message routing does not register handler function, message: %v", req.message.MessageID)
 		return
 	}
 
@@ -205,7 +202,7 @@ func (g *RouterGroup) Middleware(middlewares ...MiddlewareHandler) *RouterGroup 
 }
 
 // AddRouteHandler 添加路由处理器
-func (g *RouterGroup) AddRouteHandler(route int32, handler RouteHandler, opts ...RouteOptions) *RouterGroup {
+func (g *RouterGroup) AddRouteHandler(messageID int32, handler RouteHandler, opts ...RouteOptions) *RouterGroup {
 	var options RouteOptions
 
 	if len(opts) > 0 {
@@ -219,7 +216,7 @@ func (g *RouterGroup) AddRouteHandler(route int32, handler RouteHandler, opts ..
 		copy(options.Middlewares, g.middlewares)
 	}
 
-	g.router.AddRouteHandler(route, handler, options)
+	g.router.AddRouteHandler(messageID, handler, options)
 
 	return g
 }

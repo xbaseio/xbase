@@ -15,10 +15,12 @@ import (
 )
 
 const (
-	defaultName     = "gate"          // 默认名称
-	defaultAddr     = ":0"            // 连接器监听地址
-	defaultTimeout  = 3 * time.Second // 默认超时时间
-	defaultDispatch = cluster.Random  // 默认的无状态路由分发策略
+	defaultName        = "gate"          // 默认名称
+	defaultAddr        = ":0"            // 连接器监听地址
+	defaultTimeout     = 3 * time.Second // 默认超时时间
+	defaultDispatch    = cluster.Random  // 默认的无状态路由分发策略
+	defaultVersion     = "1"
+	defaultRetireDelay = 10 * time.Minute
 )
 
 const (
@@ -27,8 +29,10 @@ const (
 	defaultAddrKey     = "etc.cluster.gate.addr"
 	defaultExposeKey   = "etc.cluster.gate.expose"
 	defaultTimeoutKey  = "etc.cluster.gate.timeout"
-	defaultDispatchKey = "etc.cluster.gate.dispatch"
-	defaultMetadataKey = "etc.cluster.gate.metadata"
+	defaultDispatchKey    = "etc.cluster.gate.dispatch"
+	defaultMetadataKey    = "etc.cluster.gate.metadata"
+	defaultVersionKey     = "etc.cluster.gate.version"
+	defaultRetireDelayKey = "etc.cluster.gate.retireDelay"
 )
 
 type Option func(o *options)
@@ -46,6 +50,8 @@ type options struct {
 	dispatch cluster.Dispatch  // 无状态路由消息分发策略
 	nodeKind cluster.NodeKind  // 节点类型
 	gameID   int32             // 游戏ID
+	version  string            // 服务版本号
+	retireDelay time.Duration  // 低版本退出等待时间
 	metadata map[string]string // 元数据
 }
 
@@ -58,8 +64,10 @@ func defaultOptions() *options {
 		dispatch: defaultDispatch,
 		metadata: make(map[string]string),
 		expose:   etc.Get(defaultExposeKey).Bool(),
-		nodeKind: cluster.Node_Normal,
-		gameID:   -1,
+		nodeKind:    cluster.Node_Normal,
+		gameID:      -1,
+		version:     defaultVersion,
+		retireDelay: defaultRetireDelay,
 	}
 
 	if id := etc.Get(defaultIDKey).String(); id != "" {
@@ -86,6 +94,14 @@ func defaultOptions() *options {
 
 	if err := etc.Get(defaultMetadataKey).Scan(&opts.metadata); err != nil {
 		log.Warnf("scan gate metadata failed: %v", err)
+	}
+
+	if version := etc.Get(defaultVersionKey).String(); version != "" {
+		opts.version = version
+	}
+
+	if delay := etc.Get(defaultRetireDelayKey).Duration(); delay > 0 {
+		opts.retireDelay = delay
 	}
 
 	return opts
@@ -152,4 +168,12 @@ func WithMetadata(metadata map[string]string) Option {
 			maps.Copy(o.metadata, metadata)
 		}
 	}
+}
+
+func WithVersion(version string) Option {
+	return func(o *options) { o.version = version }
+}
+
+func WithRetireDelay(delay time.Duration) Option {
+	return func(o *options) { o.retireDelay = delay }
 }

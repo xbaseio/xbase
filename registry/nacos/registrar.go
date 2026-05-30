@@ -19,13 +19,13 @@ const (
 	metaFieldKind  = "kind"
 	metaFieldAlias = "alias"
 	metaFieldState = "state"
-	//metaFieldRoutes   = "routes"
 	metaFieldEvents   = "events"
 	metaFieldWeight   = "weight"
 	metaFieldServices = "services"
 	metaFieldEndpoint = "endpoint"
 	metaFieldMetadata = "metadata"
 	metaFieldGameID   = "gameID"
+	metaFieldVersion  = "version"
 )
 
 type registrar struct {
@@ -67,13 +67,8 @@ func (r *registrar) register(_ context.Context, ins *registry.ServiceInstance) e
 		param.Metadata[metaFieldWeight] = xconv.String(ins.Weight)
 	}
 
-	if len(ins.Routes) > 0 {
-		if routes, err := json.Marshal(ins.Routes); err != nil {
-			return err
-		} else {
-			param.Metadata[metaFieldRoutes] = xconv.BytesToString(routes)
-		}
-	}
+	param.Metadata[metaFieldGameID] = xconv.String(ins.GameID)
+	param.Metadata[metaFieldVersion] = ins.Version
 
 	if len(ins.Events) > 0 {
 		if events, err := json.Marshal(ins.Events); err != nil {

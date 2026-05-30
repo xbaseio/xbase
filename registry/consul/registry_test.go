@@ -57,17 +57,10 @@ func TestRegistry_Register(t *testing.T) {
 		Alias:    "mahjong",
 		State:    cluster.Work.String(),
 		Endpoint: fmt.Sprintf("grpc://%s:%d", host, port),
+		GameID:   1,
 		Metadata: map[string]string{
 			"key": "value",
 		},
-	}
-
-	for i := range 100 {
-		ins.Routes = append(ins.Routes, registry.Route{
-			ID:       int32(i),
-			Stateful: true,
-			Internal: true,
-		})
 	}
 
 	if err = reg.Register(ctx, ins); err != nil {

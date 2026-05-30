@@ -11,16 +11,22 @@ import (
 )
 
 type Dispatcher struct {
-	dispatch cluster.Dispatch
-	rw       sync.RWMutex
-	//routes    map[int32]*Route
+	dispatch  cluster.Dispatch
+	rw        sync.RWMutex
+	routes    map[int32]*GameRoute
 	events    map[int]*Event
 	endpoints map[string]*endpoint.Endpoint
 	instances map[string]*registry.ServiceInstance
 }
 
 func NewDispatcher(dispatch cluster.Dispatch) *Dispatcher {
-	return &Dispatcher{dispatch: dispatch}
+	return &Dispatcher{
+		dispatch:  dispatch,
+		routes:    make(map[int32]*GameRoute),
+		events:    make(map[int]*Event),
+		endpoints: make(map[string]*endpoint.Endpoint),
+		instances: make(map[string]*registry.ServiceInstance),
+	}
 }
 
 // FindEndpoint 查找服务端口
@@ -56,17 +62,22 @@ func (d *Dispatcher) VisitEndpoints(fn func(insID string, ep *endpoint.Endpoint)
 	}
 }
 
-// FindRoute 查找节点路由
-func (d *Dispatcher) FindRoute_001(route int32) (*Route, error) {
+// FindGameRoute 按游戏ID查找节点路由
+func (d *Dispatcher) FindGameRoute(gameID int32) (*GameRoute, error) {
 	d.rw.RLock()
 	defer d.rw.RUnlock()
 
-	r, ok := d.routes[route]
+	r, ok := d.routes[gameID]
 	if !ok {
 		return nil, xerrors.ErrNotFoundRoute
 	}
 
 	return r, nil
+}
+
+// FindRoute 查找节点路由
+func (d *Dispatcher) FindRoute(gameID int32) (*GameRoute, error) {
+	return d.FindGameRoute(gameID)
 }
 
 // FindEvent 查找节点事件
@@ -88,6 +99,8 @@ func (d *Dispatcher) ReplaceServices(services ...*registry.ServiceInstance) {
 	events := make(map[int]*Event, len(services))
 	endpoints := make(map[string]*endpoint.Endpoint)
 	instances := make(map[string]*registry.ServiceInstance, len(services))
+	maxVersionByGame := registry.MaxVersionForGame(services)
+	maxVersionByGateAlias := registry.MaxVersionByKindAlias(services, cluster.Gate.String())
 
 	for _, service := range services {
 		ep, err := endpoint.ParseEndpoint(service.Endpoint)
@@ -99,18 +112,29 @@ func (d *Dispatcher) ReplaceServices(services ...*registry.ServiceInstance) {
 
 		endpoints[service.ID] = ep
 		instances[service.ID] = service
+
+		balance := true
+		switch service.Kind {
+		case cluster.Node.String():
+			balance = registry.IsLatestVersion(service, maxVersionByGame[service.GameID])
+		case cluster.Gate.String():
+			balance = registry.IsLatestVersion(service, maxVersionByGateAlias[service.Alias])
+		}
+
+		se := &serviceEndpoint{
+			insID:    service.ID,
+			state:    service.State,
+			endpoint: ep,
+			weight:   service.Weight,
+		}
+
 		route, ok := routes[service.GameID]
 		if !ok {
 			route = newRoute_001(d, service.Alias, service.GameID)
 			routes[service.GameID] = route
-		} else {
-			route.addServiceEndpoint(&serviceEndpoint{
-				insID:    service.ID,
-				state:    service.State,
-				endpoint: ep,
-				weight:   service.Weight,
-			})
 		}
+
+		route.addServiceEndpoint(se, balance)
 
 		for _, evt := range service.Events {
 			event, ok := events[evt]
@@ -118,12 +142,7 @@ func (d *Dispatcher) ReplaceServices(services ...*registry.ServiceInstance) {
 				event = newEvent(evt)
 				events[evt] = event
 			}
-			event.addServiceEndpoint(&serviceEndpoint{
-				insID:    service.ID,
-				state:    service.State,
-				endpoint: ep,
-				weight:   service.Weight,
-			})
+			event.addServiceEndpoint(se, balance)
 		}
 	}
 

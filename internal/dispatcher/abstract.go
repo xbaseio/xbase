@@ -31,8 +31,13 @@ func newAbstract() abstract {
 	}
 }
 
-// 添加服务端点
-func (a *abstract) addServiceEndpoint(se *serviceEndpoint) {
+// 添加服务端点；balance 为 true 时参与负载均衡，否则仅保留直连映射
+func (a *abstract) addServiceEndpoint(se *serviceEndpoint, balance bool) {
+	a.endpoints5[se.insID] = se
+	if !balance {
+		return
+	}
+
 	switch se.state {
 	case cluster.Work.String():
 		a.endpoints1 = append(a.endpoints1, se)

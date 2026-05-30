@@ -88,6 +88,8 @@ func (m *Mesh) Start() {
 
 	m.proxy.watch()
 
+	m.watchVersionRetire()
+
 	m.printInfo()
 
 	m.runHookFunc(cluster.Start)
@@ -167,6 +169,7 @@ func (m *Mesh) registerServiceInstance() {
 		State:    m.getState().String(),
 		Endpoint: m.transporter.Endpoint().String(),
 		Services: make([]string, 0, len(m.services)),
+		Version:  m.opts.version,
 		Metadata: m.opts.metadata,
 	}
 

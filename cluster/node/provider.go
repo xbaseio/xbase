@@ -26,7 +26,7 @@ func (p *provider) Deliver(ctx context.Context, gid, nid string, cid, uid int64,
 		return err
 	}
 
-	stateful, ok := p.node.router.CheckRouteStateful(msg.GameID, msg.MessageID)
+	stateful, ok := p.node.router.CheckRouteStateful(msg.MessageID)
 	if !ok {
 		if ok = p.node.router.HasDefaultRouteHandler(); !ok {
 			return nil
@@ -48,7 +48,7 @@ func (p *provider) Deliver(ctx context.Context, gid, nid string, cid, uid int64,
 		}
 	}
 
-	p.node.router.deliver(gid, nid, "", cid, uid, msg.Seq, msg.GameID, msg.Buffer)
+	p.node.router.deliver(gid, nid, "", cid, uid, msg.Seq, msg.GameID, msg.MessageID, msg.Buffer)
 
 	return nil
 }

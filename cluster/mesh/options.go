@@ -17,9 +17,11 @@ import (
 )
 
 const (
-	defaultName    = "mesh"          // 默认节点名称
-	defaultCodec   = "proto"         // 默认编解码器名称
-	defaultTimeout = 3 * time.Second // 默认超时时间
+	defaultName        = "mesh"          // 默认节点名称
+	defaultCodec       = "proto"         // 默认编解码器名称
+	defaultTimeout     = 3 * time.Second // 默认超时时间
+	defaultVersion     = "1"
+	defaultRetireDelay = 10 * time.Minute
 )
 
 const (
@@ -27,7 +29,9 @@ const (
 	defaultNameKey     = "etc.cluster.mesh.name"
 	defaultCodecKey    = "etc.cluster.mesh.codec"
 	defaultTimeoutKey  = "etc.cluster.mesh.timeout"
-	defaultMetadataKey = "etc.cluster.mesh.metadata"
+	defaultMetadataKey    = "etc.cluster.mesh.metadata"
+	defaultVersionKey     = "etc.cluster.mesh.version"
+	defaultRetireDelayKey = "etc.cluster.mesh.retireDelay"
 )
 
 type Option func(o *options)
@@ -44,6 +48,8 @@ type options struct {
 	transporter transport.Transporter // 消息传输器
 	nodeKind    cluster.NodeKind      // 节点类型
 	gameID      int32                 // 游戏ID
+	version     string                // 服务版本号
+	retireDelay time.Duration         // 低版本退出等待时间
 	metadata    map[string]string     // 元数据
 }
 
@@ -54,8 +60,10 @@ func defaultOptions() *options {
 		codec:    encoding.Invoke(defaultCodec),
 		timeout:  defaultTimeout,
 		metadata: make(map[string]string),
-		nodeKind: cluster.Node_Normal,
-		gameID:   -1,
+		nodeKind:    cluster.Node_Normal,
+		gameID:      -1,
+		version:     defaultVersion,
+		retireDelay: defaultRetireDelay,
 	}
 
 	if id := etc.Get(defaultIDKey).String(); id != "" {
@@ -78,6 +86,14 @@ func defaultOptions() *options {
 
 	if err := etc.Get(defaultMetadataKey).Scan(&opts.metadata); err != nil {
 		log.Warnf("scan mesh metadata failed: %v", err)
+	}
+
+	if version := etc.Get(defaultVersionKey).String(); version != "" {
+		opts.version = version
+	}
+
+	if delay := etc.Get(defaultRetireDelayKey).Duration(); delay > 0 {
+		opts.retireDelay = delay
 	}
 
 	return opts
@@ -134,4 +150,12 @@ func WithMetadata(metadata map[string]string) Option {
 			maps.Copy(o.metadata, metadata)
 		}
 	}
+}
+
+func WithVersion(version string) Option {
+	return func(o *options) { o.version = version }
+}
+
+func WithRetireDelay(delay time.Duration) Option {
+	return func(o *options) { o.retireDelay = delay }
 }

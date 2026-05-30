@@ -22,11 +22,12 @@ const (
 	metaFieldKind     = "kind"
 	metaFieldAlias    = "alias"
 	metaFieldState    = "state"
-	metaFieldRoutes   = "routes"
 	metaFieldEvents   = "events"
 	metaFieldWeight   = "weight"
 	metaFieldServices = "services"
 	metaFieldEndpoint = "endpoint"
+	metaFieldGameID   = "gameID"
+	metaFieldVersion  = "version"
 )
 
 const (
@@ -82,6 +83,8 @@ func (r *registrar) register(_ context.Context, ins *registry.ServiceInstance) e
 	registration.Meta[metaFieldAlias] = ins.Alias
 	registration.Meta[metaFieldState] = ins.State
 	registration.Meta[metaFieldEndpoint] = ins.Endpoint
+	registration.Meta[metaFieldGameID] = xconv.String(ins.GameID)
+	registration.Meta[metaFieldVersion] = ins.Version
 
 	if ins.Weight > 0 {
 		registration.Meta[metaFieldWeight] = xconv.String(ins.Weight)
@@ -101,10 +104,6 @@ func (r *registrar) register(_ context.Context, ins *registry.ServiceInstance) e
 		} else {
 			registration.Meta[metaFieldServices] = xconv.BytesToString(services)
 		}
-	}
-
-	for field, value := range marshalMetaRoutes(ins.Routes) {
-		registration.Meta[field] = value
 	}
 
 	for field, value := range ins.Metadata {

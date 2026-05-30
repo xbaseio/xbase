@@ -54,6 +54,8 @@ type ServiceInstance struct {
 	Weight int `json:"weight,omitempty"`
 	// 游戏ID，0表示到大厅
 	GameID int32 `json:"game_id,omitempty"`
+	// 服务版本号
+	Version string `json:"version,omitempty"`
 	// 元数据
 	Metadata map[string]string `json:"metadata,omitempty"`
 }

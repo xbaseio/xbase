@@ -131,7 +131,7 @@ func (c *Client) handleReceive(conn network.Conn, data []byte) {
 		return
 	}
 
-	handlers, ok := c.routes[message.GameID]
+	handlers, ok := c.routes[message.MessageID]
 	if ok {
 		for _, handler := range handlers {
 			xcall.Call(func() {
@@ -149,7 +149,7 @@ func (c *Client) handleReceive(conn network.Conn, data []byte) {
 			message: message,
 		})
 	} else {
-		log.Debugf("route handler is not registered, route: %v", message.GameID)
+		log.Debugf("route handler is not registered, message: %v", message.MessageID)
 	}
 }
 
@@ -189,9 +189,9 @@ func (c *Client) dial(opts ...DialOption) (*Conn, error) {
 }
 
 // 添加路由处理器
-func (c *Client) addRouteHandler(route int32, handler RouteHandler) {
+func (c *Client) addRouteHandler(messageID int32, handler RouteHandler) {
 	if c.getState() == cluster.Shut {
-		c.routes[route] = append(c.routes[route], handler)
+		c.routes[messageID] = append(c.routes[messageID], handler)
 	} else {
 		log.Warnf("client is working, can't add route handler")
 	}

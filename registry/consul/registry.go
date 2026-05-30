@@ -141,7 +141,6 @@ func (r *Registry) services(ctx context.Context, serviceName string, waitIndex u
 	for _, entry := range entries {
 		ins := &registry.ServiceInstance{
 			Name:     entry.Service.Service,
-			Routes:   unmarshalMetaRoutes(entry.Service.Meta),
 			Events:   make([]int, 0),
 			Services: make([]string, 0),
 			Metadata: make(map[string]string),
@@ -169,6 +168,10 @@ func (r *Registry) services(ctx context.Context, serviceName string, waitIndex u
 				}
 			case metaFieldEndpoint:
 				ins.Endpoint = v
+			case metaFieldGameID:
+				ins.GameID = xconv.Int32(v)
+			case metaFieldVersion:
+				ins.Version = v
 			default:
 				if len(k) > 0 && string(k[0]) == defaultMetadataPrefix {
 					ins.Metadata[string(k[1:])] = v

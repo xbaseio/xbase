@@ -82,9 +82,9 @@ func (p *Proxy) Trigger() *Trigger {
 	return p.node.trigger
 }
 
-// AddRouteHandler 添加路由处理器
-func (p *Proxy) AddRouteHandler(route int32, handler RouteHandler, opts ...RouteOptions) {
-	p.node.router.AddRouteHandler(route, handler, opts...)
+// AddRouteHandler 添加路由处理器，按 MessageID 注册
+func (p *Proxy) AddRouteHandler(messageID int32, handler RouteHandler, opts ...RouteOptions) {
+	p.node.router.AddRouteHandler(messageID, handler, opts...)
 }
 
 // SetDefaultRouteHandler 设置默认路由处理器，所有未注册的路由均走默认路由处理器

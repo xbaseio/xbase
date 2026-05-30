@@ -255,60 +255,53 @@ func (l *NodeLinker) SetState(ctx context.Context, nid string, state cluster.Sta
 	return client.SetState(ctx, state)
 }
 
-// 执行节点RPC调用
-func (l *NodeLinker) doRPC_V2(ctx context.Context, gameID int32, uid int64, fn func(ctx context.Context, client *node.Client) (bool, any, error)) (any, error) {
-	var (
-		err       error
-		nid       string
-		prev      string
-		route     *dispatcher.GameRoute
-		client    *node.Client
-		ep        *endpoint.Endpoint
-		continued bool
-		reply     any
-	)
-
-	if route, err = l.dispatcher.FindGameRoute(gameID); err != nil {
+// 执行节点RPC调用；按 GameID 定位目标节点组，已绑定用户走定位，否则按分发策略选择节点
+func (l *NodeLinker) doRPC(ctx context.Context, gameID int32, uid int64, fn func(ctx context.Context, client *node.Client) (bool, any, error)) (any, error) {
+	route, err := l.dispatcher.FindGameRoute(gameID)
+	if err != nil {
 		return nil, err
 	}
 
-	if uid == 0 && (route.Stateful() || route.Authorized()) {
-		return nil, xerrors.ErrIllegalRequest
-	}
-
-	if l.opts.InsKind == cluster.Gate && route.Internal() {
-		return nil, xerrors.ErrIllegalRequest
-	}
+	var (
+		nid   string
+		prev  string
+		reply any
+	)
 
 	for range 2 {
-		if route.Stateful() {
-			if nid, err = l.LocateNode(ctx, uid, route.Group()); err != nil {
-				return nil, err
-			}
-
-			if nid == prev {
+		nid = ""
+		if uid != 0 {
+			nid, err = l.LocateNode(ctx, uid, route.Group())
+			if err != nil {
+				if !xerrors.Is(err, xerrors.ErrNotFoundUserLocation) {
+					return nil, err
+				}
+				err = nil
+			} else if nid == prev {
 				return reply, err
 			}
-
-			prev = nid
 		}
 
-		if ep, err = route.FindEndpoint(nid); err != nil {
+		ep, err := route.FindEndpoint(nid)
+		if err != nil {
 			return nil, err
 		}
 
-		if client, err = l.builder.Build(ep.Address()); err != nil {
+		client, err := l.builder.Build(ep.Address())
+		if err != nil {
 			return nil, err
 		}
 
-		if continued, reply, err = fn(ctx, client); continued {
-			if route.Stateful() {
+		continued, reply, err := fn(ctx, client)
+		if continued {
+			if uid != 0 && prev != "" {
 				l.doDeleteSource(uid, route.Group(), prev)
 			}
+			prev = nid
 			continue
 		}
 
-		break
+		return reply, err
 	}
 
 	return reply, err

@@ -108,8 +108,13 @@ func (b *Builder) watch() {
 }
 
 func (b *Builder) updateInstances(instances []*registry.ServiceInstance) {
+	maxByAlias := registry.MaxVersionByKindAlias(instances, cluster.Mesh.String())
 	pairs := make(map[string][]*cli.KVPair, len(instances))
 	for _, instance := range instances {
+		if !registry.IsLatestVersion(instance, maxByAlias[instance.Alias]) {
+			continue
+		}
+
 		ep, err := endpoint.ParseEndpoint(instance.Endpoint)
 		if err != nil {
 			log.Errorf("parse discovery endpoint failed: %v", err)
