@@ -114,6 +114,10 @@ func (g *Gate) Close() {
 
 	g.refreshServiceInstance()
 
+	g.stopNetworkServer()
+
+	g.stopLinkerServer()
+
 	g.wg.Wait()
 }
 
@@ -250,6 +254,10 @@ func (g *Gate) startLinkerServer() {
 			log.Errorf("link server start failed: %v", err)
 		}
 	}()
+
+	if err = cluster.WaitForTCPListen(g.linker.ListenAddr(), defaultTimeout); err != nil {
+		log.Fatalf("link server listen timeout: %v", err)
+	}
 }
 
 // 停止传输服务器

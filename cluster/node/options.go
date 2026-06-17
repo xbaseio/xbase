@@ -18,76 +18,77 @@ import (
 )
 
 const (
-	defaultName        = "node"          // 默认节点名称
-	defaultAddr        = ":0"            // 连接器监听地址
-	defaultCodec       = "proto"         // 默认编解码器名称
-	defaultTimeout     = 3 * time.Second // 默认超时时间
-	defaultWeight      = 1               // 默认权重
-	defaultVersion     = "1"             // 默认版本号
+	defaultName        = "node"
+	defaultAddr        = ":0"
+	defaultCodec       = "proto"
+	defaultTimeout     = 3 * time.Second
+	defaultWeight      = 1
+	defaultVersion     = "1"
 	defaultRetireDelay = 10 * time.Minute
 )
 
 const (
-	defaultIDKey       = "etc.cluster.node.id"
-	defaultNameKey     = "etc.cluster.node.name"
-	defaultAddrKey     = "etc.cluster.node.addr"
-	defaultExposeKey   = "etc.cluster.node.expose"
-	defaultCodecKey    = "etc.cluster.node.codec"
-	defaultWeightKey   = "etc.cluster.node.weight"
-	defaultTimeoutKey  = "etc.cluster.node.timeout"
-	defaultMetadataKey = "etc.cluster.node.metadata"
-	defaultGameIDKey     = "etc.cluster.node.gameID"
-	defaultVersionKey  = "etc.cluster.node.version"
-	defaultRetireDelayKey = "etc.cluster.node.retireDelay"
+	defaultIDKey             = "etc.cluster.node.id"
+	defaultNameKey           = "etc.cluster.node.name"
+	defaultAddrKey           = "etc.cluster.node.addr"
+	defaultExposeKey         = "etc.cluster.node.expose"
+	defaultCodecKey          = "etc.cluster.node.codec"
+	defaultWeightKey         = "etc.cluster.node.weight"
+	defaultTimeoutKey        = "etc.cluster.node.timeout"
+	defaultMetadataKey       = "etc.cluster.node.metadata"
+	defaultGameIDKey         = "etc.cluster.node.gameID"
+	defaultVersionKey        = "etc.cluster.node.version"
+	defaultRetireDelayKey    = "etc.cluster.node.retireDelay"
 	defaultRequestWorkersKey = "etc.cluster.node.requestWorkers"
 	defaultEventWorkersKey   = "etc.cluster.node.eventWorkers"
 	defaultDeliverTimeoutKey = "etc.cluster.node.deliverTimeout"
 	defaultMailboxTimeoutKey = "etc.cluster.node.mailboxTimeout"
+	defaultServiceStatusKey  = "etc.cluster.node.serviceStatus"
 )
 
-// SchedulingModel 调度模型
 type SchedulingModel string
-
 type Option func(o *options)
 
 type options struct {
-	ctx         context.Context       // 上下文
-	id          string                // 实例ID
-	name        string                // 实例名称；相同实例名称的节点，用户只能绑定其中一个
-	addr        string                // 监听地址
-	expose      bool                  // 是否将内部通信地址暴露到公网
-	codec       encoding.Codec        // 编解码器
-	weight      int                   // 服务器权重
-	timeout     time.Duration         // RPC调用超时时间
-	locator     locate.Locator        // 用户定位器
-	registry    registry.Registry     // 服务注册器
-	encryptor   crypto.Encryptor      // 消息加密器
-	transporter transport.Transporter // 消息传输器
-	metadata    map[string]string     // 元数据
-	nodeKind    cluster.NodeKind      // 节点类型
-	gameID      int32                 // 游戏ID
-	version     string                // 服务版本号
-	retireDelay time.Duration         // 低版本节点退出等待时间
-	requestWorkers int               // 请求 dispatch worker 数
-	eventWorkers   int               // 事件 dispatch worker 数
-	deliverTimeout time.Duration     // 投递 reqChan 超时
-	mailboxTimeout time.Duration     // Actor 邮箱入队超时
+	ctx            context.Context
+	id             string
+	name           string
+	addr           string
+	expose         bool
+	codec          encoding.Codec
+	weight         int
+	timeout        time.Duration
+	locator        locate.Locator
+	registry       registry.Registry
+	encryptor      crypto.Encryptor
+	transporter    transport.Transporter
+	metadata       map[string]string
+	nodeKind       cluster.NodeKind
+	gameID         int32
+	version        string
+	serviceStatus  registry.ServiceStatus
+	retireDelay    time.Duration
+	requestWorkers int
+	eventWorkers   int
+	deliverTimeout time.Duration
+	mailboxTimeout time.Duration
 }
 
 func defaultOptions() *options {
 	opts := &options{
-		ctx:      context.Background(),
-		name:     defaultName,
-		addr:     defaultAddr,
-		codec:    encoding.Invoke(defaultCodec),
-		weight:   defaultWeight,
-		timeout:  defaultTimeout,
-		metadata: make(map[string]string),
-		expose:   etc.Get(defaultExposeKey).Bool(),
-		nodeKind:    cluster.Node_Normal,
-		gameID:      0,
-		version:     defaultVersion,
-		retireDelay: defaultRetireDelay,
+		ctx:            context.Background(),
+		name:           defaultName,
+		addr:           defaultAddr,
+		codec:          encoding.Invoke(defaultCodec),
+		weight:         defaultWeight,
+		timeout:        defaultTimeout,
+		metadata:       make(map[string]string),
+		expose:         etc.Get(defaultExposeKey).Bool(),
+		nodeKind:       cluster.Node_Normal,
+		gameID:         0,
+		version:        defaultVersion,
+		serviceStatus:  registry.ServiceStatusNormal,
+		retireDelay:    defaultRetireDelay,
 		requestWorkers: max(runtime.NumCPU(), 1),
 		eventWorkers:   2,
 		deliverTimeout: defaultTimeout,
@@ -132,6 +133,10 @@ func defaultOptions() *options {
 		opts.version = version
 	}
 
+	if serviceStatus := etc.Get(defaultServiceStatusKey).String(); serviceStatus != "" {
+		opts.serviceStatus = registry.ParseServiceStatus(serviceStatus)
+	}
+
 	if delay := etc.Get(defaultRetireDelayKey).Duration(); delay > 0 {
 		opts.retireDelay = delay
 	}
@@ -155,100 +160,53 @@ func defaultOptions() *options {
 	return opts
 }
 
-// WithID 设置实例ID
-func WithID(id string) Option {
-	return func(o *options) { o.id = id }
-}
-
-// WithName 设置实例名称
-func WithName(name string) Option {
-	return func(o *options) { o.name = name }
-}
-
-// WithAddr 设置连接地址
-func WithAddr(addr string) Option {
-	return func(o *options) { o.addr = addr }
-}
-
-// WithExpose 设置是否将内部通信地址暴露到公网
-func WithExpose(expose bool) Option {
-	return func(o *options) { o.expose = expose }
-}
-
-// WithCodec 设置编解码器
-func WithCodec(codec encoding.Codec) Option {
-	return func(o *options) { o.codec = codec }
-}
-
-// WithContext 设置上下文
-func WithContext(ctx context.Context) Option {
-	return func(o *options) { o.ctx = ctx }
-}
-
-// WithTimeout 设置RPC调用超时时间
-func WithTimeout(timeout time.Duration) Option {
-	return func(o *options) { o.timeout = timeout }
-}
-
-// WithLocator 设置定位器
-func WithLocator(locator locate.Locator) Option {
-	return func(o *options) { o.locator = locator }
-}
-
-// WithRegistry 设置服务注册器
-func WithRegistry(r registry.Registry) Option {
-	return func(o *options) { o.registry = r }
-}
-
-// WithEncryptor 设置消息加密器
+func WithID(id string) Option                   { return func(o *options) { o.id = id } }
+func WithName(name string) Option               { return func(o *options) { o.name = name } }
+func WithAddr(addr string) Option               { return func(o *options) { o.addr = addr } }
+func WithExpose(expose bool) Option             { return func(o *options) { o.expose = expose } }
+func WithCodec(codec encoding.Codec) Option     { return func(o *options) { o.codec = codec } }
+func WithContext(ctx context.Context) Option    { return func(o *options) { o.ctx = ctx } }
+func WithTimeout(timeout time.Duration) Option  { return func(o *options) { o.timeout = timeout } }
+func WithLocator(locator locate.Locator) Option { return func(o *options) { o.locator = locator } }
+func WithRegistry(r registry.Registry) Option   { return func(o *options) { o.registry = r } }
 func WithEncryptor(encryptor crypto.Encryptor) Option {
 	return func(o *options) { o.encryptor = encryptor }
 }
-
-// WithTransporter 设置消息传输器
 func WithTransporter(transporter transport.Transporter) Option {
 	return func(o *options) { o.transporter = transporter }
 }
+func WithWeight(weight int) Option { return func(o *options) { o.weight = weight } }
 
-// WithWeight 设置权重
-func WithWeight(weight int) Option {
-	return func(o *options) { o.weight = weight }
-}
-
-// WithMetadata 设置元数据
 func WithMetadata(metadata map[string]string) Option {
 	return func(o *options) {
-		if len(metadata) != 0 {
-			if len(o.metadata) == 0 {
-				o.metadata = make(map[string]string)
-			}
-
-			maps.Copy(o.metadata, metadata)
+		if len(metadata) == 0 {
+			return
 		}
+		if len(o.metadata) == 0 {
+			o.metadata = make(map[string]string)
+		}
+		maps.Copy(o.metadata, metadata)
 	}
 }
 
 func WithNodeKind(nodeKind cluster.NodeKind) Option {
-	return func(o *options) {
-		o.nodeKind = nodeKind
-	}
+	return func(o *options) { o.nodeKind = nodeKind }
 }
+
 func WithGameID(gameID int32) Option {
-	return func(o *options) {
-		o.gameID = gameID
-	}
+	return func(o *options) { o.gameID = gameID }
 }
 
 func WithVersion(version string) Option {
-	return func(o *options) {
-		o.version = version
-	}
+	return func(o *options) { o.version = version }
+}
+
+func WithServiceStatus(status registry.ServiceStatus) Option {
+	return func(o *options) { o.serviceStatus = registry.ParseServiceStatus(string(status)) }
 }
 
 func WithRetireDelay(delay time.Duration) Option {
-	return func(o *options) {
-		o.retireDelay = delay
-	}
+	return func(o *options) { o.retireDelay = delay }
 }
 
 func WithRequestWorkers(n int) Option {

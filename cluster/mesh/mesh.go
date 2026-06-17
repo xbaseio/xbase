@@ -106,6 +106,8 @@ func (m *Mesh) Close() {
 	m.refreshServiceInstance()
 
 	m.runHookFunc(cluster.Close)
+
+	m.stopTransportServer()
 }
 
 // Destroy 销毁
@@ -150,6 +152,10 @@ func (m *Mesh) startTransportServer() {
 			log.Fatalf("transport server start failed: %v", err)
 		}
 	}()
+
+	if err = cluster.WaitForTCPListen(m.transporter.Addr(), defaultTimeout); err != nil {
+		log.Fatalf("transport server listen timeout: %v", err)
+	}
 }
 
 // 停止传输服务器

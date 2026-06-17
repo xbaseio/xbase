@@ -134,8 +134,9 @@ func (p *proxy) pickLobbyNode(ctx context.Context, uid int64) (*registry.Service
 		return nil, err
 	}
 
-	maxVersion := registry.MaxVersionForGame(services)
+	maxVersionByStatus := registry.MaxVersionForGameByServiceStatus(services)
 	candidates := make([]*registry.ServiceInstance, 0, len(services))
+	allowTest := p.gate.opts.allowTestService(uid)
 
 	for _, ins := range services {
 		if ins == nil || ins.Kind != cluster.Node.String() {
@@ -152,7 +153,17 @@ func (p *proxy) pickLobbyNode(ctx context.Context, uid int64) (*registry.Service
 			continue
 		}
 
-		if !registry.IsLatestVersion(ins, maxVersion[ins.GameID]) {
+		status := registry.ServiceStatusOf(ins)
+		group := maxVersionByStatus[ins.GameID]
+		if !registry.IsLatestVersion(ins, group[status]) {
+			continue
+		}
+
+		if status == registry.ServiceStatusTest && !allowTest {
+			continue
+		}
+
+		if allowTest && status != registry.ServiceStatusTest && group[registry.ServiceStatusTest] != "" {
 			continue
 		}
 

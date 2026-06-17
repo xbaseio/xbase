@@ -240,3 +240,65 @@ func BenchmarkDispatcher_WeightRoundRobin(b *testing.B) {
 		})
 	}
 }
+
+func TestDispatcher_ServiceStatusRouting(t *testing.T) {
+	services := []*registry.ServiceInstance{
+		{
+			ID:       "normal-v1",
+			Name:     "node-normal-v1",
+			Kind:     cluster.Node.String(),
+			Alias:    "node",
+			State:    cluster.Work.String(),
+			Endpoint: endpoint.NewEndpoint("grpc", "127.0.0.1:8101", false).String(),
+			GameID:   1,
+			Version:  "1.0.0",
+			Metadata: map[string]string{registry.MetadataServiceStatusKey: string(registry.ServiceStatusNormal)},
+		},
+		{
+			ID:       "normal-v2",
+			Name:     "node-normal-v2",
+			Kind:     cluster.Node.String(),
+			Alias:    "node",
+			State:    cluster.Work.String(),
+			Endpoint: endpoint.NewEndpoint("grpc", "127.0.0.1:8102", false).String(),
+			GameID:   1,
+			Version:  "2.0.0",
+			Metadata: map[string]string{registry.MetadataServiceStatusKey: string(registry.ServiceStatusNormal)},
+		},
+		{
+			ID:       "test-v3",
+			Name:     "node-test-v3",
+			Kind:     cluster.Node.String(),
+			Alias:    "node",
+			State:    cluster.Work.String(),
+			Endpoint: endpoint.NewEndpoint("grpc", "127.0.0.1:8103", false).String(),
+			GameID:   1,
+			Version:  "3.0.0",
+			Metadata: map[string]string{registry.MetadataServiceStatusKey: string(registry.ServiceStatusTest)},
+		},
+	}
+
+	d := dispatcher.NewDispatcher(cluster.Random)
+	d.ReplaceServices(services...)
+
+	route, err := d.FindRoute(1)
+	if err != nil {
+		t.Fatalf("find route failed: %v", err)
+	}
+
+	ep, err := route.FindEndpointForUser(false)
+	if err != nil {
+		t.Fatalf("find normal endpoint failed: %v", err)
+	}
+	if got := ep.Address(); got != "127.0.0.1:8102" {
+		t.Fatalf("unexpected normal endpoint: %s", got)
+	}
+
+	ep, err = route.FindEndpointForUser(true)
+	if err != nil {
+		t.Fatalf("find test endpoint failed: %v", err)
+	}
+	if got := ep.Address(); got != "127.0.0.1:8103" {
+		t.Fatalf("unexpected test endpoint: %s", got)
+	}
+}

@@ -9,15 +9,16 @@ import (
 )
 
 type Options struct {
-	InsID       string            // 实例ID
-	InsKind     cluster.Kind      // 实例类型
-	Codec       encoding.Codec    // 编解码器
-	Locator     locate.Locator    // 定位器
-	Registry    registry.Registry // 注册器
-	Encryptor   crypto.Encryptor  // 加密器
-	Dispatch    cluster.Dispatch  // 无状态路由消息分发策略
-	NodeKind    cluster.NodeKind  // 节点类型，仅节点链接器有效
-	GameID      int32             // 游戏ID，仅网关链接器有效
-	WaitHandler func()            // 等待处理
-	DoneHandler func()            // 完成处理
+	InsID            string
+	InsKind          cluster.Kind
+	Codec            encoding.Codec
+	Locator          locate.Locator
+	Registry         registry.Registry
+	Encryptor        crypto.Encryptor
+	Dispatch         cluster.Dispatch
+	NodeKind         cluster.NodeKind
+	GameID           int32
+	WaitHandler      func()
+	DoneHandler      func()
+	AllowTestService func(uid int64) bool
 }

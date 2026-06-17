@@ -155,6 +155,10 @@ func (n *Node) Close() {
 
 	n.runHookFunc(cluster.Close)
 
+	n.stopLinkServer()
+
+	n.stopTransportServer()
+
 	n.wg.Wait()
 }
 
@@ -235,6 +239,10 @@ func (n *Node) startLinkServer() {
 			log.Fatalf("link server start failed: %v", err)
 		}
 	}()
+
+	if err = cluster.WaitForTCPListen(n.linker.ListenAddr(), defaultTimeout); err != nil {
+		log.Fatalf("link server listen timeout: %v", err)
+	}
 }
 
 // 停止连接服务器
@@ -274,6 +282,10 @@ func (n *Node) startTransportServer() {
 			log.Fatalf("transport server start failed: %v", err)
 		}
 	}()
+
+	if err = cluster.WaitForTCPListen(n.transporter.Addr(), defaultTimeout); err != nil {
+		log.Fatalf("transport server listen timeout: %v", err)
+	}
 }
 
 // 停止传输服务器
@@ -306,7 +318,7 @@ func (n *Node) registerServiceInstances() {
 		Routes:   routes,
 		Endpoint: n.linker.Endpoint().String(),
 		Weight:   n.opts.weight,
-		Metadata: n.opts.metadata,
+		Metadata: mergeServiceMetadata(n.opts.metadata, n.opts.serviceStatus),
 		GameID:   n.opts.gameID,
 		Version:  n.opts.version,
 	})
@@ -326,7 +338,7 @@ func (n *Node) registerServiceInstances() {
 			Services: services,
 			Endpoint: n.transporter.Endpoint().String(),
 			Weight:   n.opts.weight,
-			Metadata: n.opts.metadata,
+			Metadata: mergeServiceMetadata(n.opts.metadata, n.opts.serviceStatus),
 			Version:  n.opts.version,
 		})
 	}
@@ -485,4 +497,14 @@ func (n *Node) addWait() {
 	if n.getState() != cluster.Shut {
 		n.wg.Add(1)
 	}
+}
+
+func mergeServiceMetadata(metadata map[string]string, status registry.ServiceStatus) map[string]string {
+	merged := make(map[string]string, len(metadata)+1)
+	for k, v := range metadata {
+		merged[k] = v
+	}
+	merged[registry.MetadataServiceStatusKey] = string(status)
+
+	return merged
 }

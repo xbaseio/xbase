@@ -100,6 +100,7 @@ func (d *Dispatcher) ReplaceServices(services ...*registry.ServiceInstance) {
 	endpoints := make(map[string]*endpoint.Endpoint)
 	instances := make(map[string]*registry.ServiceInstance, len(services))
 	maxVersionByGame := registry.MaxVersionForGame(services)
+	maxVersionByGameAndStatus := registry.MaxVersionForGameByServiceStatus(services)
 	maxVersionByGateAlias := registry.MaxVersionByKindAlias(services, cluster.Gate.String())
 
 	for _, service := range services {
@@ -116,7 +117,12 @@ func (d *Dispatcher) ReplaceServices(services ...*registry.ServiceInstance) {
 		balance := true
 		switch service.Kind {
 		case cluster.Node.String():
-			balance = registry.IsLatestVersion(service, maxVersionByGame[service.GameID])
+			status := registry.ServiceStatusOf(service)
+			if group, ok := maxVersionByGameAndStatus[service.GameID]; ok {
+				balance = registry.IsLatestVersion(service, group[status])
+			} else {
+				balance = registry.IsLatestVersion(service, maxVersionByGame[service.GameID])
+			}
 		case cluster.Gate.String():
 			balance = registry.IsLatestVersion(service, maxVersionByGateAlias[service.Alias])
 		}
@@ -124,6 +130,7 @@ func (d *Dispatcher) ReplaceServices(services ...*registry.ServiceInstance) {
 		se := &serviceEndpoint{
 			insID:    service.ID,
 			state:    service.State,
+			status:   registry.ServiceStatusOf(service),
 			endpoint: ep,
 			weight:   service.Weight,
 		}

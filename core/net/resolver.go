@@ -4,6 +4,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -98,28 +99,34 @@ func defaultPrivateIPResolver() (string, error) {
 
 // 默认公网IP解析器
 func defaultPublicIPResolver() (string, error) {
+	return resolveFirstPublicIP(urls, doQueryPublicIP, 500*time.Millisecond)
+}
+
+func resolveFirstPublicIP(urls []string, query func(string, time.Duration) (string, error), timeout time.Duration) (string, error) {
 	var (
-		ch      = make(chan string)
-		state   atomic.Bool
-		timeout = 500 * time.Millisecond
+		ch    = make(chan string, 1)
+		state atomic.Bool
 	)
 
-	for _, url := range urls {
+	for _, addr := range urls {
+		addr := addr
 		go func() {
-			if ip, err := doQueryPublicIP(url, timeout); err == nil {
-				if state.CompareAndSwap(false, true) {
-					ch <- ip
+			if ip, err := query(addr, timeout); err == nil && state.CompareAndSwap(false, true) {
+				select {
+				case ch <- ip:
+				default:
 				}
 			}
 		}()
 	}
 
-	defer close(ch)
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 
 	select {
 	case ip := <-ch:
-		return ip, nil
-	case <-time.After(timeout):
+		return strings.TrimSpace(ip), nil
+	case <-timer.C:
 		return "", xerrors.ErrNotFoundIPAddress
 	}
 }

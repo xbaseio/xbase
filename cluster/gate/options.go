@@ -17,10 +17,10 @@ import (
 )
 
 const (
-	defaultName           = "gate"          // 默认名称
-	defaultAddr           = ":0"            // 连接器监听地址
-	defaultTimeout        = 3 * time.Second // 默认超时时间
-	defaultDispatch       = cluster.Random  // 默认的无状态路由分发策略
+	defaultName           = "gate"
+	defaultAddr           = ":0"
+	defaultTimeout        = 3 * time.Second
+	defaultDispatch       = cluster.Random
 	defaultVersion        = "1"
 	defaultRetireDelay    = 10 * time.Minute
 	defaultReceiveQueue   = 8192
@@ -30,71 +30,75 @@ const (
 )
 
 const (
-	defaultIDKey       = "etc.cluster.gate.id"
-	defaultNameKey     = "etc.cluster.gate.name"
-	defaultAddrKey     = "etc.cluster.gate.addr"
-	defaultExposeKey   = "etc.cluster.gate.expose"
-	defaultTimeoutKey  = "etc.cluster.gate.timeout"
-	defaultDispatchKey    = "etc.cluster.gate.dispatch"
-	defaultMetadataKey    = "etc.cluster.gate.metadata"
-	defaultVersionKey     = "etc.cluster.gate.version"
-	defaultRetireDelayKey = "etc.cluster.gate.retireDelay"
-	defaultReceiveQueueKey   = "etc.cluster.gate.receiveQueue"
-	defaultDeliverWorkersKey = "etc.cluster.gate.deliverWorkers"
-	defaultLoginMessageIDKey = "etc.cluster.gate.login.messageID"
-	defaultLobbyGameIDKey    = "etc.cluster.gate.login.lobbyGameID"
-	defaultJWTSecretKey      = "etc.cluster.gate.jwt.secretKey"
-	defaultJWTIdentityKeyKey = "etc.cluster.gate.jwt.identityKey"
+	defaultIDKey               = "etc.cluster.gate.id"
+	defaultNameKey             = "etc.cluster.gate.name"
+	defaultAddrKey             = "etc.cluster.gate.addr"
+	defaultExposeKey           = "etc.cluster.gate.expose"
+	defaultTimeoutKey          = "etc.cluster.gate.timeout"
+	defaultDispatchKey         = "etc.cluster.gate.dispatch"
+	defaultMetadataKey         = "etc.cluster.gate.metadata"
+	defaultVersionKey          = "etc.cluster.gate.version"
+	defaultRetireDelayKey      = "etc.cluster.gate.retireDelay"
+	defaultReceiveQueueKey     = "etc.cluster.gate.receiveQueue"
+	defaultDeliverWorkersKey   = "etc.cluster.gate.deliverWorkers"
+	defaultLoginMessageIDKey   = "etc.cluster.gate.login.messageID"
+	defaultLobbyGameIDKey      = "etc.cluster.gate.login.lobbyGameID"
+	defaultJWTSecretKey        = "etc.cluster.gate.jwt.secretKey"
+	defaultJWTIdentityKeyKey   = "etc.cluster.gate.jwt.identityKey"
 	defaultJWTSignAlgorithmKey = "etc.cluster.gate.jwt.signAlgorithm"
+	defaultTestWhitelistKey    = "etc.cluster.gate.testWhitelist"
 )
 
 type Option func(o *options)
 
 type options struct {
-	ctx      context.Context   // 上下文
-	id       string            // 实例ID
-	name     string            // 实例名称
-	addr     string            // 监听地址
-	expose   bool              // 是否将内部通信地址暴露到公网
-	timeout  time.Duration     // RPC调用超时时间
-	server   network.Server    // 网关服务器
-	locator  locate.Locator    // 用户定位器
-	registry registry.Registry // 服务注册器
-	dispatch cluster.Dispatch  // 无状态路由消息分发策略
-	nodeKind cluster.NodeKind  // 节点类型
-	gameID   int32             // 游戏ID
-	version  string            // 服务版本号
-	retireDelay time.Duration  // 低版本退出等待时间
-	receiveQueue   int           // 收包队列容量
-	deliverWorkers int           // deliver worker 数量
-	loginMessageID int32         // Gate 登录消息 ID，<=0 表示关闭
-	lobbyGameID    int32         // 大厅 GameID，默认 0
-	jwt            *xjwt.JWT     // JWT 解析器
-	jwtSecretKey   string        // JWT 密钥（etc 注入）
-	jwtIdentityKey string        // JWT 用户 ID 字段名
-	jwtSignAlgorithm xjwt.SignAlgorithm // JWT 签名算法
-	metadata map[string]string // 元数据
+	ctx              context.Context
+	id               string
+	name             string
+	addr             string
+	expose           bool
+	timeout          time.Duration
+	server           network.Server
+	locator          locate.Locator
+	registry         registry.Registry
+	dispatch         cluster.Dispatch
+	nodeKind         cluster.NodeKind
+	gameID           int32
+	version          string
+	retireDelay      time.Duration
+	receiveQueue     int
+	deliverWorkers   int
+	loginMessageID   int32
+	lobbyGameID      int32
+	jwt              *xjwt.JWT
+	jwtSecretKey     string
+	jwtIdentityKey   string
+	jwtSignAlgorithm xjwt.SignAlgorithm
+	metadata         map[string]string
+	testWhitelist    map[int64]struct{}
+	testUserChecker  func(uid int64) bool
 }
 
 func defaultOptions() *options {
 	opts := &options{
-		ctx:      context.Background(),
-		name:     defaultName,
-		addr:     defaultAddr,
-		timeout:  defaultTimeout,
-		dispatch: defaultDispatch,
-		metadata: make(map[string]string),
-		expose:   etc.Get(defaultExposeKey).Bool(),
-		nodeKind:    cluster.Node_Normal,
-		gameID:      -1,
-		version:     defaultVersion,
-		retireDelay: defaultRetireDelay,
-		receiveQueue:   defaultReceiveQueue,
-		deliverWorkers: max(runtime.NumCPU(), 1),
-		loginMessageID: defaultLoginMessageID,
-		lobbyGameID:    defaultLobbyGameID,
-		jwtIdentityKey: defaultJWTIdentityKey,
+		ctx:              context.Background(),
+		name:             defaultName,
+		addr:             defaultAddr,
+		timeout:          defaultTimeout,
+		dispatch:         defaultDispatch,
+		metadata:         make(map[string]string),
+		expose:           etc.Get(defaultExposeKey).Bool(),
+		nodeKind:         cluster.Node_Normal,
+		gameID:           -1,
+		version:          defaultVersion,
+		retireDelay:      defaultRetireDelay,
+		receiveQueue:     defaultReceiveQueue,
+		deliverWorkers:   max(runtime.NumCPU(), 1),
+		loginMessageID:   defaultLoginMessageID,
+		lobbyGameID:      defaultLobbyGameID,
+		jwtIdentityKey:   defaultJWTIdentityKey,
 		jwtSignAlgorithm: xjwt.HS256,
+		testWhitelist:    make(map[int64]struct{}),
 	}
 
 	if id := etc.Get(defaultIDKey).String(); id != "" {
@@ -157,114 +161,83 @@ func defaultOptions() *options {
 		opts.jwtSignAlgorithm = xjwt.SignAlgorithm(signAlgorithm)
 	}
 
+	for _, uid := range etc.Get(defaultTestWhitelistKey).Int64s() {
+		if uid > 0 {
+			opts.testWhitelist[uid] = struct{}{}
+		}
+	}
+
 	return opts
 }
 
-// WithID 设置实例ID
-func WithID(id string) Option {
-	return func(o *options) { o.id = id }
-}
-
-// WithName 设置实例名称
-func WithName(name string) Option {
-	return func(o *options) { o.name = name }
-}
-
-// WithAddr 设置监听地址
-func WithAddr(addr string) Option {
-	return func(o *options) { o.addr = addr }
-}
-
-// WithExpose 设置是否将内部通信地址暴露到公网
-func WithExpose(expose bool) Option {
-	return func(o *options) { o.expose = expose }
-}
-
-// WithContext 设置上下文
-func WithContext(ctx context.Context) Option {
-	return func(o *options) { o.ctx = ctx }
-}
-
-// WithServer 设置服务器
-func WithServer(server network.Server) Option {
-	return func(o *options) { o.server = server }
-}
-
-// WithTimeout 设置RPC调用超时时间
-func WithTimeout(timeout time.Duration) Option {
-	return func(o *options) { o.timeout = timeout }
-}
-
-// WithLocator 设置用户定位器
-func WithLocator(locator locate.Locator) Option {
-	return func(o *options) { o.locator = locator }
-}
-
-// WithRegistry 设置服务注册器
-func WithRegistry(r registry.Registry) Option {
-	return func(o *options) { o.registry = r }
-}
-
-// WithDispatch 设置无状态路由消息分发策略
+func WithID(id string) Option                   { return func(o *options) { o.id = id } }
+func WithName(name string) Option               { return func(o *options) { o.name = name } }
+func WithAddr(addr string) Option               { return func(o *options) { o.addr = addr } }
+func WithExpose(expose bool) Option             { return func(o *options) { o.expose = expose } }
+func WithContext(ctx context.Context) Option    { return func(o *options) { o.ctx = ctx } }
+func WithServer(server network.Server) Option   { return func(o *options) { o.server = server } }
+func WithTimeout(timeout time.Duration) Option  { return func(o *options) { o.timeout = timeout } }
+func WithLocator(locator locate.Locator) Option { return func(o *options) { o.locator = locator } }
+func WithRegistry(r registry.Registry) Option   { return func(o *options) { o.registry = r } }
 func WithDispatch(dispatch cluster.Dispatch) Option {
 	return func(o *options) { o.dispatch = dispatch }
 }
 
-// WithMetadata 设置元数据
 func WithMetadata(metadata map[string]string) Option {
 	return func(o *options) {
-		if len(metadata) != 0 {
-			if len(o.metadata) == 0 {
-				o.metadata = make(map[string]string)
-			}
+		if len(metadata) == 0 {
+			return
+		}
+		if len(o.metadata) == 0 {
+			o.metadata = make(map[string]string)
+		}
+		maps.Copy(o.metadata, metadata)
+	}
+}
 
-			maps.Copy(o.metadata, metadata)
+func WithVersion(version string) Option          { return func(o *options) { o.version = version } }
+func WithRetireDelay(delay time.Duration) Option { return func(o *options) { o.retireDelay = delay } }
+func WithReceiveQueue(size int) Option           { return func(o *options) { o.receiveQueue = size } }
+func WithDeliverWorkers(n int) Option            { return func(o *options) { o.deliverWorkers = n } }
+func WithLoginMessageID(messageID int32) Option {
+	return func(o *options) { o.loginMessageID = messageID }
+}
+func WithLobbyGameID(gameID int32) Option { return func(o *options) { o.lobbyGameID = gameID } }
+func WithJWT(jwt *xjwt.JWT) Option        { return func(o *options) { o.jwt = jwt } }
+func WithJWTSecretKey(secretKey string) Option {
+	return func(o *options) { o.jwtSecretKey = secretKey }
+}
+func WithJWTIdentityKey(identityKey string) Option {
+	return func(o *options) { o.jwtIdentityKey = identityKey }
+}
+func WithJWTSignAlgorithm(signAlgorithm xjwt.SignAlgorithm) Option {
+	return func(o *options) { o.jwtSignAlgorithm = signAlgorithm }
+}
+
+func WithTestWhitelist(uids ...int64) Option {
+	return func(o *options) {
+		if o.testWhitelist == nil {
+			o.testWhitelist = make(map[int64]struct{}, len(uids))
+		}
+		for _, uid := range uids {
+			if uid > 0 {
+				o.testWhitelist[uid] = struct{}{}
+			}
 		}
 	}
 }
 
-func WithVersion(version string) Option {
-	return func(o *options) { o.version = version }
+func WithTestUserChecker(checker func(uid int64) bool) Option {
+	return func(o *options) { o.testUserChecker = checker }
 }
 
-func WithRetireDelay(delay time.Duration) Option {
-	return func(o *options) { o.retireDelay = delay }
-}
-
-func WithReceiveQueue(size int) Option {
-	return func(o *options) { o.receiveQueue = size }
-}
-
-func WithDeliverWorkers(n int) Option {
-	return func(o *options) { o.deliverWorkers = n }
-}
-
-// WithLoginMessageID 设置 Gate 登录消息 ID；<=0 关闭 Gate 登录
-func WithLoginMessageID(messageID int32) Option {
-	return func(o *options) { o.loginMessageID = messageID }
-}
-
-// WithLobbyGameID 设置大厅 GameID，登录包与大厅绑定均使用该值
-func WithLobbyGameID(gameID int32) Option {
-	return func(o *options) { o.lobbyGameID = gameID }
-}
-
-// WithJWT 注入 JWT 解析器（HTTP 登录签发 token，Gate 校验并绑定用户）
-func WithJWT(jwt *xjwt.JWT) Option {
-	return func(o *options) { o.jwt = jwt }
-}
-
-// WithJWTSecretKey 设置 JWT 密钥（与 HTTP 服一致）
-func WithJWTSecretKey(secretKey string) Option {
-	return func(o *options) { o.jwtSecretKey = secretKey }
-}
-
-// WithJWTIdentityKey 设置 JWT 中用户 ID 字段名
-func WithJWTIdentityKey(identityKey string) Option {
-	return func(o *options) { o.jwtIdentityKey = identityKey }
-}
-
-// WithJWTSignAlgorithm 设置 JWT 签名算法
-func WithJWTSignAlgorithm(signAlgorithm xjwt.SignAlgorithm) Option {
-	return func(o *options) { o.jwtSignAlgorithm = signAlgorithm }
+func (o *options) allowTestService(uid int64) bool {
+	if uid <= 0 {
+		return false
+	}
+	if o.testUserChecker != nil {
+		return o.testUserChecker(uid)
+	}
+	_, ok := o.testWhitelist[uid]
+	return ok
 }

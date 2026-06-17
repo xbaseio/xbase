@@ -22,13 +22,14 @@ func newProxy(gate *Gate) *proxy {
 	return &proxy{
 		gate: gate,
 		nodeLinker: link.NewNodeLinker(gate.ctx, &link.Options{
-			InsID:    gate.opts.id,
-			InsKind:  cluster.Gate,
-			Locator:  gate.opts.locator,
-			Registry: gate.opts.registry,
-			Dispatch: gate.opts.dispatch,
-			NodeKind: gate.opts.nodeKind,
-			GameID:   gate.opts.gameID,
+			InsID:            gate.opts.id,
+			InsKind:          cluster.Gate,
+			Locator:          gate.opts.locator,
+			Registry:         gate.opts.registry,
+			Dispatch:         gate.opts.dispatch,
+			NodeKind:         gate.opts.nodeKind,
+			GameID:           gate.opts.gameID,
+			AllowTestService: gate.opts.allowTestService,
 		}),
 		routeWatcher: newRouteWatcher(gate.ctx, gate.opts.registry),
 	}

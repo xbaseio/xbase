@@ -31,3 +31,5 @@ go.work.sum
 
 # executable files
 *.exe
+
+.gocache
