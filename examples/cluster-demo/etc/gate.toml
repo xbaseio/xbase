@@ -1,0 +1,51 @@
+pid = "./run/cluster-demo-gate.pid"
+mode = "debug"
+timezone = "Local"
+shutdownMaxWaitTime = "5s"
+
+[clusterDemo.debug]
+addr = ":28001"
+
+[cluster.gate]
+name = "demo-gate"
+addr = ":18001"
+version = "1.0.0"
+timeout = "3s"
+dispatch = "random"
+receiveQueue = 4096
+deliverWorkers = 4
+testWhitelist = [10001, 10002]
+
+    [cluster.gate.login]
+    messageID = 1000
+    lobbyGameID = 0
+
+    [cluster.gate.jwt]
+    secretKey = "cluster-demo-secret"
+    identityKey = "uid"
+    signAlgorithm = "HS256"
+
+[network.tcp.server]
+addr = ":3553"
+maxConnNum = 2048
+authorizeTimeout = "30s"
+
+[registry.consul]
+addr = "127.0.0.1:8500"
+healthCheck = true
+healthCheckInterval = 10
+healthCheckTimeout = 5
+heartbeatCheck = true
+heartbeatCheckInterval = 10
+deregisterCriticalServiceAfter = 30
+
+[locate.redis]
+addrs = ["127.0.0.1:6379"]
+db = 0
+prefix = "xbase:cluster-demo"
+
+[log]
+level = "info"
+
+    [log.console]
+    format = "text"

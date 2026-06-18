@@ -1,0 +1,31 @@
+pid = "./run/cluster-demo-mesh.pid"
+mode = "debug"
+timezone = "Local"
+shutdownMaxWaitTime = "5s"
+
+[clusterDemo.debug]
+addr = ":28004"
+
+[cluster.mesh]
+name = "demo-mesh"
+codec = "json"
+version = "1.0.0"
+timeout = "3s"
+
+[transport.grpc.server]
+addr = ":21001"
+
+[registry.consul]
+addr = "127.0.0.1:8500"
+healthCheck = true
+healthCheckInterval = 10
+healthCheckTimeout = 5
+heartbeatCheck = true
+heartbeatCheckInterval = 10
+deregisterCriticalServiceAfter = 30
+
+[log]
+level = "info"
+
+    [log.console]
+    format = "text"

@@ -1,0 +1,43 @@
+pid = "./run/cluster-demo-node-normal.pid"
+mode = "debug"
+timezone = "Local"
+shutdownMaxWaitTime = "5s"
+
+[clusterDemo.debug]
+addr = ":28002"
+
+[cluster.node]
+name = "lobby"
+addr = ":19001"
+codec = "json"
+weight = 100
+gameID = 0
+version = "1.0.0"
+serviceStatus = "normal"
+requestWorkers = 4
+eventWorkers = 2
+deliverTimeout = "3s"
+mailboxTimeout = "3s"
+
+[transport.rpcx.server]
+addr = ":20001"
+
+[registry.consul]
+addr = "127.0.0.1:8500"
+healthCheck = true
+healthCheckInterval = 10
+healthCheckTimeout = 5
+heartbeatCheck = true
+heartbeatCheckInterval = 10
+deregisterCriticalServiceAfter = 30
+
+[locate.redis]
+addrs = ["127.0.0.1:6379"]
+db = 0
+prefix = "xbase:cluster-demo"
+
+[log]
+level = "info"
+
+    [log.console]
+    format = "text"
