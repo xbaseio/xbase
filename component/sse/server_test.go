@@ -1,7 +1,6 @@
 package sse
 
 import (
-	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -20,9 +19,8 @@ func TestEventBytes(t *testing.T) {
 	}
 }
 
-func TestCollectTopics(t *testing.T) {
-	req := httptest.NewRequest("GET", "/events?topic=lobby,battle&topic=chat", nil)
-	topics := collectTopics(req, "topic")
+func TestCollectTopicsFromValues(t *testing.T) {
+	topics := collectTopicsFromValues([]string{"lobby,battle", "chat"})
 	if len(topics) != 3 || topics[0] != "lobby" || topics[1] != "battle" || topics[2] != "chat" {
 		t.Fatalf("unexpected topics: %#v", topics)
 	}
