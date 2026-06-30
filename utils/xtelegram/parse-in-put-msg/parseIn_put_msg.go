@@ -3,18 +3,30 @@ package parseInPutMsg
 import "strings"
 
 func ParseInPutMsg(msg string) []string {
-	if len(msg) == 0 {
+	msg = strings.TrimSpace(msg)
+	if msg == "" {
 		return nil
 	}
-	//用换符号切割
-	msg = strings.Replace(msg, "\r\n", " ", -1)
-	msg = strings.Replace(msg, "\n", " ", -1)
-	//英文，
-	msg = strings.Replace(msg, ",", " ", -1)
-	//英文;
-	msg = strings.Replace(msg, ";", " ", -1)
-	// |
-	msg = strings.Replace(msg, "|", " ", -1)
 
-	return strings.Split(msg, " ")
+	// 统一把各种分隔符替换成空格
+	replacer := strings.NewReplacer(
+		"\r\n", " ",
+		"\n", " ",
+		"\r", " ",
+
+		",", " ",
+		";", " ",
+		"|", " ",
+
+		"，", " ",
+		"；", " ",
+		"｜", " ",
+		"、", " ",
+		"\t", " ",
+	)
+
+	msg = replacer.Replace(msg)
+
+	// Fields 会自动去掉连续空格和空字符串
+	return strings.Fields(msg)
 }
