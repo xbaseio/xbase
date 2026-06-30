@@ -330,3 +330,156 @@ func divMod(x, y int) (int, int) {
 
 	return q, r
 }
+
+// Format 格式化时间
+// 不传时间时，默认格式化当前时间
+func Format(layout string, t ...Time) string {
+	if layout == "" {
+		layout = DateTime
+	}
+
+	target := Now()
+	if len(t) > 0 {
+		target = t[0].In(Location())
+	}
+
+	return target.Format(layout)
+}
+
+// Date 当前日期，格式：2006-01-02
+func Date(t ...Time) string {
+	return Format(DateOnly, t...)
+}
+
+// Datetime 当前日期时间，格式：2006-01-02 15:04:05
+// 注意：不能叫 DateTime，因为上面已经有 const DateTime = time.DateTime
+func Datetime(t ...Time) string {
+	return Format(DateTime, t...)
+}
+
+// TimeString 当前时间，格式：15:04:05
+func TimeString(t ...Time) string {
+	return Format(TimeOnly, t...)
+}
+
+// MonthString 当前年月，格式：2006-01
+func MonthString(t ...Time) string {
+	return Format(MonthOnly, t...)
+}
+
+// YearString 当前年份，格式：2006
+func YearString(t ...Time) string {
+	return Format(YearOnly, t...)
+}
+
+// Timestamp 当前秒级时间戳
+// 不传时间时，默认当前时间
+func Timestamp(t ...Time) int64 {
+	target := Now()
+	if len(t) > 0 {
+		target = t[0].In(Location())
+	}
+	return target.Unix()
+}
+
+// TimestampMilli 当前毫秒时间戳
+func TimestampMilli(t ...Time) int64 {
+	target := Now()
+	if len(t) > 0 {
+		target = t[0].In(Location())
+	}
+	return target.UnixMilli()
+}
+
+// TimestampMicro 当前微秒时间戳
+func TimestampMicro(t ...Time) int64 {
+	target := Now()
+	if len(t) > 0 {
+		target = t[0].In(Location())
+	}
+	return target.UnixMicro()
+}
+
+// TimestampNano 当前纳秒时间戳
+func TimestampNano(t ...Time) int64 {
+	target := Now()
+	if len(t) > 0 {
+		target = t[0].In(Location())
+	}
+	return target.UnixNano()
+}
+
+// TodayZeroUnix 今天 0 点秒级时间戳
+func TodayZeroUnix() int64 {
+	return DayHead().Unix()
+}
+
+// TodayTailUnix 今天 23:59:59 秒级时间戳
+func TodayTailUnix() int64 {
+	return DayTail().Unix()
+}
+
+// DayHeadUnix 指定偏移天数的 0 点秒级时间戳
+// 例如：DayHeadUnix(-1) 昨天0点，DayHeadUnix(0) 今天0点，DayHeadUnix(1) 明天0点
+func DayHeadUnix(offset ...int) int64 {
+	return DayHead(offset...).Unix()
+}
+
+// DayTailUnix 指定偏移天数的结束秒级时间戳
+func DayTailUnix(offset ...int) int64 {
+	return DayTail(offset...).Unix()
+}
+
+// WeekHeadUnix 本周开始秒级时间戳，默认周一0点
+func WeekHeadUnix(offset ...int) int64 {
+	return WeekHead(offset...).Unix()
+}
+
+// WeekTailUnix 本周结束秒级时间戳，默认周日23:59:59
+func WeekTailUnix(offset ...int) int64 {
+	return WeekTail(offset...).Unix()
+}
+
+// MonthHeadUnix 本月开始秒级时间戳
+func MonthHeadUnix(offset ...int) int64 {
+	return MonthHead(offset...).Unix()
+}
+
+// MonthTailUnix 本月结束秒级时间戳
+func MonthTailUnix(offset ...int) int64 {
+	return MonthTail(offset...).Unix()
+}
+
+// ParseDate 解析日期：2006-01-02
+func ParseDate(value string) (Time, error) {
+	return Parse(DateOnly, value)
+}
+
+// ParseDatetime 解析日期时间：2006-01-02 15:04:05
+func ParseDatetime(value string) (Time, error) {
+	return Parse(DateTime, value)
+}
+
+// ParseMonth 解析月份：2006-01
+func ParseMonth(value string) (Time, error) {
+	return Parse(MonthOnly, value)
+}
+
+// MustParse 解析时间，失败返回当前时间
+func MustParse(layout string, value string) Time {
+	t, err := Parse(layout, value)
+	if err != nil {
+		return Now()
+	}
+	return t
+}
+
+// MustParseDate 解析日期，失败返回当前时间
+func MustParseDate(value string) Time {
+	return MustParse(DateOnly, value)
+}
+
+// MustParseDatetime 解析日期时间，失败返回当前时间
+func MustParseDatetime(value string) Time {
+	return MustParse(DateTime, value)
+}
