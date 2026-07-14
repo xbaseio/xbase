@@ -91,12 +91,12 @@ func (c *Cache) Get(ctx context.Context, key string, def ...any) cache.Result {
 }
 
 // Set 设置缓存值
-func (c *Cache) Set(ctx context.Context, key string, value any, expiration time.Duration) error {
-	if expiration > 0 {
+func (c *Cache) Set(ctx context.Context, key string, value any, expiration ...time.Duration) error {
+	if len(expiration) > 0 && expiration[0] > 0 {
 		return c.opts.client.Set(&memcache.Item{
 			Key:        c.AddPrefix(key),
 			Value:      []byte(xconv.String(value)),
-			Expiration: int32(expiration.Seconds()),
+			Expiration: int32(expiration[0].Seconds()),
 		})
 	} else {
 		return c.opts.client.Set(&memcache.Item{
@@ -107,7 +107,7 @@ func (c *Cache) Set(ctx context.Context, key string, value any, expiration time.
 }
 
 // GetSet 获取设置缓存值
-func (c *Cache) GetSet(ctx context.Context, key string, fn cache.SetValueFunc, expiration time.Duration) cache.Result {
+func (c *Cache) GetSet(ctx context.Context, key string, fn cache.SetValueFunc, expiration ...time.Duration) cache.Result {
 	key = c.AddPrefix(key)
 
 	val, err, _ := c.sfg.Do(key, func() (any, error) {
@@ -147,7 +147,7 @@ func (c *Cache) GetSet(ctx context.Context, key string, fn cache.SetValueFunc, e
 			return cache.NewResult(nil, xerrors.ErrNil), nil
 		}
 
-		expiration := c.GetExpiration(expiration)
+		expiration := c.GetExpiration(expiration...)
 
 		if err = c.opts.client.Set(&memcache.Item{
 			Key:        key,
@@ -162,11 +162,11 @@ func (c *Cache) GetSet(ctx context.Context, key string, fn cache.SetValueFunc, e
 
 	return rst.(cache.Result)
 }
-func (c *Cache) GetExpiration(expiration time.Duration) time.Duration {
+func (c *Cache) GetExpiration(expiration ...time.Duration) time.Duration {
 	// 显式传了，就使用传入的缓存时间。
 	// 注意：传 0 表示 Redis 永不过期。
-	if expiration > 0 {
-		return expiration
+	if len(expiration) > 0 {
+		return expiration[0]
 	}
 
 	minExpiration := c.opts.minExpiration

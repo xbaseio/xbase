@@ -18,9 +18,9 @@ type Cache interface {
 	// Get 获取缓存值
 	Get(ctx context.Context, key string, def ...any) Result
 	// Set 设置缓存值
-	Set(ctx context.Context, key string, value any, expiration time.Duration) error
+	Set(ctx context.Context, key string, value any, expiration ...time.Duration) error
 	// GetSet 获取设置缓存值
-	GetSet(ctx context.Context, key string, fn SetValueFunc, expiration time.Duration) Result
+	GetSet(ctx context.Context, key string, fn SetValueFunc, expiration ...time.Duration) Result
 	// GetExpiration 获取过期时间
 	GetExpiration(expiration time.Duration) time.Duration
 	// Delete 删除缓存
@@ -82,21 +82,21 @@ func Get(ctx context.Context, key string, def ...any) Result {
 }
 
 // Set 设置缓存值
-func Set(ctx context.Context, key string, value any, expiration time.Duration) error {
+func Set(ctx context.Context, key string, value any, expiration ...time.Duration) error {
 	if globalCache == nil {
 		return xerrors.ErrMissingCacheInstance
 	}
 
-	return globalCache.Set(ctx, key, value, expiration)
+	return globalCache.Set(ctx, key, value, expiration...)
 }
 
 // GetSet 获取设置缓存值
-func GetSet(ctx context.Context, key string, fn SetValueFunc, expiration time.Duration) Result {
+func GetSet(ctx context.Context, key string, fn SetValueFunc, expiration ...time.Duration) Result {
 	if globalCache == nil {
 		return NewResult(nil, xerrors.ErrMissingCacheInstance)
 	}
 
-	return globalCache.GetSet(ctx, key, fn, expiration)
+	return globalCache.GetSet(ctx, key, fn, expiration...)
 }
 
 // Delete 删除缓存
