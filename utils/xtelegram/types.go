@@ -1,4 +1,4 @@
-package tgmsg
+package xtelegram
 
 import (
 	tgtypes "github.com/xbaseio/xbase/utils/xtelegram/tg-types"

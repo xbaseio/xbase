@@ -1,4 +1,4 @@
-package tgmsg_test
+package xtelegram_test
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 	//optionListenerAddressDao "github.com/xbaseio/xbase/utils/dao/option-listener-address"
 	//optiontelegramcmd "github.com/xbaseio/xbase/utils/option/option-telegram-cmd"
 
-	tgmsg "github.com/xbaseio/xbase/utils/xtelegram/tg-msg"
+	"github.com/xbaseio/xbase/utils/xtelegram"
 	tgtypes "github.com/xbaseio/xbase/utils/xtelegram/tg-types"
 )
 
@@ -42,12 +42,12 @@ func TestClient_SendMessage(t *testing.T) {
 	replaces["game_name"] = "黄老师"
 	replaces["currency"] = "csd"
 
-	xMsg, err := tgmsg.NewXTelegramMessage(bot_token,
-		tgmsg.WithText(msg),
-		tgmsg.WithDebug(true),
-		tgmsg.WithMessageThreadID(-1002066585210),
-		tgmsg.WithMsgType(tgtypes.RobotMsgTypePhoto),
-		tgmsg.WithParseMode(tgtypes.ModeMarkdown))
+	xMsg, err := xtelegram.NewXTelegramMessage(bot_token,
+		xtelegram.WithText(msg),
+		xtelegram.WithDebug(true),
+		xtelegram.WithMessageThreadID(-1002066585210),
+		xtelegram.WithMsgType(tgtypes.RobotMsgTypePhoto),
+		xtelegram.WithParseMode(tgtypes.ModeMarkdown))
 	if err == nil {
 		log.Errorf("%v", err)
 		return

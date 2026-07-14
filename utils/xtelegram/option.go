@@ -1,4 +1,4 @@
-package tgmsg
+package xtelegram
 
 import (
 	//tgbutton "github.com/xbaseio/xbase/utils/xtelegram/tg-button"

@@ -1,4 +1,4 @@
-package tgmsg
+package xtelegram
 
 import (
 	"fmt"
