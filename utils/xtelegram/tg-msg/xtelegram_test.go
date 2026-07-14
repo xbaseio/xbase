@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/xbaseio/xbase/config"
-	"github.com/xbaseio/xbase/config/etcd"
 	"github.com/xbaseio/xbase/config/file"
 	"github.com/xbaseio/xbase/log"
 
@@ -27,7 +26,7 @@ const (
 
 func init() {
 	// 设置配置中心
-	config.SetConfigurator(config.NewConfigurator(config.WithSources(file.NewSource(), etcd.NewSource())))
+	config.SetConfigurator(config.NewConfigurator(config.WithSources(file.NewSource())))
 }
 func TestClient_SendMessage(t *testing.T) {
 

@@ -9,6 +9,20 @@ import (
 	"github.com/xbaseio/xbase/log/internal"
 )
 
+func waitFor(t *testing.T, fn func() bool) {
+	t.Helper()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if fn() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	t.Fatal("condition not satisfied before timeout")
+}
+
 func TestMakeFileName(t *testing.T) {
 	s := NewSyncer(
 		WithPath(filepath.Join(t.TempDir(), "xbase.log")),
@@ -46,9 +60,10 @@ func TestSyncerCurrentFileUsesDateTag(t *testing.T) {
 	}
 
 	want := filepath.Join(dir, "xbase."+now.Format("20060102")+".log")
-	if _, err := os.Stat(want); err != nil {
-		t.Fatalf("expected current dated file %s: %v", want, err)
-	}
+	waitFor(t, func() bool {
+		_, err := os.Stat(want)
+		return err == nil
+	})
 }
 
 func TestSyncerRotateBySizeUsesVersionInSameDay(t *testing.T) {
@@ -80,13 +95,15 @@ func TestSyncerRotateBySizeUsesVersionInSameDay(t *testing.T) {
 	first := filepath.Join(dir, "xbase."+tag+".log")
 	second := filepath.Join(dir, "xbase."+tag+".1.log")
 
-	if _, err := os.Stat(first); err != nil {
-		t.Fatalf("expected first file %s: %v", first, err)
-	}
-
-	if _, err := os.Stat(second); err != nil {
-		t.Fatalf("expected second file %s: %v", second, err)
-	}
+	waitFor(t, func() bool {
+		if _, err := os.Stat(first); err != nil {
+			return false
+		}
+		if _, err := os.Stat(second); err != nil {
+			return false
+		}
+		return true
+	})
 }
 
 func TestSyncerCleanupExpiredFiles(t *testing.T) {
@@ -127,5 +144,34 @@ func TestSyncerCleanupExpiredFiles(t *testing.T) {
 
 	if _, err := os.Stat(currentPath); err != nil {
 		t.Fatalf("expected current file kept: %v", err)
+	}
+}
+
+func TestSyncerCloseFlushesQueuedEntries(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "xbase.log")
+	s := NewSyncer(WithPath(path))
+
+	now := time.Now()
+	if err := s.Write(&internal.Entity{
+		Now:     now,
+		Time:    now.Format(time.DateTime),
+		Level:   internal.LevelInfo,
+		Message: "queued before close",
+	}); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+
+	if err := s.Close(); err != nil {
+		t.Fatalf("close failed: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read file failed: %v", err)
+	}
+
+	if len(data) == 0 {
+		t.Fatal("expected queued entries to be flushed on close")
 	}
 }

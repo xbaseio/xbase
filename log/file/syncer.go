@@ -37,14 +37,14 @@ type Syncer struct {
 	fileTag     string
 	fileVersion int64
 	gzipExt     string
-	mu          sync.Mutex
+	fileMu      sync.Mutex
+	queueMu     sync.Mutex
+	queueCond   *sync.Cond
+	pending     []entry
 	size        int64
 	file        *os.File
 	writer      *bufio.Writer
-	acc         atomic.Int64
-	chEntry     chan entry
 	closing     atomic.Bool
-	flushing    bool
 	wg          sync.WaitGroup
 	formatter   internal.Formatter
 }
@@ -79,8 +79,8 @@ func (s *Syncer) init() {
 
 	s.fileDir = path
 	s.gzipExt = gzipExt
-	s.chEntry = make(chan entry, 4096)
 	s.ctx, s.cancel = context.WithCancel(context.Background())
+	s.queueCond = sync.NewCond(&s.queueMu)
 
 	if s.opts.format == FormatJson {
 		s.formatter = internal.NewJsonFormatter()
@@ -96,6 +96,8 @@ func (s *Syncer) init() {
 	_ = s.openCurrentFile()
 	_ = s.cleanupExpiredFiles(xtime.Now())
 
+	s.wg.Add(1)
+	go s.writeLoop()
 	go s.tickCleanup()
 }
 
@@ -118,38 +120,37 @@ func (s *Syncer) Write(entity *internal.Entity) error {
 
 // 执行写入日志操作
 func (s *Syncer) doWrite(e entry) error {
-	if s.mu.TryLock() {
-		defer s.mu.Unlock()
+	s.queueMu.Lock()
+	defer s.queueMu.Unlock()
 
-		if s.closing.Load() {
-			return xerrors.ErrSyncerClosed
+	if s.closing.Load() {
+		if e.buf != nil {
+			e.buf.Release()
 		}
-
-		return s.flushToFile(e)
+		return xerrors.ErrSyncerClosed
 	}
 
-	s.chEntry <- e
-	s.acc.Add(1)
-
-	s.tryFlushToFile()
+	s.pending = append(s.pending, e)
+	s.queueCond.Signal()
 
 	return nil
 }
 
 // Close 关闭同步器
 func (s *Syncer) Close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if !s.closing.CompareAndSwap(false, true) {
 		return xerrors.ErrSyncerClosed
 	}
 
 	s.cancel()
-
-	_ = s.flushToFile()
+	s.queueMu.Lock()
+	s.queueCond.Broadcast()
+	s.queueMu.Unlock()
 
 	s.wg.Wait()
+
+	s.fileMu.Lock()
+	defer s.fileMu.Unlock()
 
 	if s.writer != nil {
 		_ = s.writer.Flush()
@@ -163,62 +164,55 @@ func (s *Syncer) Close() error {
 }
 
 // 尝试将数据刷入文件中
-func (s *Syncer) tryFlushToFile() {
-HEAD:
-	if s.flushing {
-		return
-	}
+func (s *Syncer) writeLoop() {
+	defer s.wg.Done()
 
-	if s.mu.TryLock() {
-		_ = s.flushToFile()
+	for {
+		items := s.takePending()
+		if len(items) == 0 {
+			if s.closing.Load() {
+				return
+			}
+			continue
+		}
 
-		s.mu.Unlock()
-	} else {
-		goto HEAD
+		s.fileMu.Lock()
+		for _, item := range items {
+			if err := s.writeEntry(item, false); err != nil && item.buf != nil {
+				item.buf.Release()
+			}
+		}
+		_ = s.flushWriter()
+		s.fileMu.Unlock()
 	}
 }
 
 // 写入将缓冲区数据写入文件
-func (s *Syncer) flushToFile(e ...entry) error {
-	acc := s.acc.Load()
+func (s *Syncer) takePending() []entry {
+	s.queueMu.Lock()
+	defer s.queueMu.Unlock()
 
-	if acc > 0 || len(e) > 0 {
-		if s.file == nil {
-			if err := s.openCurrentFile(); err != nil {
-				return err
-			}
-		}
+	for len(s.pending) == 0 && !s.closing.Load() {
+		s.queueCond.Wait()
 	}
 
-	if acc > 0 {
-		s.flushing = true
-		defer func() {
-			s.flushing = false
-		}()
-
-		for item := range s.chEntry {
-			s.acc.Add(-1)
-
-			if err := s.writeEntry(item, false); err != nil {
-				return err
-			}
-
-			acc--
-			if acc == 0 {
-				break
-			}
-		}
+	if len(s.pending) == 0 {
+		return nil
 	}
 
-	if len(e) > 0 {
-		return s.writeEntry(e[0], true)
-	}
-
-	return nil
+	items := s.pending
+	s.pending = nil
+	return items
 }
 
 // 写入日志
 func (s *Syncer) writeEntry(e entry, isAutoFlush bool) error {
+	if s.file == nil {
+		if err := s.openCurrentFile(); err != nil {
+			return err
+		}
+	}
+
 	nextTag := s.makeFileTag(e.now)
 	if nextTag != s.fileTag {
 		if err := s.flushWriter(); err != nil {
@@ -273,9 +267,9 @@ func (s *Syncer) tickCleanup() {
 				return
 			}
 
-			s.mu.Lock()
+			s.fileMu.Lock()
 			_ = s.cleanupExpiredFiles(now)
-			s.mu.Unlock()
+			s.fileMu.Unlock()
 		case <-s.ctx.Done():
 			return
 		}
