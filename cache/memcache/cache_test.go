@@ -73,7 +73,7 @@ func TestCache_GetSet(t *testing.T) {
 
 	value, err := cache.GetSet(ctx, "key", func() (any, error) {
 		return "new value", nil
-	}).Result()
+	}, 0).Result()
 	if err != nil {
 		t.Fatal(err)
 	}

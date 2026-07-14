@@ -100,15 +100,15 @@ func (c *Cache) Get(ctx context.Context, key string, def ...any) cache.Result {
 }
 
 // Set 设置缓存值
-func (c *Cache) Set(ctx context.Context, key string, value any, expiration ...time.Duration) error {
-	if len(expiration) > 0 {
-		return c.opts.client.Set(ctx, c.AddPrefix(key), xconv.String(value), expiration[0]).Err()
+func (c *Cache) Set(ctx context.Context, key string, value any, expiration time.Duration) error {
+	if expiration.Seconds() > 0 {
+		return c.opts.client.Set(ctx, c.AddPrefix(key), xconv.String(value), expiration).Err()
 	} else {
 		return c.opts.client.Set(ctx, c.AddPrefix(key), xconv.String(value), redis.KeepTTL).Err()
 	}
 }
 
-func (c *Cache) GetSet(ctx context.Context, key string, fn cache.SetValueFunc, expiration ...time.Duration) cache.Result {
+func (c *Cache) GetSet(ctx context.Context, key string, fn cache.SetValueFunc, expiration time.Duration) cache.Result {
 	key = c.AddPrefix(key)
 
 	// 1. 先读 Redis，singleflight 防止同一个 key 并发打 Redis
@@ -144,7 +144,7 @@ func (c *Cache) GetSet(ctx context.Context, key string, fn cache.SetValueFunc, e
 			return cache.NewResult(nil, xerrors.ErrNil), nil
 		}
 
-		ttl := c.GetExpiration(expiration...)
+		ttl := c.GetExpiration(expiration)
 
 		err = c.opts.client.Set(ctx, key, xconv.String(val), ttl).Err()
 		if err != nil {
