@@ -44,7 +44,7 @@ func IsIdCard(idCard string) bool {
 	checkCodes := []string{"1", "0", "X", "9", "8", "7", "6", "5", "4", "3", "2"}
 
 	sum := 0
-	for i := 0; i < 17; i++ {
+	for i := range 17 {
 		num, _ := strconv.Atoi(string(idCard[i]))
 		sum += num * factor[i]
 	}

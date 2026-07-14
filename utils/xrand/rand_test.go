@@ -42,7 +42,7 @@ func TestWeight(t *testing.T) {
 
 	counters := []int{0, 0, 0}
 
-	for i := 0; i < total; i++ {
+	for range total {
 		index := xrand.Weight(func(v any) float64 {
 			return xconv.Float64(v)
 		}, weights...)

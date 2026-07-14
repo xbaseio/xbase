@@ -36,7 +36,7 @@ func NewMultiPoolWithFunc(size, sizePerPool int, fn func(any), lbs LoadBalancing
 	}
 
 	pools := make([]*PoolWithFunc, size)
-	for i := 0; i < size; i++ {
+	for i := range size {
 		pool, err := NewPoolWithFunc(sizePerPool, fn, options...)
 		if err != nil {
 			return nil, err

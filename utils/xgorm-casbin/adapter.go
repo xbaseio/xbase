@@ -16,7 +16,7 @@ type adapter struct {
 	table string
 }
 
-func newAdapter(database interface{}, table string, logger ...Logger) (*adapter, error) {
+func newAdapter(database any, table string, logger ...Logger) (*adapter, error) {
 	var adp *adapter
 
 	switch v := database.(type) {
@@ -171,7 +171,7 @@ func (a *adapter) RemovePolicies(sec string, ptype string, rules [][]string) (er
 
 	for _, rule := range rules {
 		query := make([]string, 0, 7)
-		args := make([]interface{}, 0, 7)
+		args := make([]any, 0, 7)
 		query = append(query, fmt.Sprintf("%s = ?", policyColumns.PType))
 		args = append(args, ptype)
 
@@ -277,7 +277,7 @@ func (a *adapter) buildPolicyRule(ptype string, data []string) *policyRule {
 
 // deletes a policy rule.
 func (a *adapter) deletePolicyRule(rule *policyRule) error {
-	where := make(map[string]interface{}, 7)
+	where := make(map[string]any, 7)
 	where[policyColumns.PType] = rule.PType
 
 	if rule.V0 != "" {

@@ -95,7 +95,7 @@ func TestDispatcher_WeightRoundRobin(t *testing.T) {
 	counts := make(map[string]int)
 	totalRounds := 200
 
-	for i := 0; i < totalRounds; i++ {
+	for range totalRounds {
 		route, err := d.FindRoute(1)
 		if err != nil {
 			t.Errorf("find route failed: %v", err)

@@ -48,12 +48,9 @@ func (e *Encryptor) Encrypt(data []byte) ([]byte, error) {
 		h         = e.opts.hash.New()
 	)
 
-	for i := 0; i < total; i++ {
+	for i := range total {
 		start = i * e.opts.blockSize
-		end = (i + 1) * e.opts.blockSize
-		if end > len(data) {
-			end = len(data)
-		}
+		end = min((i+1)*e.opts.blockSize, len(data))
 
 		switch e.opts.padding {
 		case OAEP:
@@ -86,12 +83,9 @@ func (e *Encryptor) Decrypt(ciphertext []byte) ([]byte, error) {
 		h     = e.opts.hash.New()
 	)
 
-	for i := 0; i < total; i++ {
+	for i := range total {
 		start = i * e.privateKey.Size()
-		end = (i + 1) * e.privateKey.Size()
-		if end > len(ciphertext) {
-			end = len(ciphertext)
-		}
+		end = min((i+1)*e.privateKey.Size(), len(ciphertext))
 
 		switch e.opts.padding {
 		case OAEP:

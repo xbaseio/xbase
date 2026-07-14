@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/xml"
+	"maps"
 	"net/http"
 	"regexp"
 	"strings"
@@ -59,13 +60,9 @@ func (r *request) prepare(method, url string, data any, opts ...*RequestOptions)
 	method, url = strings.ToUpper(method), r.makeUrl(url)
 
 	if len(opts) > 0 && opts[0] != nil {
-		for key, value := range opts[0].Headers {
-			headers[key] = value
-		}
+		maps.Copy(headers, opts[0].Headers)
 
-		for key, value := range opts[0].Cookies {
-			cookies[key] = value
-		}
+		maps.Copy(cookies, opts[0].Cookies)
 	}
 
 	switch contentType := headers[HeaderContentType]; contentType {

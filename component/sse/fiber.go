@@ -135,7 +135,7 @@ func collectTopicsFromValues(values []string) []string {
 
 	topics := make([]string, 0, len(values))
 	for _, value := range values {
-		for _, topic := range strings.Split(value, ",") {
+		for topic := range strings.SplitSeq(value, ",") {
 			topic = strings.TrimSpace(topic)
 			if topic != "" {
 				topics = append(topics, topic)

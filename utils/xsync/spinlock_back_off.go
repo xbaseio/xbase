@@ -22,8 +22,8 @@ func (sl *spinLockBackoff) Lock() {
 	}
 
 	for {
-		for i := 0; i < activeSpin; i++ {
-			for j := 0; j < activeCount; j++ {
+		for range activeSpin {
+			for range activeCount {
 				if atomic.LoadUint32(&sl.state) == 0 && atomic.CompareAndSwapUint32(&sl.state, 0, 1) {
 					return
 				}

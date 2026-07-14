@@ -195,7 +195,7 @@ func doPressureTest(concurrency int, requests int, size int) {
 
 	startTime := time.Now()
 
-	for i := 0; i < requests; i++ {
+	for range requests {
 		jobs <- struct{}{}
 	}
 
@@ -239,10 +239,7 @@ func doPressureTest(concurrency int, requests int, size int) {
 func dialClients(dial func() (network.Conn, error), concurrency int) []network.Conn {
 	conns := make([]network.Conn, 0, concurrency)
 
-	maxAttempts := concurrency * 10
-	if maxAttempts < 10 {
-		maxAttempts = 10
-	}
+	maxAttempts := max(concurrency*10, 10)
 
 	for attempts := 0; len(conns) < concurrency && attempts < maxAttempts; attempts++ {
 		conn, err := dial()

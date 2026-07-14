@@ -136,7 +136,7 @@ func (r *upload) writeFiles(writer *multipart.Writer, files any) error {
 			kind = rv.Kind()
 		)
 
-		for kind == reflect.Ptr {
+		for kind == reflect.Pointer {
 			rv = rv.Elem()
 			kind = rv.Kind()
 		}
@@ -230,7 +230,7 @@ func (r *upload) writeData(writer *multipart.Writer, data any, fieldType FieldTy
 		kind = rv.Kind()
 	)
 
-	for kind == reflect.Ptr {
+	for kind == reflect.Pointer {
 		rv = rv.Elem()
 		kind = rv.Kind()
 	}

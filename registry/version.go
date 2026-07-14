@@ -21,12 +21,9 @@ func CompareVersion(a, b string) int {
 
 	partsA := strings.Split(a, ".")
 	partsB := strings.Split(b, ".")
-	n := len(partsA)
-	if len(partsB) > n {
-		n = len(partsB)
-	}
+	n := max(len(partsB), len(partsA))
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		va := int64(0)
 		vb := int64(0)
 

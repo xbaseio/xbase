@@ -389,7 +389,7 @@ func TestRequireFromString(t *testing.T) {
 func TestRequireFromStringErrs(t *testing.T) {
 	s := "qwert"
 	var d Decimal
-	var err interface{}
+	var err any
 
 	func(d Decimal) {
 		defer func() {
@@ -2416,7 +2416,7 @@ func TestDecimal_Max(t *testing.T) {
 	}
 }
 
-func scanHelper(t *testing.T, dbval interface{}, expected Decimal) {
+func scanHelper(t *testing.T, dbval any, expected Decimal) {
 	t.Helper()
 
 	a := Decimal{}
@@ -2476,7 +2476,7 @@ func TestDecimal_Scan(t *testing.T) {
 func TestDecimal_Value(t *testing.T) {
 	// Make sure this does implement the database/sql's driver.Valuer interface
 	var d Decimal
-	if _, ok := interface{}(d).(driver.Valuer); !ok {
+	if _, ok := any(d).(driver.Valuer); !ok {
 		t.Error("Decimal does not implement driver.Valuer")
 	}
 
@@ -3171,7 +3171,7 @@ func TestNullDecimal_Scan(t *testing.T) {
 
 	// Make sure handles nil values
 	a := NullDecimal{}
-	var dbvaluePtr interface{}
+	var dbvaluePtr any
 	err := a.Scan(dbvaluePtr)
 	if err != nil {
 		// Scan failed... no need to test result value
@@ -3264,7 +3264,7 @@ func TestNullDecimal_Scan(t *testing.T) {
 func TestNullDecimal_Value(t *testing.T) {
 	// Make sure this does implement the database/sql's driver.Valuer interface
 	var nullDecimal NullDecimal
-	if _, ok := interface{}(nullDecimal).(driver.Valuer); !ok {
+	if _, ok := any(nullDecimal).(driver.Valuer); !ok {
 		t.Error("NullDecimal does not implement driver.Valuer")
 	}
 

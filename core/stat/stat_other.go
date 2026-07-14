@@ -1,5 +1,4 @@
 //go:build !windows && !freebsd && !darwin && !linux && !openbsd
-// +build !windows,!freebsd,!darwin,!linux,!openbsd
 
 package stat
 

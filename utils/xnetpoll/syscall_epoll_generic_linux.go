@@ -1,5 +1,4 @@
 //go:build !arm64 && !riscv64 && poll_opt
-// +build !arm64,!riscv64,poll_opt
 
 package xnetpoll
 

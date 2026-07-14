@@ -64,7 +64,7 @@ func (r *Reader) ReadBools(n int) ([]bool, error) {
 	}
 
 	values := make([]bool, 0, n)
-	for i := 0; i < len(buf); i++ {
+	for i := range buf {
 		values = append(values, buf[i] == 1)
 	}
 
@@ -93,7 +93,7 @@ func (r *Reader) ReadInt8s(n int) ([]int8, error) {
 	}
 
 	values := make([]int8, 0, n)
-	for i := 0; i < len(buf); i++ {
+	for i := range buf {
 		values = append(values, int8(buf[i]))
 	}
 
@@ -122,7 +122,7 @@ func (r *Reader) ReadUint8s(n int) ([]uint8, error) {
 	}
 
 	values := make([]uint8, 0, n)
-	for i := 0; i < len(buf); i++ {
+	for i := range buf {
 		values = append(values, buf[i])
 	}
 

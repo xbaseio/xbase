@@ -109,7 +109,6 @@ func resolveFirstPublicIP(urls []string, query func(string, time.Duration) (stri
 	)
 
 	for _, addr := range urls {
-		addr := addr
 		go func() {
 			if ip, err := query(addr, timeout); err == nil && state.CompareAndSwap(false, true) {
 				select {

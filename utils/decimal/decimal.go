@@ -188,7 +188,7 @@ func NewFromString(value string) (Decimal, error) {
 
 	pIndex := -1
 	vLen := len(value)
-	for i := 0; i < vLen; i++ {
+	for i := range vLen {
 		if value[i] == '.' {
 			if pIndex > -1 {
 				return Decimal{}, fmt.Errorf("can't convert %s to decimal: too many .s", value)
@@ -394,11 +394,7 @@ func NewFromFloatWithExponent(value float64, exp int32) Decimal {
 
 	// 当 N<0 时，要精确表示 2^N 所需的十进制小数位数最多不会超过 -N。
 	if exp < 0 && exp < exp2 {
-		if exp2 < 0 {
-			exp = exp2
-		} else {
-			exp = 0
-		}
+		exp = min(exp2, 0)
 	}
 
 	// 把 10^M * 2^N 表示为 5^M * 2^(M+N)。
@@ -969,11 +965,9 @@ func (d Decimal) ExpHullAbrham(overallPrecision uint32) (Decimal, error) {
 	}
 
 	// t 是满足对应 abs(d/k) < 1 的最小非负整数。
-	t := d.exp + int32(d.NumDigits()) // Add d.NumDigits because the paper assumes that d.value [0.1, 1)
-
-	if t < 0 {
-		t = 0
-	}
+	t := max(
+		// Add d.NumDigits because the paper assumes that d.value [0.1, 1)
+		d.exp+int32(d.NumDigits()), 0)
 
 	k := New(1, t)                                     // reduction factor
 	r := Decimal{new(big.Int).Set(d.value), d.exp - t} // reduced argument
@@ -1187,7 +1181,7 @@ func (d Decimal) Ln(precision int32) (Decimal, error) {
 		var prevStep Decimal
 		maxIters := calcPrecision*2 + 10
 
-		for i := int32(0); i < maxIters; i++ {
+		for range maxIters {
 			// exp(a_n)
 			comp3, _ = comp1.ExpTaylor(calcPrecision)
 			// exp(a_n) - z
@@ -1815,7 +1809,7 @@ func (d Decimal) MarshalBinary() (data []byte, err error) {
 }
 
 // Scan 实现 sql.Scanner 接口，用于数据库反序列化。
-func (d *Decimal) Scan(value interface{}) error {
+func (d *Decimal) Scan(value any) error {
 	// 先尝试判断数据库中是否以 Numeric 类型存储数据。
 	switch v := value.(type) {
 
@@ -2001,7 +1995,7 @@ func RescalePair(d1 Decimal, d2 Decimal) (Decimal, Decimal) {
 	return d1, d2
 }
 
-func unquoteIfQuoted(value interface{}) (string, error) {
+func unquoteIfQuoted(value any) (string, error) {
 	var bytes []byte
 
 	switch v := value.(type) {
@@ -2035,7 +2029,7 @@ func NewNullDecimal(d Decimal) NullDecimal {
 }
 
 // Scan 实现 sql.Scanner 接口，用于数据库反序列化。
-func (d *NullDecimal) Scan(value interface{}) error {
+func (d *NullDecimal) Scan(value any) error {
 	if value == nil {
 		d.Valid = false
 		return nil

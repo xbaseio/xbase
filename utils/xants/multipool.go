@@ -46,7 +46,7 @@ func releasePools(ctx context.Context, pools []contextReleaser) error {
 	_ = wg.Wait()
 
 	var errStr strings.Builder
-	for i := 0; i < len(pools); i++ {
+	for range pools {
 		if err := <-errCh; err != nil {
 			errStr.WriteString(err.Error())
 			errStr.WriteString(" | ")
@@ -83,7 +83,7 @@ func NewMultiPool(size, sizePerPool int, lbs LoadBalancingStrategy, options ...O
 		return nil, ErrInvalidLoadBalancingStrategy
 	}
 	pools := make([]*Pool, size)
-	for i := 0; i < size; i++ {
+	for i := range size {
 		pool, err := NewPool(sizePerPool, options...)
 		if err != nil {
 			return nil, err

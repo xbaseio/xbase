@@ -80,7 +80,7 @@ func TestMixedBuffer_Basic(t *testing.T) {
 	)
 
 	bs = bs[:0]
-	for i := 0; i < maxBlocks; i++ {
+	for i := range maxBlocks {
 		n := rand.Intn(512) + 128
 		cum += n
 
@@ -188,7 +188,7 @@ func TestMixedBuffer_WriteTo(t *testing.T) {
 		buf     bytes.Buffer
 	)
 
-	for i := 0; i < maxBlocks; i++ {
+	for i := range maxBlocks {
 		n := rand.Intn(512) + 128
 		cum += n
 

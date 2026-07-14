@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
+	"maps"
 	"net/http"
 	"net/http/cookiejar"
 	"sync"
@@ -71,9 +72,7 @@ func (c *Client) SetHeaders(headers map[string]string) {
 	c.rw.Lock()
 	defer c.rw.Unlock()
 
-	for key, value := range headers {
-		c.headers[key] = value
-	}
+	maps.Copy(c.headers, headers)
 }
 
 // GetHeaders Returns all common headers.
@@ -82,9 +81,7 @@ func (c *Client) GetHeaders() map[string]string {
 	defer c.rw.RUnlock()
 
 	headers := make(map[string]string, len(c.headers))
-	for key, value := range c.headers {
-		headers[key] = value
-	}
+	maps.Copy(headers, c.headers)
 
 	return headers
 }
@@ -102,9 +99,7 @@ func (c *Client) SetCookies(cookies map[string]string) {
 	c.rw.Lock()
 	defer c.rw.Unlock()
 
-	for key, value := range cookies {
-		c.cookies[key] = value
-	}
+	maps.Copy(c.cookies, cookies)
 }
 
 // GetCookies Returns all common cookies.
@@ -113,9 +108,7 @@ func (c *Client) GetCookies() map[string]string {
 	defer c.rw.RUnlock()
 
 	cookies := make(map[string]string, len(c.cookies))
-	for key, value := range c.cookies {
-		cookies[key] = value
-	}
+	maps.Copy(cookies, c.cookies)
 
 	return cookies
 }

@@ -129,15 +129,13 @@ func BenchmarkClient_Get(b *testing.B) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < b.N; i++ {
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			_, err := client.Request(xhttp.MethodGet, "", nil, nil)
 			if err != nil {
 				b.Error(err)
 			}
 
-			wg.Done()
-		}()
+		})
 	}
 
 	wg.Wait()

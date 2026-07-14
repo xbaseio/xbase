@@ -4,6 +4,8 @@ import (
 	stderrors "errors"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 
 	"github.com/xbaseio/xbase/codes"
 	"github.com/xbaseio/xbase/core/stack"
@@ -100,11 +102,12 @@ func join(parts []string, sep string) string {
 	if len(parts) == 0 {
 		return ""
 	}
-	s := parts[0]
+	var s strings.Builder
+	s.WriteString(parts[0])
 	for i := 1; i < len(parts); i++ {
-		s += sep + parts[i]
+		s.WriteString(sep + parts[i])
 	}
-	return s
+	return s.String()
 }
 
 // Code 返回错误码
@@ -167,11 +170,8 @@ func (e *Error) Replace(text string, condition ...*codes.Code) error {
 		return e
 	}
 
-	for _, c := range condition {
-		if c == e.code {
-			e.text = text
-			break
-		}
+	if slices.Contains(condition, e.code) {
+		e.text = text
 	}
 
 	return e

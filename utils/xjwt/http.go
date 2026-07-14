@@ -111,7 +111,7 @@ func (h *Http) ExtractPayload(r *http.Request, ignoreExpired ...bool) (payload P
 // ExtractIdentity Retrieve identity from request.
 // By default, the token expired error doesn't be ignored.
 // You can ignore expired error by setting the `ignoreExpired` parameter.
-func (h *Http) ExtractIdentity(r *http.Request, ignoreExpired ...bool) (interface{}, error) {
+func (h *Http) ExtractIdentity(r *http.Request, ignoreExpired ...bool) (any, error) {
 	if h.jwt.opts.identityKey == "" {
 		return nil, ErrMissingIdentity
 	}

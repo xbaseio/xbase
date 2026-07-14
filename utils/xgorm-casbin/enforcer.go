@@ -30,7 +30,7 @@ type Options struct {
 	Enable   bool          `json:"enable"`   // enable permission, false means allow all
 	Autoload bool          `json:"autoload"` // auto load policy
 	Duration time.Duration `json:"duration"` // auto load duration
-	Database interface{}   `json:"database"` // database instance
+	Database any           `json:"database"` // database instance
 	Table    string        `json:"table"`    // database policy table name
 	Logger   Logger        `json:"logger"`   // database logger interface
 }

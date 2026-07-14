@@ -19,12 +19,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xpool/xbytebuffer"
 	"github.com/xbaseio/xbase/utils/xpool/xgoroutine"
 	"github.com/xbaseio/xbase/xerrors"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -1977,7 +1977,7 @@ func batchSendAndRecv(t *testing.T, c net.Conn, rd *bufio.Reader, packetSize, ba
 		buf       []byte
 		packetLen int
 	)
-	for i := 0; i < batch; i++ {
+	for range batch {
 		req := make([]byte, packetSize)
 		_, err := crand.Read(req)
 		assert.NoError(t, err)

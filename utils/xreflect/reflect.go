@@ -11,7 +11,7 @@ func Value(val any) (reflect.Kind, reflect.Value) {
 		rk = rv.Kind()
 	)
 
-	for rk == reflect.Ptr {
+	for rk == reflect.Pointer {
 		rv = rv.Elem()
 		rk = rv.Kind()
 	}

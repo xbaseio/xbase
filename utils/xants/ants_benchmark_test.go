@@ -61,7 +61,7 @@ func BenchmarkGoroutines(b *testing.B) {
 	var wg sync.WaitGroup
 	for i := 0; i < b.N; i++ {
 		wg.Add(RunTimes)
-		for j := 0; j < RunTimes; j++ {
+		for range int(RunTimes) {
 			go func() {
 				demoFunc()
 				wg.Done()
@@ -79,7 +79,7 @@ func BenchmarkChannel(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		wg.Add(RunTimes)
-		for j := 0; j < RunTimes; j++ {
+		for range int(RunTimes) {
 			sema <- struct{}{}
 			go func() {
 				demoFunc()
@@ -100,7 +100,7 @@ func BenchmarkErrGroup(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		wg.Add(RunTimes)
-		for j := 0; j < RunTimes; j++ {
+		for range int(RunTimes) {
 			pool.Go(func() error {
 				demoFunc()
 				wg.Done()
@@ -120,7 +120,7 @@ func BenchmarkAntsPool(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		wg.Add(RunTimes)
-		for j := 0; j < RunTimes; j++ {
+		for range int(RunTimes) {
 			_ = p.Submit(func() {
 				demoFunc()
 				wg.Done()
@@ -139,7 +139,7 @@ func BenchmarkAntsMultiPool(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		wg.Add(RunTimes)
-		for j := 0; j < RunTimes; j++ {
+		for range int(RunTimes) {
 			_ = p.Submit(func() {
 				demoFunc()
 				wg.Done()
@@ -152,7 +152,7 @@ func BenchmarkAntsMultiPool(b *testing.B) {
 // BenchmarkGoroutinesThroughput 基准：直接 goroutine 的吞吐测试（不等待完成）。
 func BenchmarkGoroutinesThroughput(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		for j := 0; j < RunTimes; j++ {
+		for range int(RunTimes) {
 			go demoFunc()
 		}
 	}
@@ -162,7 +162,7 @@ func BenchmarkGoroutinesThroughput(b *testing.B) {
 func BenchmarkSemaphoreThroughput(b *testing.B) {
 	sema := make(chan struct{}, PoolCap)
 	for i := 0; i < b.N; i++ {
-		for j := 0; j < RunTimes; j++ {
+		for range int(RunTimes) {
 			sema <- struct{}{}
 			go func() {
 				demoFunc()
@@ -179,7 +179,7 @@ func BenchmarkAntsPoolThroughput(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		for j := 0; j < RunTimes; j++ {
+		for range int(RunTimes) {
 			_ = p.Submit(demoFunc)
 		}
 	}
@@ -192,7 +192,7 @@ func BenchmarkAntsMultiPoolThroughput(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		for j := 0; j < RunTimes; j++ {
+		for range int(RunTimes) {
 			_ = p.Submit(demoFunc)
 		}
 	}

@@ -28,7 +28,7 @@ func TestLoopQueue(t *testing.T) {
 	q := newWorkerLoopQueue(size)
 
 	// 插入 5 个
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		err := q.insert(&goWorker{lastUsed: time.Now().UnixNano()})
 		if err != nil {
 			break
@@ -43,7 +43,7 @@ func TestLoopQueue(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// 再插入直到接近满
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		err := q.insert(&goWorker{lastUsed: time.Now().UnixNano()})
 		if err != nil {
 			break
@@ -86,7 +86,7 @@ func TestRotatedQueueSearch(t *testing.T) {
 	require.EqualValues(t, 1, q.binarySearch(currTime), "index should be 1")
 
 	// --- 填充更多元素 ---
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		currTime++
 		_ = q.insert(&goWorker{lastUsed: currTime})
 	}
@@ -104,7 +104,7 @@ func TestRotatedQueueSearch(t *testing.T) {
 	require.EqualValues(t, 7, q.binarySearch(expiry3), "index should be 7")
 
 	// --- 队列旋转（head 移动）---
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		_ = q.detach()
 	}
 
@@ -112,7 +112,7 @@ func TestRotatedQueueSearch(t *testing.T) {
 	expiry4 := currTime
 	_ = q.insert(&goWorker{lastUsed: expiry4})
 
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		currTime++
 		_ = q.insert(&goWorker{lastUsed: currTime})
 	}
@@ -120,7 +120,7 @@ func TestRotatedQueueSearch(t *testing.T) {
 	// head=6, tail=5
 	require.EqualValues(t, 0, q.binarySearch(expiry4), "index should be 0")
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_ = q.detach()
 	}
 
@@ -131,7 +131,7 @@ func TestRotatedQueueSearch(t *testing.T) {
 	// head=6, tail=5
 	require.EqualValues(t, 5, q.binarySearch(expiry5), "index should be 5")
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		currTime++
 		_ = q.insert(&goWorker{lastUsed: currTime})
 	}
@@ -185,7 +185,7 @@ func TestRetrieveExpiry(t *testing.T) {
 	for i := 0; i < size/2; i++ {
 		_ = q.detach()
 	}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_ = q.insert(&goWorker{lastUsed: time.Now().UnixNano()})
 	}
 

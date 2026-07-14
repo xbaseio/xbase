@@ -50,7 +50,7 @@ func (cli *Client) Start() error {
 
 	var tickerLoop *eventloop
 
-	for i := 0; i < numEventLoop; i++ {
+	for range numEventLoop {
 		el := eventloop{
 			ch:           make(chan any, 1024),
 			eng:          cli.eng,

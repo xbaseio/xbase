@@ -59,7 +59,7 @@ func (eng *engine) start(ctx context.Context, numEventLoop int) error {
 	var tickerLoop *eventloop
 
 	// 启动 event-loop
-	for i := 0; i < numEventLoop; i++ {
+	for i := range numEventLoop {
 		el := eventloop{
 			ch:           make(chan any, 1024),
 			eng:          eng,

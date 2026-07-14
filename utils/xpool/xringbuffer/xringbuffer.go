@@ -82,7 +82,7 @@ func (p *Pool) calibrate() {
 	a := make(callSizes, 0, steps)
 	var callsSum uint64
 
-	for i := uint64(0); i < steps; i++ {
+	for i := range uint64(steps) {
 		calls := atomic.SwapUint64(&p.calls[i], 0)
 		callsSum += calls
 		a = append(a, callSize{
@@ -99,7 +99,7 @@ func (p *Pool) calibrate() {
 	maxSum := uint64(float64(callsSum) * maxPercentile)
 	callsSum = 0
 
-	for i := 0; i < steps; i++ {
+	for i := range steps {
 		if callsSum > maxSum {
 			break
 		}

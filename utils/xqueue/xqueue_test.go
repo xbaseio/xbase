@@ -14,14 +14,14 @@ func TestLockFreeQueue(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(4)
 	go func() {
-		for i := 0; i < taskNum; i++ {
+		for range taskNum {
 			task := &xqueue.Task{}
 			q.Enqueue(task)
 		}
 		wg.Done()
 	}()
 	go func() {
-		for i := 0; i < taskNum; i++ {
+		for range taskNum {
 			task := &xqueue.Task{}
 			q.Enqueue(task)
 		}

@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sync"
 	"sync/atomic"
 
@@ -501,9 +502,7 @@ func (n *Node) addWait() {
 
 func mergeServiceMetadata(metadata map[string]string, status registry.ServiceStatus) map[string]string {
 	merged := make(map[string]string, len(metadata)+1)
-	for k, v := range metadata {
-		merged[k] = v
-	}
+	maps.Copy(merged, metadata)
 	merged[registry.MetadataServiceStatusKey] = string(status)
 
 	return merged

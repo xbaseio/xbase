@@ -126,7 +126,7 @@ func (p Params) AddNonZeroFloat(key string, value float64) {
 
 // AddAny adds an any if it is not nil and can be JSON marshaled.
 func (p Params) AddAny(key string, value any) error {
-	if value == nil || (reflect.ValueOf(value).Kind() == reflect.Ptr && reflect.ValueOf(value).IsNil()) {
+	if value == nil || (reflect.ValueOf(value).Kind() == reflect.Pointer && reflect.ValueOf(value).IsNil()) {
 		return nil
 	}
 

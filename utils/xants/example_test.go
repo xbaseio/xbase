@@ -36,7 +36,7 @@ func ExamplePool() {
 	wg.Add(runTimes)
 
 	// 使用默认协程池
-	for i := 0; i < runTimes; i++ {
+	for i := range runTimes {
 		j := i
 		_ = xants.Submit(func() {
 			incSumInt(int32(j))
@@ -53,7 +53,7 @@ func ExamplePool() {
 	pool, _ := xants.NewPool(10)
 	defer pool.Release()
 
-	for i := 0; i < runTimes; i++ {
+	for i := range runTimes {
 		j := i
 		_ = pool.Submit(func() {
 			incSumInt(int32(j))
@@ -77,7 +77,7 @@ func ExamplePoolWithFunc() {
 	pool, _ := xants.NewPoolWithFunc(10, incSum)
 	defer pool.Release()
 
-	for i := 0; i < runTimes; i++ {
+	for i := range runTimes {
 		_ = pool.Invoke(int32(i))
 	}
 	wg.Wait()
@@ -96,7 +96,7 @@ func ExamplePoolWithFuncGeneric() {
 	pool, _ := xants.NewPoolWithFuncGeneric(10, incSumInt)
 	defer pool.Release()
 
-	for i := 0; i < runTimes; i++ {
+	for i := range runTimes {
 		_ = pool.Invoke(int32(i))
 	}
 	wg.Wait()
@@ -115,7 +115,7 @@ func ExampleMultiPool() {
 	mp, _ := xants.NewMultiPool(10, runTimes/10, xants.RoundRobin)
 	defer mp.ReleaseTimeout(time.Second) // nolint:errcheck
 
-	for i := 0; i < runTimes; i++ {
+	for i := range runTimes {
 		j := i
 		_ = mp.Submit(func() {
 			incSumInt(int32(j))
@@ -137,7 +137,7 @@ func ExampleMultiPoolWithFunc() {
 	mp, _ := xants.NewMultiPoolWithFunc(10, runTimes/10, incSum, xants.RoundRobin)
 	defer mp.ReleaseTimeout(time.Second) // nolint:errcheck
 
-	for i := 0; i < runTimes; i++ {
+	for i := range runTimes {
 		_ = mp.Invoke(int32(i))
 	}
 	wg.Wait()
@@ -156,7 +156,7 @@ func ExampleMultiPoolWithFuncGeneric() {
 	mp, _ := xants.NewMultiPoolWithFuncGeneric(10, runTimes/10, incSumInt, xants.RoundRobin)
 	defer mp.ReleaseTimeout(time.Second) // nolint:errcheck
 
-	for i := 0; i < runTimes; i++ {
+	for i := range runTimes {
 		_ = mp.Invoke(int32(i))
 	}
 	wg.Wait()

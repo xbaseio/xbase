@@ -151,7 +151,7 @@ func BenchmarkDecimal_NumDigits100(b *testing.B) {
 
 func Benchmark_Cmp(b *testing.B) {
 	decimals := DecimalSlice([]Decimal{})
-	for i := 0; i < 1000000; i++ {
+	for i := range 1000000 {
 		decimals = append(decimals, New(int64(i), 0))
 	}
 	b.ResetTimer()

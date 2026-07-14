@@ -200,11 +200,7 @@ func (w *Writer) grow(n int) {
 }
 
 func (w *Writer) growSlice(n int) {
-	c := len(w.buf) + n
-
-	if c < 2*cap(w.buf) {
-		c = 2 * cap(w.buf)
-	}
+	c := max(len(w.buf)+n, 2*cap(w.buf))
 
 	buf := make([]byte, c)
 	copy(buf, w.buf[:w.off])

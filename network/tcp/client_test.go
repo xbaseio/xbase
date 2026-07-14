@@ -64,7 +64,7 @@ func TestClient_Simple(t *testing.T) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
-	for counter := 0; counter < 200; counter++ {
+	for range 200 {
 		<-ticker.C
 
 		if err = conn.Push(msg); err != nil {
@@ -176,7 +176,7 @@ func doPressureTest(concurrency int, requests int, size int) {
 
 	startTime := time.Now()
 
-	for i := 0; i < requests; i++ {
+	for range requests {
 		jobs <- struct{}{}
 	}
 
@@ -220,10 +220,7 @@ func doPressureTest(concurrency int, requests int, size int) {
 func dialClients(client network.Client, concurrency int) []network.Conn {
 	conns := make([]network.Conn, 0, concurrency)
 
-	maxAttempts := concurrency * 10
-	if maxAttempts < 10 {
-		maxAttempts = 10
-	}
+	maxAttempts := max(concurrency*10, 10)
 
 	for attempts := 0; len(conns) < concurrency && attempts < maxAttempts; attempts++ {
 		conn, err := client.Dial()

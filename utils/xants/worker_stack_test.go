@@ -20,7 +20,7 @@ func TestNewWorkerStack(t *testing.T) {
 func TestWorkerStack(t *testing.T) {
 	q := newWorkerQueue(queueType(-1), 0)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		err := q.insert(&goWorker{lastUsed: time.Now().UnixNano()})
 		if err != nil {
 			break
@@ -37,7 +37,7 @@ func TestWorkerStack(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		err := q.insert(&goWorker{lastUsed: time.Now().UnixNano()})
 		if err != nil {
 			t.Fatal("Enqueue error")
@@ -77,7 +77,7 @@ func TestSearch(t *testing.T) {
 	require.EqualValues(t, 1, q.binarySearch(0, q.len()-1, currTime), "index should be 1")
 
 	// more
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		currTime++
 		_ = q.insert(&goWorker{lastUsed: currTime})
 	}
@@ -87,7 +87,7 @@ func TestSearch(t *testing.T) {
 
 	_ = q.insert(&goWorker{lastUsed: expiry3})
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		currTime++
 		_ = q.insert(&goWorker{lastUsed: currTime})
 	}

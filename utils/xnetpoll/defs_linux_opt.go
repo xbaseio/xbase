@@ -1,5 +1,4 @@
 //go:build linux && poll_opt && !(mips || mipsle || mips64 || mips64le)
-// +build linux,poll_opt,!mips,!mipsle,!mips64,!mips64le
 
 package xnetpoll
 

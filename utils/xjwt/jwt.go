@@ -3,6 +3,7 @@ package xjwt
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"strconv"
@@ -28,7 +29,7 @@ const (
 	noDetailReason = "no detail reason"
 )
 
-type Payload map[string]interface{}
+type Payload map[string]any
 
 type Token struct {
 	Token     string    `json:"token"`
@@ -39,8 +40,8 @@ type Token struct {
 type JWT struct {
 	opts          *options
 	secretKey     []byte
-	publicKey     interface{}
-	privateKey    interface{}
+	publicKey     any
+	privateKey    any
 	signingMethod jwt.SigningMethod
 	once          sync.Once
 	http          *Http
@@ -143,9 +144,7 @@ func (j *JWT) RefreshToken(token string, ignoreExpired ...bool) (*Token, error) 
 	refreshAt := now.Add(j.opts.refreshDuration)
 
 	newClaims := make(jwt.MapClaims)
-	for k, v := range oldClaims {
-		newClaims[k] = v
-	}
+	maps.Copy(newClaims, oldClaims)
 
 	newClaims[jwtIssueAt] = now.Unix()
 	newClaims[jwtExpired] = expiredAt.Unix()
@@ -222,7 +221,7 @@ func (j *JWT) ExtractPayload(token string, ignoreExpired ...bool) (Payload, erro
 // ExtractIdentity Retrieve identity from token.
 // By default, the token expired error doesn't be ignored.
 // You can ignore expired error by setting the `ignoreExpired` parameter.
-func (j *JWT) ExtractIdentity(token string, ignoreExpired ...bool) (interface{}, error) {
+func (j *JWT) ExtractIdentity(token string, ignoreExpired ...bool) (any, error) {
 	if j.opts.identityKey == "" {
 		return nil, ErrMissingIdentity
 	}
@@ -241,7 +240,7 @@ func (j *JWT) ExtractIdentity(token string, ignoreExpired ...bool) (interface{},
 }
 
 // DestroyIdentity Destroy the identification mark.
-func (j *JWT) DestroyIdentity(identity interface{}) error {
+func (j *JWT) DestroyIdentity(identity any) error {
 	return j.removeIdentity(identity)
 }
 
@@ -268,7 +267,7 @@ func (j *JWT) parseToken(token string, ignoreExpired ...bool) (jwt.MapClaims, er
 		return nil, ErrMissingToken
 	}
 
-	jt, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+	jt, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
 		if j.signingMethod != t.Method {
 			return nil, ErrSignAlgorithmNotMatch
 		}
@@ -314,7 +313,7 @@ func (j *JWT) parseToken(token string, ignoreExpired ...bool) (jwt.MapClaims, er
 }
 
 // save identification mark.
-func (j *JWT) saveIdentity(identity, jid interface{}) error {
+func (j *JWT) saveIdentity(identity, jid any) error {
 	if j.opts.identityKey == "" {
 		return nil
 	}
@@ -364,7 +363,7 @@ func (j *JWT) verifyIdentity(claims jwt.MapClaims, ignoreMissed bool) error {
 }
 
 // remove identification mark.
-func (j *JWT) removeIdentity(identity interface{}) error {
+func (j *JWT) removeIdentity(identity any) error {
 	if j.opts.identityKey == "" {
 		return nil
 	}

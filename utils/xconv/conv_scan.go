@@ -112,7 +112,7 @@ func Scan(b []byte, any any) error {
 			kind = rv.Kind()
 		)
 
-		if kind != reflect.Ptr {
+		if kind != reflect.Pointer {
 			return fmt.Errorf("can't unmarshal %T", v)
 		}
 

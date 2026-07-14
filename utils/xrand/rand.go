@@ -82,7 +82,7 @@ func Str(seed string, length int) string {
 	var b strings.Builder
 	b.Grow(length)
 
-	for i := 0; i < length; i++ {
+	for range length {
 		pos := intnHybrid(n)
 		b.WriteRune(r[pos])
 	}
@@ -109,7 +109,7 @@ func FastStr(seed string, length int) string {
 	var b strings.Builder
 	b.Grow(length)
 
-	for i := 0; i < length; i++ {
+	for range length {
 		b.WriteRune(r[fastIntn(n)])
 	}
 	return b.String()
@@ -432,7 +432,7 @@ func secureFloat64() (float64, bool) {
 
 func secureUint64() (uint64, bool) {
 	var b [8]byte
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		v, ok := secureByte()
 		if !ok {
 			return 0, false
@@ -508,7 +508,7 @@ func refillEntropy() error {
 	}
 
 	// 其他 goroutine 等待当前 refill 完成。
-	for i := 0; i < 64; i++ {
+	for range 64 {
 		if refillState.Load() == 0 && currentChunk.Load() != nil {
 			return nil
 		}

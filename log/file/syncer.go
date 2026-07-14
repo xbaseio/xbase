@@ -293,11 +293,9 @@ func (s *Syncer) rotateTo(fileTag string, fileVersion int64) error {
 	if s.opts.compress && oldPath != "" && oldPath != s.currentFilePath(s.fileTag, s.fileVersion, s.fileExt) {
 		gzipPath := oldPath + gzipExt
 
-		s.wg.Add(1)
-		go func() {
+		s.wg.Go(func() {
 			_ = s.compressFile(gzipPath, oldPath)
-			s.wg.Done()
-		}()
+		})
 	}
 
 	_ = s.cleanupExpiredFiles(xtime.Now())

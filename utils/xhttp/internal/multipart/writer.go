@@ -40,7 +40,7 @@ func (w *Writer) WriteField(fieldName string, fieldValue any, fieldType FieldTyp
 		kind = rv.Kind()
 	)
 
-	for kind == reflect.Ptr {
+	for kind == reflect.Pointer {
 		rv = rv.Elem()
 		kind = rv.Kind()
 	}

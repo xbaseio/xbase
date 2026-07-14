@@ -31,7 +31,7 @@ func TestAntsPoolWaitToGetWorker(t *testing.T) {
 	p, _ := xants.NewPool(AntsSize)
 	defer p.Release()
 
-	for i := 0; i < n; i++ {
+	for range n {
 		wg.Add(1)
 		_ = p.Submit(func() {
 			demoPoolFunc(Param)
@@ -55,7 +55,7 @@ func TestAntsPoolWaitToGetWorkerPreMalloc(t *testing.T) {
 	p, _ := xants.NewPool(AntsSize, xants.WithPreAlloc(true))
 	defer p.Release()
 
-	for i := 0; i < n; i++ {
+	for range n {
 		wg.Add(1)
 		_ = p.Submit(func() {
 			demoPoolFunc(Param)
@@ -82,7 +82,7 @@ func TestAntsPoolWithFuncWaitToGetWorker(t *testing.T) {
 	})
 	defer p.Release()
 
-	for i := 0; i < n; i++ {
+	for range n {
 		wg.Add(1)
 		_ = p.Invoke(Param)
 	}
@@ -106,7 +106,7 @@ func TestAntsPoolWithFuncGenericWaitToGetWorker(t *testing.T) {
 	})
 	defer p.Release()
 
-	for i := 0; i < n; i++ {
+	for range n {
 		wg.Add(1)
 		_ = p.Invoke(Param)
 	}
