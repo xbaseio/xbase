@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/xbaseio/xbase"
 	"github.com/xbaseio/xbase/cluster/gate"
+	eventbuscomponent "github.com/xbaseio/xbase/component/eventbus"
 	"github.com/xbaseio/xbase/etc"
 	"github.com/xbaseio/xbase/examples/cluster-demo/internal/bootstrap"
 	"github.com/xbaseio/xbase/examples/cluster-demo/internal/observability"
@@ -23,8 +24,9 @@ func main() {
 		gate.WithRegistry(reg),
 		gate.WithServer(server),
 	)
+	globalEventbus := eventbuscomponent.NewGlobal(bootstrap.NewEventbus())
 
 	container := xbase.NewContainer()
-	container.Add(debugServer, g)
+	container.Add(debugServer, globalEventbus, g)
 	container.Serve()
 }

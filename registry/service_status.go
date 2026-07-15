@@ -6,11 +6,14 @@ type ServiceStatus string
 
 const (
 	ServiceStatusNormal ServiceStatus = "normal"
+	ServiceStatusGray   ServiceStatus = "gray"
 	ServiceStatusTest   ServiceStatus = "test"
 )
 
 func ParseServiceStatus(status string) ServiceStatus {
 	switch ServiceStatus(status) {
+	case ServiceStatusGray:
+		return ServiceStatusGray
 	case ServiceStatusTest:
 		return ServiceStatusTest
 	default:
@@ -47,4 +50,15 @@ func MaxVersionForGameByServiceStatus(services []*ServiceInstance) map[int32]map
 	}
 
 	return maxVersions
+}
+
+func PreferredServiceStatuses(target ServiceStatus) []ServiceStatus {
+	switch ParseServiceStatus(string(target)) {
+	case ServiceStatusTest:
+		return []ServiceStatus{ServiceStatusTest, ServiceStatusGray, ServiceStatusNormal}
+	case ServiceStatusGray:
+		return []ServiceStatus{ServiceStatusGray, ServiceStatusNormal}
+	default:
+		return []ServiceStatus{ServiceStatusNormal}
+	}
 }

@@ -1,474 +1,340 @@
 # xbase
 
-xbase 是一套面向游戏与实时业务的 Go 分布式框架。通过 **组件化容器** 组装 Gateway、Node、Mesh 等进程角色，配合 **服务注册**、**用户定位** 与 **两级消息路由**，支持从单机到多机集群的平滑扩展与滚动发布。
+`xbase` 是一套面向实时业务和游戏服务器场景的 Go 分布式框架。
+
+它把常见的几个问题拆开处理：
+
+- 对外连接由 `Gate` 负责
+- 业务逻辑由 `Node` 负责
+- RPC 服务由 `Mesh` 负责
+- 服务发现、用户定位、版本切换、灰度路由、事件总线这些基础能力由框架统一提供
+
+如果你想快速理解这套框架，可以先抓住一句话：
+
+`Client -> Gate -> Node -> Mesh/RPC`
 
 ---
 
-## 整体架构
+## 适合什么场景
 
-```mermaid
-flowchart TB
-    subgraph ClientSide["客户端侧"]
-        C[Client 组件]
-    end
+这套框架更适合下面这类服务：
 
-    subgraph Gateway["网关层"]
-        G[Gate 组件]
-        NS[network: TCP / KCP / WS]
-    end
-
-    subgraph GameLogic["游戏逻辑层"]
-        N[Node 组件]
-        A[Actor 模型]
-    end
-
-    subgraph Micro["微服务层"]
-        M[Mesh 组件]
-        T[transport: gRPC / rpcx]
-    end
-
-    subgraph Infra["基础设施"]
-        R[(Registry<br/>etcd / consul / nacos)]
-        L[(Locator<br/>redis 等)]
-        D[Dispatcher<br/>负载均衡 + 版本过滤]
-    end
-
-    C -->|长连接| NS
-    NS --> G
-    G -->|GameID 选 Node| N
-    N --> A
-    N <-->|RPC| M
-    G --> D
-    N --> D
-    M --> D
-    G --> R
-    N --> R
-    M --> R
-    G --> L
-    N --> L
-    M --> L
-```
-
-**数据流向（玩家消息）：**
-
-```
-Client ──TCP/WS/KCP──▶ Gate ──GameID──▶ Node ──MessageID──▶ RouteHandler / Actor
-                              │
-                              └── Locator 绑定 uid ↔ gate / node
-```
+- 游戏大厅、房间服、战斗服
+- 有长连接入口的实时业务
+- 需要按用户做状态绑定的服务
+- 需要滚动发布、灰度放量、版本切换的集群
 
 ---
 
-## 进程角色
+## 核心角色
 
-| 角色 | 包路径 | 职责 |
-|------|--------|------|
-| **Gate** | `cluster/gate` | 对外长连接入口；维护 Session；将上行包按 `GameID` 投递到 Node |
-| **Node** | `cluster/node` | 游戏逻辑主战场；按 `MessageID` 分发；内置 Actor 调度；可内嵌 Mesh RPC |
-| **Mesh** | `cluster/mesh` | 独立微服务进程；对外暴露 gRPC / rpcx；可被 Node / 其他 Mesh 调用 |
-| **Client** | `cluster/client` | 框架侧测试/工具客户端；按 `MessageID` 注册本地处理器 |
+### Gate
 
-各角色均实现 `component.Component` 接口，由 `xbase.Container` 统一 `Init → Start → Close → Destroy` 管理生命周期。
+`cluster/gate`
 
----
+Gate 是对外入口，主要负责：
 
-## 消息模型
+- 管理客户端连接和会话
+- 收包、解包、登录
+- 按 `GameID` 把消息转发给对应 Node 组
+- 在需要时绑定用户和 Gate 的关系
+- 订阅集群路由信息和灰度策略
 
-统一包结构定义在 `packet/message.go`：
+你可以把它理解成“连接层 + 转发层”。
 
-```go
-type Message struct {
-    Seq       int32  // 序列号
-    GameID    int32  // 游戏 ID；0=大厅，非 0=具体游戏；**仅 Gateway 用于选 Node**
-    MessageID int32  // 消息 ID；**Node / Client 内业务路由键**
-    Buffer    []byte // 业务 payload
-}
-```
+### Node
 
-### 两级路由
+`cluster/node`
 
-| 层级 | 路由键 | 发生位置 | 说明 |
-|------|--------|----------|------|
-| 第一级 | `GameID` | Gate → Node | `NodeLinker.Deliver` 通过 `Dispatcher.FindGameRoute(gameID)` 选目标节点组 |
-| 第二级 | `MessageID` | Node / Client | `Router.AddRouteHandler(messageID, handler)` 匹配业务处理器 |
+Node 是业务执行层，主要负责：
 
-Gate 在 `cluster/gate/proxy.go` 中解包后携带 `message.GameID` 调用 Node；Node 与 Client **不再** 按 GameID 二次选服，只处理 MessageID。
+- 按 `MessageID` 分发业务消息
+- 执行业务 handler
+- 维护有状态路由
+- 绑定用户和 Node 的关系
+- 可选内置 Actor 调度
+- 可选暴露 RPC 服务给别的进程调用
 
-### 有状态 / 无状态路由
+你可以把它理解成“游戏逻辑服 / 业务逻辑服”。
 
-Node 路由可附加选项（`cluster/node/router.go`）：
+### Mesh
 
-- **Stateful**：用户绑定到固定 Node（通过 Locator 记录 `uid → nid`）
-- **Authorized**：集群流转时必须携带 UID；Gate 监听 Node 注册的 `Routes` 元数据，对 `uid==0` 的连接提前拦截
-- **Internal**：仅在 Node 间流转，不暴露给客户端
+`cluster/mesh`
 
-无状态路由走 Dispatcher 负载均衡（random / rr / wrr）；有状态路由优先 `LocateNode`，失败再回退到均衡策略。
+Mesh 是纯 RPC 服务进程，主要负责：
 
----
+- 注册和暴露 gRPC / rpcx 服务
+- 被 Node 或其他 Mesh 发现并调用
+- 参与版本过滤和滚动发布
 
-## 服务注册与发现
-
-`registry.ServiceInstance` 描述一个集群实例：
-
-| 字段 | 含义 |
-|------|------|
-| `ID` | 实例唯一 ID |
-| `Kind` | `gate` / `node` / `mesh` |
-| `Alias` | 逻辑组名（同名 Node 构成一组；Gate/Mesh 按 Alias 分组版本） |
-| `GameID` | Node 所属游戏（0=大厅） |
-| `Version` | 服务版本号（语义化 `x.y.z` 比较） |
-| `Endpoint` | 集群内部通信地址 |
-| `Events` | Node 订阅的连接事件（Connect / Reconnect / Disconnect） |
-| `Routes` | Node 路由元数据（MessageID + Stateful / Authorized / Internal），供 Gate 拦截与集群感知 |
-| `State` | work / busy / hang / shut |
-
-注册中心实现：`registry/etcd`、`registry/consul`、`registry/nacos`。
-
-`internal/dispatcher` 监听注册表变更，维护：
-
-- `routes[gameID]` — Node 分组与负载均衡池
-- `events[event]` — 事件广播目标
-- `endpoints5[insID]` — **全量实例直连表**（含低版本，保障已绑定用户仍可访问旧 Node）
-
----
-
-## 用户定位（Locator）
-
-`locate.Locator` 维护玩家在线位置：
-
-- `BindGate` / `LocateGate` — 用户 ↔ 网关
-- `BindNode` / `LocateNode` — 用户 ↔ 节点（按节点组名 `name`）
-
-Gate 连接建立时绑定 Gate；Node 处理有状态路由时绑定 Node。实现位于 `locate/redis` 等。
-
-Gate / Node 的 Linker 会 `WatchUserLocate`，本地缓存 `sources[uid][group] → insID`，减少定位中心压力。
-
----
-
-## 版本与滚动发布
-
-Gate、Node、Mesh 均支持：
-
-```go
-gate.WithVersion("2")
-gate.WithRetireDelay(10 * time.Minute)
-
-node.WithVersion("2")
-node.WithRetireDelay(10 * time.Minute)
-
-mesh.WithVersion("2")
-mesh.WithRetireDelay(10 * time.Minute)
-```
-
-**行为：**
-
-1. 注册时写入 `Version` 到注册中心
-2. **新流量**只进入同组最高版本：
-   - Node：按 `GameID` 分组取 max version（Dispatcher 负载池过滤）
-   - Gate：按 `Alias` 分组
-   - Mesh：gRPC / rpcx discovery resolver 过滤低版本实例
-3. **已绑定用户**仍可通过 `endpoints5` 直连旧实例，直到 Locator 迁移完成
-4. 低版本实例检测到更高版本后，`cluster/versionretire` 等待 `RetireDelay`（默认 10 分钟）再优雅退出
-
-版本比较逻辑：`registry.CompareVersion` / `MaxVersionForGame` / `MaxVersionByKindAlias`。
-
----
-
-## Node Actor 模型
-
-Node 内置 Actor 调度（`cluster/node/actor.go`）：
-
-- 每个 Actor 拥有独立 mailbox，消息串行处理
-- 支持 `Spawn` 子 Actor、`AfterFunc` 定时、`Invoke` 线程安全调用
-- Actor 可注册 `MessageID` 级路由，与全局 Router 并存
-
-适用于单玩家/单房间等有状态、需顺序保证的业务单元。
-
----
-
-## Mesh 微服务
-
-Mesh 通过 `transport` 抽象暴露服务：
-
-```go
-// 直连 IP
-direct://127.0.0.1:8011
-
-// 直连实例 ID
-direct://711baf8d-8a06-11ef-b7df-f4f19e1f0070
-
-// 服务发现（仅最高版本）
-discovery://service_name
-```
-
-实现：`transport/grpc`、`transport/rpcx`。Resolver 位于 `transport/*/internal/resolver/{discovery,direct}`。
-
-Node 若同时启动 transporter，会在注册中心以 **Mesh Kind** 额外注册一份实例，便于其他进程发现其 RPC 服务。
-
----
-
-## 集群内部通信
-
-| 模块 | 路径 | 作用 |
-|------|------|------|
-| Linker | `internal/link` | GateLinker / NodeLinker；封装 Deliver、Trigger、Push 等 |
-| Transporter | `internal/transporter` | Gate / Node 之间的二进制协议与连接池 |
-| Dispatcher | `internal/dispatcher` | 路由表、事件表、负载均衡、版本过滤 |
-
-Gate 只持有 `NodeLinker`；Node 同时持有 `GateLinker`（下行推送）与 `NodeLinker`（跨 Node / 事件）。
-
----
-
-## 容器与配置
+你可以把它理解成“独立微服务进程”。
 
 ### Container
 
+`container.go`
+
+所有组件都挂在 `xbase.Container` 里统一管理生命周期：
+
 ```go
 container := xbase.NewContainer()
-container.Add(gate, node, mesh) // 任意 component.Component
-container.Serve()               // Init → Start → 等待信号 → Close → Destroy
+container.Add(comp1, comp2, comp3)
+container.Serve()
 ```
 
-### 配置分层
+执行顺序是：
 
-| 机制 | 包 | 用途 |
-|------|-----|------|
-| **etc** | `etc` | 进程启动配置（集群参数、组件注入），只读，来自本地 `./etc` |
-| **config** | `config` | 业务动态配置，可接 etcd / consul / nacos / file |
-
-### 集群 etc 配置项
-
-配置写在 `./etc` 目录（或通过环境变量 `DUE_ETC` / 启动参数 `-etc` 指定路径）。下表列出 Gate / Node / Mesh 常用键；未配置时使用括号中的默认值。
-
-#### Gate
-
-| etc 键 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `etc.cluster.gate.id` | string | UUID | 实例 ID |
-| `etc.cluster.gate.name` | string | `gate` | 实例名称 / Alias |
-| `etc.cluster.gate.addr` | string | `:0` | 集群链路监听地址 |
-| `etc.cluster.gate.expose` | bool | `false` | 是否暴露内部通信地址 |
-| `etc.cluster.gate.timeout` | duration | `3s` | RPC 调用超时 |
-| `etc.cluster.gate.dispatch` | string | `random` | 无状态路由策略：`random` / `rr` / `wrr` |
-| `etc.cluster.gate.version` | string | `1` | 服务版本号 |
-| `etc.cluster.gate.retireDelay` | duration | `10m` | 低版本实例退出等待时间 |
-| `etc.cluster.gate.receiveQueue` | int | `8192` | 收包队列容量；满则关闭连接 |
-| `etc.cluster.gate.deliverWorkers` | int | `NumCPU` | 异步 deliver worker 数量 |
-
-代码注入（与 etc 等价）：
-
-```go
-gate.WithReceiveQueue(8192)
-gate.WithDeliverWorkers(8)
-gate.WithVersion("1")
-gate.WithRetireDelay(10 * time.Minute)
-gate.WithTimeout(3 * time.Second)
-```
-
-#### Node
-
-| etc 键 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `etc.cluster.node.id` | string | UUID | 实例 ID |
-| `etc.cluster.node.name` | string | `node` | 节点组名（Locator / 路由组 key） |
-| `etc.cluster.node.addr` | string | `:0` | 集群链路监听地址 |
-| `etc.cluster.node.expose` | bool | `false` | 是否暴露内部通信地址 |
-| `etc.cluster.node.codec` | string | `proto` | 编解码器 |
-| `etc.cluster.node.weight` | int | `1` | 负载均衡权重 |
-| `etc.cluster.node.timeout` | duration | `3s` | RPC 调用超时 |
-| `etc.cluster.node.gameID` | int32 | `0` | 游戏 ID（0=大厅） |
-| `etc.cluster.node.version` | string | `1` | 服务版本号 |
-| `etc.cluster.node.retireDelay` | duration | `10m` | 低版本实例退出等待时间 |
-| `etc.cluster.node.requestWorkers` | int | `NumCPU` | 业务消息 dispatch worker 数 |
-| `etc.cluster.node.eventWorkers` | int | `2` | 连接事件 dispatch worker 数 |
-| `etc.cluster.node.deliverTimeout` | duration | `3s` | 投递 `reqChan` / `evtChan` 超时；满则丢弃 |
-| `etc.cluster.node.mailboxTimeout` | duration | `3s` | Actor 邮箱入队超时 |
-
-代码注入：
-
-```go
-node.WithGameID(1)
-node.WithRequestWorkers(8)
-node.WithEventWorkers(2)
-node.WithDeliverTimeout(3 * time.Second)
-node.WithMailboxTimeout(3 * time.Second)
-node.WithVersion("1")
-node.WithRetireDelay(10 * time.Minute)
-```
-
-#### Mesh
-
-| etc 键 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `etc.cluster.mesh.version` | string | `1` | 服务版本号 |
-| `etc.cluster.mesh.retireDelay` | duration | `10m` | 低版本实例退出等待时间 |
-
-### 网络层队列（`network` 包）
-
-TCP / KCP / WS / xgnet 使用统一背压策略，常量定义在 `network/queue.go`：
-
-| 常量 | 默认值 | 行为 |
-|------|--------|------|
-| `DefaultRecvQueueSize` | `1024` | 收包队列容量；满则**关闭连接** |
-| `DefaultWriteQueueSize` | `4096` | 写队列容量 |
-| `DefaultWriteEnqueueTimeout` | `3s` | 写队列入队超时；超时则**关闭连接** |
-
-数据路径：`read` 协程只负责解包入队 → `receiveLoop` 调业务回调，避免慢 handler 阻塞 I/O。
-
-### etc 配置示例
-
-```toml
-# etc/gate.toml
-[cluster.gate]
-receiveQueue = 8192
-deliverWorkers = 8
-version = "1"
-retireDelay = "10m"
-timeout = "3s"
-
-# etc/node.toml
-[cluster.node]
-gameID = 1
-requestWorkers = 8
-eventWorkers = 2
-deliverTimeout = "3s"
-mailboxTimeout = "3s"
-version = "1"
-retireDelay = "10m"
-```
-
-> 实际键名以 `etc` 包读取为准（如 `etc.cluster.gate.receiveQueue`）；文件组织方式取决于 `./etc` 下的 toml/json 结构。
+`Init -> Start -> 等待退出信号 -> Close -> Destroy`
 
 ---
 
-## 目录结构
+## 一条消息怎么走
 
-```
-xbase/
-├── container.go          # 应用容器入口
-├── cluster/              # Gate / Node / Mesh / Client 集群组件
-│   └── versionretire/    # 低版本优雅退出
-├── component/            # HTTP、pprof 等通用组件
-├── internal/
-│   ├── dispatcher/       # 路由与负载均衡
-│   ├── link/             # 集群互联
-│   └── transporter/      # 集群传输协议
-├── network/              # TCP / KCP / WS / xgnet
-├── packet/               # 消息编解码
-├── registry/             # 服务注册发现
-├── locate/               # 用户定位
-├── session/              # Gate 连接/用户/频道会话
-├── transport/            # gRPC / rpcx 微服务传输
-├── config/               # 配置中心
-├── etc/                  # 启动配置
-├── log/                  # 日志
-├── cache/ lock/ eventbus/ # 缓存、分布式锁、事件总线
-├── crypto/ encoding/     # 加密与序列化
-└── utils/                # 工具库
-```
+框架里消息是两级路由：
+
+1. Gate 先按 `GameID` 选 Node 组
+2. Node 再按 `MessageID` 找具体 handler
+
+也就是：
+
+`Client -> Gate -> GameID -> Node -> MessageID -> Handler/Actor`
+
+对应的数据结构是 `cluster.Message` / `packet.Message` 这一套。
+
+### 为什么这样设计
+
+这样拆以后：
+
+- Gate 不需要理解业务消息，只负责选业务组
+- Node 内部路由保持简单，只关心自己的 `MessageID`
+- 集群扩容时更容易按游戏、房间、业务组拆分
 
 ---
 
-## 快速上手
+## 路由和状态
 
-```go
-package main
+### 无状态路由
 
-import (
-    "time"
+普通消息没有绑定关系时，会走 `Dispatcher` 的负载均衡：
 
-    "github.com/xbaseio/xbase"
-    "github.com/xbaseio/xbase/cluster/gate"
-    "github.com/xbaseio/xbase/cluster/node"
-    "github.com/xbaseio/xbase/locate/redis"
-    "github.com/xbaseio/xbase/registry/consul"
-    // ...
-)
+- `random`
+- `rr`
+- `wrr`
 
-func main() {
-    locator := redis.NewLocator(/* ... */)
-    reg := consul.NewRegistry(/* ... */)
+### 有状态路由
 
-    g := gate.NewGate(
-        gate.WithLocator(locator),
-        gate.WithRegistry(reg),
-        gate.WithVersion("1"),
-        gate.WithReceiveQueue(8192),
-        gate.WithDeliverWorkers(8),
-        // gate.WithServer(tcpServer),
-    )
+如果某类业务需要“用户固定落到某个 Node”，就会用 Locator 记录：
 
-    n := node.NewNode(
-        node.WithLocator(locator),
-        node.WithRegistry(reg),
-        node.WithGameID(1),
-        node.WithVersion("1"),
-        node.WithRequestWorkers(8),
-        node.WithDeliverTimeout(3*time.Second),
-    )
+`uid -> node`
 
-    n.Proxy().Router().AddRouteHandler(1001, func(ctx node.Context) {
-        // 处理 MessageID = 1001
-    })
+这样后续请求会优先打到同一台 Node。
 
-    // 需登录后才能访问的路由
-    n.Proxy().Router().AddRouteHandler(2001, loginHandler, node.AuthorizedRoute)
+这类场景常见于：
 
-    container := xbase.NewContainer()
-    container.Add(g, n)
-    container.Serve()
-}
-```
+- 房间服
+- 战斗服
+- 单用户状态机
 
-客户端发送时需设置正确的 `GameID`（Gateway 选 Node）与 `MessageID`（Node 选 Handler）：
+### Authorized / Internal / Stateful
 
-```go
-msg := &packet.Message{
-    GameID:    1,     // 路由到 GameID=1 的 Node 组
-    MessageID: 1001,  // Node 内业务处理器
-    Buffer:    payload,
-}
-```
+Node 路由还支持附加属性：
+
+- `Authorized`：要求用户先登录
+- `Internal`：仅集群内部可达
+- `Stateful`：需要用户定位到固定 Node
 
 ---
 
-## Node.js 测试客户端
+## 服务发现和用户定位
 
-仓库提供 Node.js 版 Gate 连接测试工具，协议与 `packet` 包一致：
+### Registry
+
+`registry/*`
+
+Registry 负责服务注册和发现。当前仓库内有：
+
+- Consul
+- Nacos
+- etcd 风格接口抽象
+
+服务实例会注册这些信息：
+
+- `Kind`
+- `Alias`
+- `GameID`
+- `Version`
+- `Endpoint`
+- `Routes`
+- `Events`
+- `Metadata`
+
+### Locator
+
+`locate/*`
+
+Locator 负责用户位置绑定。常见关系有：
+
+- `uid -> gate`
+- `uid -> node`
+
+这样 Gate、Node、Mesh 都能知道一个用户当前应该路由到哪里。
+
+默认示例使用的是 Redis Locator。
+
+---
+
+## 版本和灰度
+
+这套框架现在支持两种常见控制维度：
+
+### 版本过滤
+
+服务实例注册时会带 `Version`。
+
+新流量默认只会进入同组里的最高版本，旧版本实例可以在一段 `retireDelay` 内继续承接已经绑定的老用户，用来做滚动发布。
+
+### 服务状态
+
+Node 还可以带 `serviceStatus`：
+
+- `normal`
+- `gray`
+- `test`
+
+当前 Gate 的登录路由已经支持：
+
+- 普通用户进 `normal`
+- 灰度白名单或灰度比例命中进 `gray`
+- 测试白名单进 `test`
+- 当高层状态不可用时，按 `test -> gray -> normal` 回退
+
+这部分在示例里有完整演示。
+
+---
+
+## RPC 和 Mesh
+
+如果 Node 或独立 Mesh 挂了 transporter，就可以把服务注册成 RPC 服务。
+
+当前仓库支持：
+
+- `transport/grpc`
+- `transport/rpcx`
+
+常见调用方式是：
+
+- `direct://ip:port`
+- `direct://instance-id`
+- `discovery://service-name`
+
+所以 Node 既可以只做消息处理，也可以顺手暴露一部分 RPC 服务给别的进程调用。
+
+---
+
+## 事件总线
+
+`eventbus/*`
+
+框架内有统一事件总线抽象，当前仓库里有：
+
+- Redis
+- NATS
+- Kafka
+
+当前示例里已经用它做了一个很典型的事情：
+
+- Gate 订阅灰度策略事件
+- 其他服务或脚本发布策略事件
+- Gate 在线更新灰度/测试路由策略
+
+---
+
+## 最小上手方式
+
+最直接的学习路径不是从零写代码，而是先跑示例：
+
+### 1. 看示例目录
+
+- [examples/cluster-demo/README.md](examples/cluster-demo/README.md)
+- [examples/nodejs-client/README.md](examples/nodejs-client/README.md)
+
+### 2. 启动依赖
+
+`cluster-demo` 需要：
+
+- Redis
+- Consul
+- NATS
+
+### 3. 启动示例进程
 
 ```bash
-cd examples/nodejs-client
-npm install
-node src/index.js --host 127.0.0.1 --port 3553 --game 1 --message 1001 --body hello
+go run ./examples/cluster-demo/node -etc ./examples/cluster-demo/etc/node-normal.toml
+go run ./examples/cluster-demo/node -etc ./examples/cluster-demo/etc/node-gray.toml
+go run ./examples/cluster-demo/node -etc ./examples/cluster-demo/etc/node-test.toml
+go run ./examples/cluster-demo/gate -etc ./examples/cluster-demo/etc/gate.toml
+go run ./examples/cluster-demo/mesh -etc ./examples/cluster-demo/etc/mesh.toml
 ```
 
-详见 [examples/nodejs-client/README.md](examples/nodejs-client/README.md)。
+### 4. 再看代码入口
+
+- `examples/cluster-demo/gate/main.go`
+- `examples/cluster-demo/node/main.go`
+- `examples/cluster-demo/mesh/main.go`
+
+这里基本能看清楚：
+
+- 组件怎么组装
+- Registry / Locator / Transporter 怎么注入
+- 路由怎么注册
+- 调试服务怎么挂
+- 灰度策略事件怎么接
 
 ---
 
-框架各层均通过接口注入，可按项目替换实现：
+## 读代码建议
 
-| 类别 | 接口 / 包 | 常见实现 |
-|------|-----------|----------|
-| 网络 | `network` | TCP、KCP、WebSocket |
-| 注册 | `registry.Registry` | etcd、Consul、Nacos |
-| 定位 | `locate.Locator` | Redis |
-| 传输 | `transport` | gRPC、rpcx |
-| 配置 | `config` | file、etcd、Consul、Nacos |
-| 日志 | `log` | console、file、阿里云、腾讯云 |
-| 缓存 | `cache` | Redis、Memcache |
-| 锁 | `lock` | Redis、Memcache |
-| 事件 | `eventbus` | Redis、NATS、Kafka、RabbitMQ |
-| 编解码 | `encoding` | JSON、Protobuf、MsgPack |
-| 加密 | `crypto` | RSA、ECC |
+如果你是第一次进这个仓库，我建议按这个顺序看：
+
+1. `container.go`
+2. `cluster/cluster.go`
+3. `cluster/gate`
+4. `cluster/node`
+5. `internal/link`
+6. `internal/dispatcher`
+7. `registry` 和 `locate`
+8. `transport`
+9. `examples/cluster-demo`
+
+这样会比直接从 `internal` 深处开始看轻松很多。
 
 ---
 
-## 设计要点小结
+## 目录概览
 
-1. **Gate 管连接，Node 管逻辑，Mesh 管 RPC** — 职责清晰，可独立扩缩容。
-2. **GameID 与 MessageID 分离** — 网关只做一次选服，Node 内路由简单稳定。
-3. **Locator + Stateful 路由** — 玩家粘滞在固定 Node，支持无缝迁移与踢线。
-4. **版本双轨** — 负载均衡走最高版本，直连表保留全量实例，滚动发布不丢在线用户。
-5. **组件化容器** — 同一套框架可跑 Gate-only、Node-only、Gate+Node、Mesh 等任意组合。
-6. **统一背压** — 网络收包队列 + Gate/Node 异步队列；过载时关连接或丢弃，避免单 goroutine 拖死全链路。
+```text
+xbase/
+├─ cluster/         Gate / Node / Mesh / Client
+├─ component/       通用组件
+├─ eventbus/        事件总线实现
+├─ locate/          用户定位
+├─ registry/        服务注册发现
+├─ transport/       gRPC / rpcx
+├─ network/         TCP / WS / KCP 等网络层
+├─ session/         会话管理
+├─ internal/        Dispatcher / Linker / Transporter 等内部实现
+├─ examples/        最小示例和调试示例
+└─ container.go     组件容器入口
+```
+
+---
+
+## 当前建议
+
+如果你准备基于这套框架继续开发，建议优先保留这几个边界：
+
+- Gate 只做连接、登录、转发、入口侧策略
+- Node 只做消息路由和业务逻辑
+- Mesh 只做 RPC 服务
+- 灰度、事件、配置更新尽量用统一基础设施，不要散在业务里
+
+这样后面做扩容、拆服、灰度和排障都会轻松很多。

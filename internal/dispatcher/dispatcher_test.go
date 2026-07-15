@@ -266,6 +266,17 @@ func TestDispatcher_ServiceStatusRouting(t *testing.T) {
 			Metadata: map[string]string{registry.MetadataServiceStatusKey: string(registry.ServiceStatusNormal)},
 		},
 		{
+			ID:       "gray-v25",
+			Name:     "node-gray-v25",
+			Kind:     cluster.Node.String(),
+			Alias:    "node",
+			State:    cluster.Work.String(),
+			Endpoint: endpoint.NewEndpoint("grpc", "127.0.0.1:81025", false).String(),
+			GameID:   1,
+			Version:  "2.5.0",
+			Metadata: map[string]string{registry.MetadataServiceStatusKey: string(registry.ServiceStatusGray)},
+		},
+		{
 			ID:       "test-v3",
 			Name:     "node-test-v3",
 			Kind:     cluster.Node.String(),
@@ -294,7 +305,15 @@ func TestDispatcher_ServiceStatusRouting(t *testing.T) {
 		t.Fatalf("unexpected normal endpoint: %s", got)
 	}
 
-	ep, err = route.FindEndpointForUser(true)
+	ep, err = route.FindEndpointForServiceStatus(registry.ServiceStatusGray)
+	if err != nil {
+		t.Fatalf("find gray endpoint failed: %v", err)
+	}
+	if got := ep.Address(); got != "127.0.0.1:81025" {
+		t.Fatalf("unexpected gray endpoint: %s", got)
+	}
+
+	ep, err = route.FindEndpointForServiceStatus(registry.ServiceStatusTest)
 	if err != nil {
 		t.Fatalf("find test endpoint failed: %v", err)
 	}

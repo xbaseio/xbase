@@ -282,7 +282,7 @@ func (l *NodeLinker) doRPC(ctx context.Context, gameID int32, uid int64, fn func
 			}
 		}
 
-		ep, err := route.FindEndpointForUser(l.allowTestService(uid), nid)
+		ep, err := route.FindEndpointForServiceStatus(l.resolveServiceStatus(uid), nid)
 		if err != nil {
 			return nil, err
 		}
@@ -321,8 +321,12 @@ func (l *NodeLinker) doBuildClient(nid string) (*node.Client, error) {
 	return l.builder.Build(ep.Address())
 }
 
-func (l *NodeLinker) allowTestService(uid int64) bool {
-	return l.opts != nil && l.opts.AllowTestService != nil && l.opts.AllowTestService(uid)
+func (l *NodeLinker) resolveServiceStatus(uid int64) registry.ServiceStatus {
+	if l.opts != nil && l.opts.ResolveServiceStatus != nil {
+		return l.opts.ResolveServiceStatus(uid)
+	}
+
+	return registry.ServiceStatusNormal
 }
 
 // 打包消息

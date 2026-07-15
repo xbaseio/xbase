@@ -14,6 +14,9 @@ timeout = "3s"
 dispatch = "random"
 receiveQueue = 4096
 deliverWorkers = 4
+grayWhitelist = [10003]
+grayTrafficPercent = 20
+grayTrafficSalt = "cluster-demo-lobby"
 testWhitelist = [10001, 10002]
 
     [cluster.gate.login]
@@ -43,6 +46,11 @@ deregisterCriticalServiceAfter = 30
 addrs = ["127.0.0.1:6379"]
 db = 0
 prefix = "xbase:cluster-demo"
+
+[eventbus.nats]
+url = "nats://127.0.0.1:4222"
+timeout = "2s"
+prefix = "xbase:eventbus:cluster-demo"
 
 [log]
 level = "info"

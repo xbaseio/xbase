@@ -9,16 +9,16 @@ import (
 )
 
 type Options struct {
-	InsID            string
-	InsKind          cluster.Kind
-	Codec            encoding.Codec
-	Locator          locate.Locator
-	Registry         registry.Registry
-	Encryptor        crypto.Encryptor
-	Dispatch         cluster.Dispatch
-	NodeKind         cluster.NodeKind
-	GameID           int32
-	WaitHandler      func()
-	DoneHandler      func()
-	AllowTestService func(uid int64) bool
+	InsID                string
+	InsKind              cluster.Kind
+	Codec                encoding.Codec
+	Locator              locate.Locator
+	Registry             registry.Registry
+	Encryptor            crypto.Encryptor
+	Dispatch             cluster.Dispatch
+	NodeKind             cluster.NodeKind
+	GameID               int32
+	WaitHandler          func()
+	DoneHandler          func()
+	ResolveServiceStatus func(uid int64) registry.ServiceStatus
 }

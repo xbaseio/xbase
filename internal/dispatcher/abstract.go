@@ -23,6 +23,8 @@ type abstract struct {
 	endpoints5 map[string]*serviceEndpoint
 	endpoints6 []*serviceEndpoint
 	endpoints7 []*serviceEndpoint
+	endpoints8 []*serviceEndpoint
+	endpoints9 []*serviceEndpoint
 }
 
 func newAbstract() abstract {
@@ -34,6 +36,8 @@ func newAbstract() abstract {
 		endpoints5: make(map[string]*serviceEndpoint),
 		endpoints6: make([]*serviceEndpoint, 0),
 		endpoints7: make([]*serviceEndpoint, 0),
+		endpoints8: make([]*serviceEndpoint, 0),
+		endpoints9: make([]*serviceEndpoint, 0),
 	}
 }
 
@@ -50,6 +54,17 @@ func (a *abstract) addServiceEndpoint(se *serviceEndpoint, balance bool) {
 			a.endpoints6 = append(a.endpoints6, se)
 		case cluster.Busy.String():
 			a.endpoints7 = append(a.endpoints7, se)
+		case cluster.Hang.String():
+			a.endpoints3 = append(a.endpoints3, se)
+		case cluster.Shut.String():
+			a.endpoints4 = append(a.endpoints4, se)
+		}
+	case registry.ServiceStatusGray:
+		switch se.state {
+		case cluster.Work.String():
+			a.endpoints8 = append(a.endpoints8, se)
+		case cluster.Busy.String():
+			a.endpoints9 = append(a.endpoints9, se)
 		case cluster.Hang.String():
 			a.endpoints3 = append(a.endpoints3, se)
 		case cluster.Shut.String():

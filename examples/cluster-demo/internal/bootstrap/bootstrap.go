@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"github.com/xbaseio/xbase/eventbus"
+	natseventbus "github.com/xbaseio/xbase/eventbus/nats"
 	"github.com/xbaseio/xbase/locate"
 	redislocate "github.com/xbaseio/xbase/locate/redis"
 	"github.com/xbaseio/xbase/network"
@@ -30,4 +32,8 @@ func NewTransporter() transport.Transporter {
 
 func NewRPCXTransporter() transport.Transporter {
 	return rpcxtransport.NewTransporter()
+}
+
+func NewEventbus() eventbus.Eventbus {
+	return natseventbus.NewEventbus()
 }

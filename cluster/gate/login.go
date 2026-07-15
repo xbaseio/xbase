@@ -135,51 +135,58 @@ func (p *proxy) pickLobbyNode(ctx context.Context, uid int64) (*registry.Service
 	}
 
 	maxVersionByStatus := registry.MaxVersionForGameByServiceStatus(services)
-	candidates := make([]*registry.ServiceInstance, 0, len(services))
-	allowTest := p.gate.opts.allowTestService(uid)
+	decision := p.gate.resolveServiceStatusDecision(uid)
+	group := maxVersionByStatus[p.gate.opts.lobbyGameID]
 
-	for _, ins := range services {
-		if ins == nil || ins.Kind != cluster.Node.String() {
+	for _, preferredStatus := range registry.PreferredServiceStatuses(decision.targetStatus) {
+		candidates := make([]*registry.ServiceInstance, 0, len(services))
+		for _, ins := range services {
+			if ins == nil || ins.Kind != cluster.Node.String() {
+				continue
+			}
+
+			if ins.GameID != p.gate.opts.lobbyGameID {
+				continue
+			}
+
+			switch ins.State {
+			case cluster.Work.String(), cluster.Busy.String():
+			default:
+				continue
+			}
+
+			status := registry.ServiceStatusOf(ins)
+			if status != preferredStatus {
+				continue
+			}
+
+			if !registry.IsLatestVersion(ins, group[status]) {
+				continue
+			}
+
+			candidates = append(candidates, ins)
+		}
+
+		if len(candidates) == 0 {
 			continue
 		}
 
-		if ins.GameID != p.gate.opts.lobbyGameID {
-			continue
+		idx := uid % int64(len(candidates))
+		if idx < 0 {
+			idx = -idx
 		}
 
-		switch ins.State {
-		case cluster.Work.String(), cluster.Busy.String():
-		default:
-			continue
-		}
+		selected := candidates[idx]
+		log.Infof("gate lobby route selected, uid: %d targetStatus: %s selectedStatus: %s reason: %s grayWhitelistHit: %t testWhitelistHit: %t grayTrafficHit: %t grayTrafficBucket: %d nodeID: %s nodeName: %s version: %s",
+			uid, decision.targetStatus, preferredStatus, decision.reason, decision.grayWhitelistHit, decision.testWhitelistHit,
+			decision.grayTrafficHit, decision.grayTrafficBucket, selected.ID, selected.Alias, selected.Version)
 
-		status := registry.ServiceStatusOf(ins)
-		group := maxVersionByStatus[ins.GameID]
-		if !registry.IsLatestVersion(ins, group[status]) {
-			continue
-		}
-
-		if status == registry.ServiceStatusTest && !allowTest {
-			continue
-		}
-
-		if allowTest && status != registry.ServiceStatusTest && group[registry.ServiceStatusTest] != "" {
-			continue
-		}
-
-		candidates = append(candidates, ins)
+		return selected, nil
 	}
 
-	if len(candidates) == 0 {
-		return nil, xerrors.ErrNotFoundEndpoint
-	}
-
-	idx := uid % int64(len(candidates))
-	if idx < 0 {
-		idx = -idx
-	}
-
-	return candidates[idx], nil
+	log.Warnf("gate lobby route not found, uid: %d targetStatus: %s reason: %s grayWhitelistHit: %t testWhitelistHit: %t grayTrafficHit: %t grayTrafficBucket: %d",
+		uid, decision.targetStatus, decision.reason, decision.grayWhitelistHit, decision.testWhitelistHit, decision.grayTrafficHit, decision.grayTrafficBucket)
+	return nil, xerrors.ErrNotFoundEndpoint
 }
 
 func (p *proxy) pushLoginReply(conn network.Conn, seq int32, code int, uid int64, msg string) {

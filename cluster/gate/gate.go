@@ -97,6 +97,8 @@ func (g *Gate) Start() {
 
 	g.registerServiceInstance()
 
+	g.subscribeServiceStatusPolicy()
+
 	g.proxy.watch()
 
 	g.watchVersionRetire()

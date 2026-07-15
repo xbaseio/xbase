@@ -6,6 +6,7 @@ import (
 
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/core/endpoint"
+	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/xerrors"
 )
 
@@ -30,18 +31,26 @@ func (r *GameRoute) ID() int32     { return r.gameID }
 func (r *GameRoute) Group() string { return r.group }
 
 func (r *GameRoute) FindEndpoint(insID ...string) (*endpoint.Endpoint, error) {
-	return r.FindEndpointForUser(false, insID...)
+	return r.FindEndpointForServiceStatus(registry.ServiceStatusNormal, insID...)
 }
 
 func (r *GameRoute) FindEndpointForUser(allowTest bool, insID ...string) (*endpoint.Endpoint, error) {
+	if allowTest {
+		return r.FindEndpointForServiceStatus(registry.ServiceStatusTest, insID...)
+	}
+
+	return r.FindEndpointForServiceStatus(registry.ServiceStatusNormal, insID...)
+}
+
+func (r *GameRoute) FindEndpointForServiceStatus(status registry.ServiceStatus, insID ...string) (*endpoint.Endpoint, error) {
 	if len(insID) == 0 || insID[0] == "" {
 		switch r.dispatcher.dispatch {
 		case cluster.RoundRobin:
-			return r.roundRobinDispatch(allowTest)
+			return r.roundRobinDispatch(status)
 		case cluster.WeightRoundRobin:
-			return r.weightRoundRobinDispatch(allowTest)
+			return r.weightRoundRobinDispatch(status)
 		default:
-			return r.randomDispatch(allowTest)
+			return r.randomDispatch(status)
 		}
 	}
 
@@ -56,28 +65,28 @@ func (r *GameRoute) directDispatch(insID string) (*endpoint.Endpoint, error) {
 	return sep.endpoint, nil
 }
 
-func (r *GameRoute) randomDispatch(allowTest bool) (*endpoint.Endpoint, error) {
-	if endpoints := r.balanceEndpoints(allowTest); len(endpoints) > 0 {
+func (r *GameRoute) randomDispatch(status registry.ServiceStatus) (*endpoint.Endpoint, error) {
+	if endpoints := r.balanceEndpoints(status); len(endpoints) > 0 {
 		return endpoints[rand.IntN(len(endpoints))].endpoint, nil
 	}
 	return nil, xerrors.ErrNotFoundEndpoint
 }
 
-func (r *GameRoute) roundRobinDispatch(allowTest bool) (*endpoint.Endpoint, error) {
-	if endpoints := r.balanceEndpoints(allowTest); len(endpoints) > 0 {
+func (r *GameRoute) roundRobinDispatch(status registry.ServiceStatus) (*endpoint.Endpoint, error) {
+	if endpoints := r.balanceEndpoints(status); len(endpoints) > 0 {
 		index := int(r.counter.Add(1) % uint64(len(endpoints)))
 		return endpoints[index].endpoint, nil
 	}
 	return nil, xerrors.ErrNotFoundEndpoint
 }
 
-func (r *GameRoute) weightRoundRobinDispatch(allowTest bool) (*endpoint.Endpoint, error) {
+func (r *GameRoute) weightRoundRobinDispatch(status registry.ServiceStatus) (*endpoint.Endpoint, error) {
 	var (
 		selected    *serviceEndpoint
 		totalWeight int
 	)
 
-	if endpoints := r.balanceEndpoints(allowTest); len(endpoints) > 0 {
+	if endpoints := r.balanceEndpoints(status); len(endpoints) > 0 {
 		for i := range endpoints {
 			se := endpoints[i]
 			se.currWeight += se.weight
@@ -96,21 +105,31 @@ func (r *GameRoute) weightRoundRobinDispatch(allowTest bool) (*endpoint.Endpoint
 	return nil, xerrors.ErrNotFoundEndpoint
 }
 
-func (r *GameRoute) balanceEndpoints(allowTest bool) []*serviceEndpoint {
-	if allowTest {
-		if len(r.endpoints6) > 0 {
-			return r.endpoints6
+func (r *GameRoute) balanceEndpoints(status registry.ServiceStatus) []*serviceEndpoint {
+	for _, preferred := range registry.PreferredServiceStatuses(status) {
+		switch preferred {
+		case registry.ServiceStatusTest:
+			if len(r.endpoints6) > 0 {
+				return r.endpoints6
+			}
+			if len(r.endpoints7) > 0 {
+				return r.endpoints7
+			}
+		case registry.ServiceStatusGray:
+			if len(r.endpoints8) > 0 {
+				return r.endpoints8
+			}
+			if len(r.endpoints9) > 0 {
+				return r.endpoints9
+			}
+		default:
+			if len(r.endpoints1) > 0 {
+				return r.endpoints1
+			}
+			if len(r.endpoints2) > 0 {
+				return r.endpoints2
+			}
 		}
-		if len(r.endpoints7) > 0 {
-			return r.endpoints7
-		}
-	}
-
-	if len(r.endpoints1) > 0 {
-		return r.endpoints1
-	}
-	if len(r.endpoints2) > 0 {
-		return r.endpoints2
 	}
 
 	return nil
