@@ -21,7 +21,6 @@ func SetWebHook(botToken, channelCode, webHookUrl string) error {
 
 	var res any
 	err := client.Get("/setWebhook", data, res)
-	//6867997452:AAFYZXHAC_TDvcfBiYto2ShutRSiUcboa04
 	log.Warnf("channelCode:%v CallBack:%v, %#v:%v", channelCode, webHookUrl, res, err)
 	if err != nil {
 		return err
