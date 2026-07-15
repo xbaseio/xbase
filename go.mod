@@ -19,7 +19,6 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/consul/api v1.33.7
 	github.com/jinzhu/copier v0.4.0
-	github.com/liangma499/xbase v0.0.0-20260407025400-afe8e20e1b67
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.5
 	github.com/nats-io/nats.go v1.50.0
 	github.com/redis/go-redis/v9 v9.18.0

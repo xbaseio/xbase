@@ -1,7 +1,7 @@
 package xjwt
 
 import (
-	"github.com/liangma499/xbase/xerrors"
+	"github.com/xbaseio/xbase/xerrors"
 )
 
 var (
