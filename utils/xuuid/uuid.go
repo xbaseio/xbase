@@ -5,6 +5,6 @@ import (
 )
 
 func UUID() string {
-	id, _ := uuid.NewUUID()
+	id, _ := uuid.NewV7()
 	return id.String()
 }
