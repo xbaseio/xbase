@@ -9,7 +9,7 @@ import (
 const (
 	dueModeEtcName = "etc.mode"
 	dueModeArgName = "mode"
-	dueModeEnvName = "DUE_MODE"
+	dueModeEnvName = "XBASE_MODE"
 )
 
 const (

@@ -15,12 +15,15 @@ const (
 )
 
 const (
-	defaultLevelKey        = "etc.log.level"
-	defaultTerminalsKey    = "etc.log.terminals"
-	defaultStackLevelKey   = "etc.log.stackLevel"
-	defaultTimeFormatKey   = "etc.log.timeFormat"
-	defaultCallSkipKey     = "etc.log.callSkip"
-	defaultCallFullPathKey = "etc.log.callFullPath"
+	defaultLevelKey          = "etc.log.level"
+	defaultTerminalsKey      = "etc.log.terminals"
+	defaultStackLevelKey     = "etc.log.stackLevel"
+	defaultTimeFormatKey     = "etc.log.timeFormat"
+	defaultCallSkipKey       = "etc.log.callSkip"
+	defaultCallFullPathKey   = "etc.log.callFullPath"
+	defaultCallerFullPathKey = "etc.log.callerFullPath"
+	defaultStdoutKey         = "etc.log.stdout"
+	defaultFileKey           = "etc.log.file"
 )
 
 var defaultTerminals = []Terminal{TerminalConsole, TerminalFile}
@@ -47,6 +50,19 @@ func defaultOptions() *options {
 		callFullPath: etc.Get(defaultCallFullPathKey, defaultCallFullPath).Bool(),
 	}
 
+	// Compatible with the original flat [log] configuration. When `file` is a
+	// scalar it enables file output; stdout independently controls the console.
+	if fileValue := etc.Get(defaultFileKey); fileValue.Kind() == reflect.String {
+		terminals := []Terminal{TerminalFile}
+		if etc.Get(defaultStdoutKey, true).Bool() {
+			terminals = append([]Terminal{TerminalConsole}, terminals...)
+		}
+		opts.terminals = terminals
+	}
+	if etc.Has(defaultCallerFullPathKey) {
+		opts.callFullPath = etc.Get(defaultCallerFullPathKey).Bool()
+	}
+
 	switch value := etc.Get(defaultTerminalsKey); value.Kind() {
 	case reflect.Slice, reflect.Array:
 		terminals := make([]Terminal, 0)
@@ -65,7 +81,8 @@ func defaultOptions() *options {
 			opts.terminals = terminals
 		}
 	default:
-		opts.terminals = defaultTerminals
+		// Keep the terminals selected by the flat configuration (or defaults)
+		// when no explicit terminals collection is configured.
 	}
 
 	return opts

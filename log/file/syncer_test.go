@@ -175,3 +175,45 @@ func TestSyncerCloseFlushesQueuedEntries(t *testing.T) {
 		t.Fatal("expected queued entries to be flushed on close")
 	}
 }
+
+func TestClassifiedStorageWritesToLowerAndEqualLevelFiles(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "due.log")
+	s := NewSyncer(
+		WithPath(path),
+		WithClassifiedStorage(true),
+	)
+
+	now := time.Now()
+	if err := s.Write(&internal.Entity{
+		Now:     now,
+		Time:    now.Format(time.DateTime),
+		Level:   internal.LevelInfo,
+		Message: "classified info",
+	}); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatalf("close failed: %v", err)
+	}
+
+	for _, name := range []string{"due.debug.log", "due.info.log"} {
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatalf("read %s failed: %v", name, err)
+		}
+		if len(data) == 0 {
+			t.Fatalf("expected %s to contain the info entry", name)
+		}
+	}
+
+	for _, name := range []string{"due.warn.log", "due.error.log", "due.fatal.log", "due.panic.log"} {
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatalf("read %s failed: %v", name, err)
+		}
+		if len(data) != 0 {
+			t.Fatalf("expected %s not to contain the info entry", name)
+		}
+	}
+}

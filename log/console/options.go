@@ -1,6 +1,8 @@
 package console
 
 import (
+	"reflect"
+
 	"github.com/xbaseio/xbase/etc"
 )
 
@@ -19,8 +21,12 @@ type options struct {
 }
 
 func defaultOptions() *options {
+	format := etc.Get(defaultFormatKey, defaultFormat).String()
+	if value := etc.Get("etc.log.format"); value.Kind() == reflect.String {
+		format = value.String()
+	}
 	return &options{
-		format: Format(etc.Get(defaultFormatKey, defaultFormat).String()),
+		format: Format(format),
 	}
 }
 

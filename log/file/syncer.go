@@ -47,6 +47,7 @@ type Syncer struct {
 	closing     atomic.Bool
 	wg          sync.WaitGroup
 	formatter   internal.Formatter
+	classified  map[internal.Level]*Syncer
 }
 
 type entry struct {
@@ -68,6 +69,10 @@ func NewSyncer(opts ...Option) *Syncer {
 }
 
 func (s *Syncer) init() {
+	if s.opts.classifiedStorage {
+		s.initClassified()
+		return
+	}
 	path, file := filepath.Split(s.opts.path)
 	list := strings.Split(file, ".")
 	switch c := len(list); c {
@@ -111,6 +116,17 @@ func (s *Syncer) Write(entity *internal.Entity) error {
 	if s.closing.Load() {
 		return xerrors.ErrSyncerClosed
 	}
+	if len(s.classified) > 0 {
+		var firstErr error
+		for level, syncer := range s.classified {
+			if entity.Level.Priority() >= level.Priority() {
+				if err := syncer.Write(entity); err != nil && firstErr == nil {
+					firstErr = err
+				}
+			}
+		}
+		return firstErr
+	}
 
 	return s.doWrite(entry{
 		buf: s.formatter.Format(entity),
@@ -141,6 +157,15 @@ func (s *Syncer) Close() error {
 	if !s.closing.CompareAndSwap(false, true) {
 		return xerrors.ErrSyncerClosed
 	}
+	if len(s.classified) > 0 {
+		var firstErr error
+		for _, syncer := range s.classified {
+			if err := syncer.Close(); err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+		return firstErr
+	}
 
 	s.cancel()
 	s.queueMu.Lock()
@@ -161,6 +186,27 @@ func (s *Syncer) Close() error {
 	}
 
 	return s.file.Close()
+}
+
+func (s *Syncer) initClassified() {
+	s.classified = make(map[internal.Level]*Syncer, 6)
+	levels := []internal.Level{
+		internal.LevelDebug, internal.LevelInfo, internal.LevelWarn,
+		internal.LevelError, internal.LevelFatal, internal.LevelPanic,
+	}
+	for _, level := range levels {
+		o := *s.opts
+		o.path = classifiedPath(o.path, string(level))
+		o.classifiedStorage = false
+		child := &Syncer{opts: &o}
+		child.init()
+		s.classified[level] = child
+	}
+}
+
+func classifiedPath(path, level string) string {
+	ext := filepath.Ext(path)
+	return strings.TrimSuffix(path, ext) + "." + level + ext
 }
 
 // 尝试将数据刷入文件中

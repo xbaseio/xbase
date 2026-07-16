@@ -14,7 +14,7 @@ import (
 // config配置中心的配置信息可通过master管理服进行动态修改。
 
 const (
-	dueEtcEnvName  = "DUE_ETC"
+	dueEtcEnvName  = "XBASE_ETC"
 	dueEtcArgName  = "etc"
 	defaultEtcPath = "./etc"
 )
