@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	dueModeEtcName = "etc.mode"
-	dueModeArgName = "mode"
-	dueModeEnvName = "XBASE_MODE"
+	xbaseModeEtcName = "etc.mode"
+	xbaseModeArgName = "mode"
+	xbaseModeEnvName = "XBASE_MODE"
 )
 
 const (
@@ -23,13 +23,13 @@ const (
 	TestMode = "test"
 )
 
-var dueMode string
+var xbaseMode string
 
 // 优先级： 配置文件 < 环境变量 < 运行参数 < mode.SetMode()
 func init() {
-	mode := etc.Get(dueModeEtcName, DebugMode).String()
-	mode = env.Get(dueModeEnvName, mode).String()
-	mode = flag.String(dueModeArgName, mode)
+	mode := etc.Get(xbaseModeEtcName, DebugMode).String()
+	mode = env.Get(xbaseModeEnvName, mode).String()
+	mode = flag.String(xbaseModeArgName, mode)
 	SetMode(mode)
 }
 
@@ -41,7 +41,7 @@ func SetMode(m string) {
 
 	switch m {
 	case DebugMode, DevelopMode, TestMode, ReleaseMode:
-		dueMode = m
+		xbaseMode = m
 	default:
 		panic("xbase mode unknown: " + m + " (available mode: debug develop test release)")
 	}
@@ -49,25 +49,25 @@ func SetMode(m string) {
 
 // GetMode 获取运行模式
 func GetMode() string {
-	return dueMode
+	return xbaseMode
 }
 
 // IsDebugMode 是否Debug模式
 func IsDebugMode() bool {
-	return dueMode == DebugMode
+	return xbaseMode == DebugMode
 }
 
 // IsDevelopMode 是否Develop模式
 func IsDevelopMode() bool {
-	return dueMode == DevelopMode
+	return xbaseMode == DevelopMode
 }
 
 // IsTestMode 是否Test模式
 func IsTestMode() bool {
-	return dueMode == TestMode
+	return xbaseMode == TestMode
 }
 
 // IsReleaseMode 是否Release模式
 func IsReleaseMode() bool {
-	return dueMode == ReleaseMode
+	return xbaseMode == ReleaseMode
 }
