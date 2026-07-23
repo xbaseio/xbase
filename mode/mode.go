@@ -15,6 +15,8 @@ const (
 const (
 	// DebugMode indicates xbase mode is debug.
 	DebugMode = "debug"
+	// DevelopMode indicates xbase mode is develop.
+	DevelopMode = "develop"
 	// ReleaseMode indicates xbase mode is release.
 	ReleaseMode = "release"
 	// TestMode indicates xbase mode is test.
@@ -38,10 +40,10 @@ func SetMode(m string) {
 	}
 
 	switch m {
-	case DebugMode, TestMode, ReleaseMode:
+	case DebugMode, DevelopMode, TestMode, ReleaseMode:
 		dueMode = m
 	default:
-		panic("xbase mode unknown: " + m + " (available mode: debug test release)")
+		panic("xbase mode unknown: " + m + " (available mode: debug develop test release)")
 	}
 }
 
@@ -53,6 +55,11 @@ func GetMode() string {
 // IsDebugMode 是否Debug模式
 func IsDebugMode() bool {
 	return dueMode == DebugMode
+}
+
+// IsDevelopMode 是否Develop模式
+func IsDevelopMode() bool {
+	return dueMode == DevelopMode
 }
 
 // IsTestMode 是否Test模式
