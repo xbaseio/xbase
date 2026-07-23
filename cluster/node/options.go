@@ -85,7 +85,7 @@ func defaultOptions() *options {
 		metadata:       make(map[string]string),
 		expose:         etc.Get(defaultExposeKey).Bool(),
 		nodeKind:       cluster.Node_Normal,
-		gameID:         0,
+		gameID:         cluster.LobbyGameID,
 		version:        defaultVersion,
 		serviceStatus:  registry.ServiceStatusNormal,
 		retireDelay:    defaultRetireDelay,

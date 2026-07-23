@@ -48,8 +48,8 @@ Gate 是对外入口，主要负责：
 
 Node 是业务执行层，主要负责：
 
-- 按 `MessageID` 分发业务消息
-- 执行业务 handler
+- 把业务消息交给绑定的消息分发函数
+- 提供消息上下文、Actor 和集群调用能力
 - 维护有状态路由
 - 绑定用户和 Node 的关系
 - 可选内置 Actor 调度
@@ -91,12 +91,13 @@ container.Serve()
 
 框架里消息是两级路由：
 
-1. Gate 先按 `GameID` 选 Node 组
-2. Node 再按 `MessageID` 找具体 handler
+1. Gate 按 `GameID` 区分消息归属：`0` 是 Gate 控制消息，`1` 是大厅，`2+` 是对应游戏
+2. Gate 控制消息直接交给 Gate 上层 dispatcher，其余消息按 `GameID` 选择 Node 组
+3. Node 把消息交给业务绑定的 dispatcher
 
 也就是：
 
-`Client -> Gate -> GameID -> Node -> MessageID -> Handler/Actor`
+`Client -> Gate -> GameID -> (GateDispatcher | Node -> MessageDispatcher) -> Handler/Actor`
 
 对应的数据结构是 `cluster.Message` / `packet.Message` 这一套。
 
@@ -105,8 +106,18 @@ container.Serve()
 这样拆以后：
 
 - Gate 不需要理解业务消息，只负责选业务组
-- Node 内部路由保持简单，只关心自己的 `MessageID`
+- Node 不持有业务路由表，业务可自由选择生成代码、模块路由、Actor 或脚本分发
 - 集群扩容时更容易按游戏、房间、业务组拆分
+
+Gate 控制消息可以绑定上层处理函数：
+
+```go
+gate.NewGate(
+	gate.WithMessageDispatcher(func(ctx context.Context, conn network.Conn, msg *packet.Message) {
+		// 处理 GameID=0 的 Gate 消息
+	}),
+)
+```
 
 ---
 
@@ -134,13 +145,41 @@ container.Serve()
 - 战斗服
 - 单用户状态机
 
-### Authorized / Internal / Stateful
+### 绑定消息分发函数
 
-Node 路由还支持附加属性：
+Node 推荐只绑定一个业务消息入口，普通消息不需要逐条向框架注册：
 
-- `Authorized`：要求用户先登录
+```go
+n.Proxy().BindMessageDispatcher(func(ctx node.Context) {
+	switch ctx.MessageID() {
+	case 1001:
+		handlePing(ctx)
+	case 2001:
+		handleEnterRoom(ctx)
+	default:
+		handleUnknown(ctx)
+	}
+})
+```
+
+业务可以在这个入口后接自己的协议生成器、模块路由、Actor 或脚本系统，Node 不限制具体实现。
+
+只有消息需要特殊集群调度策略时才声明策略，例如：
+
+```go
+n.Proxy().SetRoutePolicy(2001, node.StatefulPolicy)
+```
+
+这不是注册业务 handler；没有声明策略的消息同样会进入 dispatcher。
+
+### Internal / Stateful
+
+Node 只关心影响集群投递的策略：
+
 - `Internal`：仅集群内部可达
 - `Stateful`：需要用户定位到固定 Node
+
+登录态和鉴权属于 Gate 边界。Node 接收集群内部流量，不重复做逐消息鉴权。
 
 ---
 

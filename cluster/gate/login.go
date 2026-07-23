@@ -33,12 +33,16 @@ type loginReply struct {
 	Msg  string `json:"msg,omitempty"`
 }
 
+func (p *proxy) requiresLogin() bool {
+	return p.gate.opts.jwt != nil && p.gate.opts.loginMessageID > 0
+}
+
 func (p *proxy) isLoginMessage(message *packet.Message) bool {
-	if p.gate.opts.jwt == nil || p.gate.opts.loginMessageID <= 0 {
+	if !p.requiresLogin() {
 		return false
 	}
 
-	return message.GameID == p.gate.opts.lobbyGameID &&
+	return message.GameID == cluster.GateGameID &&
 		message.MessageID == p.gate.opts.loginMessageID
 }
 
@@ -202,7 +206,7 @@ func (p *proxy) pushLoginReply(conn network.Conn, seq int32, code int, uid int64
 
 	wire, err := packet.PackMessage(&packet.Message{
 		Seq:       seq,
-		GameID:    p.gate.opts.lobbyGameID,
+		GameID:    cluster.GateGameID,
 		MessageID: p.gate.opts.loginMessageID,
 		Buffer:    body,
 	})

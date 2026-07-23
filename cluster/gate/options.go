@@ -15,6 +15,7 @@ import (
 	"github.com/xbaseio/xbase/locate"
 	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
+	"github.com/xbaseio/xbase/packet"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/utils/xjwt"
 	"github.com/xbaseio/xbase/utils/xuuid"
@@ -29,7 +30,7 @@ const (
 	defaultRetireDelay    = 10 * time.Minute
 	defaultReceiveQueue   = 8192
 	defaultLoginMessageID = 1000
-	defaultLobbyGameID    = 0
+	defaultLobbyGameID    = cluster.LobbyGameID
 	defaultJWTIdentityKey = "uid"
 )
 
@@ -58,6 +59,10 @@ const (
 
 type Option func(o *options)
 
+// MessageDispatcher handles Gate control messages (GameID = GateGameID)
+// that are not consumed by a built-in Gate handler.
+type MessageDispatcher func(ctx context.Context, conn network.Conn, message *packet.Message)
+
 type options struct {
 	ctx              context.Context
 	id               string
@@ -75,6 +80,7 @@ type options struct {
 	retireDelay      time.Duration
 	receiveQueue     int
 	deliverWorkers   int
+	messageDispatcher MessageDispatcher
 	loginMessageID   int32
 	lobbyGameID      int32
 	jwt              *xjwt.JWT
@@ -232,6 +238,9 @@ func WithVersion(version string) Option          { return func(o *options) { o.v
 func WithRetireDelay(delay time.Duration) Option { return func(o *options) { o.retireDelay = delay } }
 func WithReceiveQueue(size int) Option           { return func(o *options) { o.receiveQueue = size } }
 func WithDeliverWorkers(n int) Option            { return func(o *options) { o.deliverWorkers = n } }
+func WithMessageDispatcher(dispatcher MessageDispatcher) Option {
+	return func(o *options) { o.messageDispatcher = dispatcher }
+}
 func WithLoginMessageID(messageID int32) Option {
 	return func(o *options) { o.loginMessageID = messageID }
 }

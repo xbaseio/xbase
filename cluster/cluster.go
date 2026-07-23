@@ -5,6 +5,11 @@ import (
 )
 
 const (
+	GateGameID  int32 = 0 // Gate 控制消息
+	LobbyGameID int32 = 1 // 大厅消息
+)
+
+const (
 	Gate   Kind = iota + 1 // 网关服
 	Node                   // 节点服
 	Mesh                   // 微服务

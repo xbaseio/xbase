@@ -52,7 +52,7 @@ type ServiceInstance struct {
 	Endpoint string `json:"endpoint,omitempty"`
 	// 微服务路由加权轮询权重
 	Weight int `json:"weight,omitempty"`
-	// 游戏ID，0表示到大厅
+	// 游戏ID，1表示大厅；0保留给 Gate 控制消息
 	GameID int32 `json:"game_id,omitempty"`
 	// 服务版本号
 	Version string `json:"version,omitempty"`

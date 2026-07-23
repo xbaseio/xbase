@@ -101,6 +101,10 @@ func (n *Node) Init() {
 		log.Fatal("instance name can not be empty")
 	}
 
+	if n.opts.gameID <= cluster.GateGameID {
+		log.Fatal("node game id must be greater than gate game id")
+	}
+
 	if n.opts.codec == nil {
 		log.Fatal("codec component is not injected")
 	}

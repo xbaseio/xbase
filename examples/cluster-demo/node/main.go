@@ -108,7 +108,8 @@ func main() {
 		)
 	})
 
-	n.Proxy().Router().AddRouteHandler(1001, func(ctx node.Context) {
+	handlers := make(map[int32]node.MessageDispatcher)
+	handlers[1001] = func(ctx node.Context) {
 		started := time.Now()
 		var req EchoRequest
 		if err := ctx.Parse(&req); err != nil {
@@ -157,9 +158,9 @@ func main() {
 			"version", version,
 			"serviceStatus", serviceStatus,
 		)
-	})
+	}
 
-	n.Proxy().Router().AddRouteHandler(2001, func(ctx node.Context) {
+	handlers[2001] = func(ctx node.Context) {
 		started := time.Now()
 		var req EchoRequest
 		if err := ctx.Parse(&req); err != nil {
@@ -203,14 +204,14 @@ func main() {
 			"nodeName", name,
 			"gameID", ctx.GameID(),
 			"messageID", ctx.MessageID(),
-			"routeType", "authorized",
+			"routeType", "business",
 			"latencyMs", time.Since(started).Milliseconds(),
 			"version", version,
 			"serviceStatus", serviceStatus,
 		)
-	}, node.AuthorizedRoute)
+	}
 
-	n.Proxy().Router().AddRouteHandler(3001, func(ctx node.Context) {
+	handlers[3001] = func(ctx node.Context) {
 		started := time.Now()
 		var req EchoRequest
 		if err := ctx.Parse(&req); err != nil {
@@ -301,12 +302,25 @@ func main() {
 			"nodeName", name,
 			"gameID", ctx.GameID(),
 			"messageID", ctx.MessageID(),
-			"routeType", "authorized_rpc",
+			"routeType", "rpc",
 			"latencyMs", time.Since(started).Milliseconds(),
 			"version", version,
 			"serviceStatus", serviceStatus,
 		)
-	}, node.AuthorizedRoute)
+	}
+
+	n.Proxy().BindMessageDispatcher(func(ctx node.Context) {
+		handler, ok := handlers[ctx.MessageID()]
+		if !ok {
+			observability.Warn("message_not_supported", nil,
+				"uid", ctx.UID(),
+				"gameID", ctx.GameID(),
+				"messageID", ctx.MessageID(),
+			)
+			return
+		}
+		handler(ctx)
+	})
 
 	n.Proxy().AddHookListener(cluster.Start, func(proxy *node.Proxy) {
 		observability.Info(

@@ -13,6 +13,14 @@ import (
 
 type RouteHandler func(ctx Context)
 
+// MessageDispatcher is the node-level message entry point.
+//
+// A dispatcher receives every request accepted by the node and can implement
+// any application-level dispatch strategy (a switch, generated table,
+// module registry, scripting engine, and so on). RoutePolicy is only needed
+// when a message has special cluster routing requirements.
+type MessageDispatcher = RouteHandler
+
 // RouteOptions 路由选项
 type RouteOptions struct {
 	// 是否内部的路由，默认非内部
@@ -25,7 +33,8 @@ type RouteOptions struct {
 	// 有状态路由消息会在绑定节点服务器后，固定路由到绑定的节点服务器进行处理
 	Stateful bool
 
-	// 是否授权路由，默认非授权
+	// 是否授权路由，默认非授权。Deprecated: 启用 Gate 登录后所有业务消息
+	// 都会统一校验登录态，不再需要逐消息声明。
 	// 授权路由在集群间流转时必需附带UID信息，否则无法进行路由投递
 	// 该参数可在网关层对未授权连接进行提前拦截，降低节点服对于攻击处理的压力
 	Authorized bool
@@ -34,10 +43,21 @@ type RouteOptions struct {
 	Middlewares []MiddlewareHandler
 }
 
+// RoutePolicy describes cluster routing behavior without registering a
+// business message handler. Authentication is intentionally absent because
+// it belongs to the Gate boundary.
+type RoutePolicy struct {
+	Internal    bool
+	Stateful    bool
+	Middlewares []MiddlewareHandler
+}
+
 var (
 	InternalRoute   = RouteOptions{Internal: true}
 	StatefulRoute   = RouteOptions{Stateful: true}
 	AuthorizedRoute = RouteOptions{Authorized: true}
+	InternalPolicy  = RoutePolicy{Internal: true}
+	StatefulPolicy  = RoutePolicy{Stateful: true}
 )
 
 type Router struct {
@@ -47,6 +67,7 @@ type Router struct {
 	preRouteHandler     RouteHandler
 	postRouteHandler    RouteHandler
 	defaultRouteHandler RouteHandler
+	dispatcher          MessageDispatcher
 }
 
 type routeEntity struct {
@@ -63,25 +84,65 @@ func newRouter(node *Node) *Router {
 	}
 }
 
-// AddRouteHandler 添加路由处理器，按 MessageID 注册（GameID 已在网关层完成节点选址）
+// BindMessageDispatcher binds the single application message entry point.
+// It must be called before the node starts. Once bound, the dispatcher is
+// invoked for every request, including requests without a route declaration.
+func (r *Router) BindMessageDispatcher(dispatcher MessageDispatcher) {
+	if r.node.getState() != cluster.Shut {
+		log.Warnf("the node server is working, can't bind message dispatcher")
+		return
+	}
+
+	r.dispatcher = dispatcher
+}
+
+// HasMessageDispatcher reports whether a node-level dispatcher is bound.
+func (r *Router) HasMessageDispatcher() bool {
+	return r.dispatcher != nil
+}
+
+// SetRoutePolicy sets optional cluster routing metadata for a message. It does
+// not register a business handler. Messages without a policy are also
+// delivered to the dispatcher.
+func (r *Router) SetRoutePolicy(messageID int32, policy RoutePolicy) {
+	if r.node.getState() != cluster.Shut {
+		log.Warnf("the node server is working, can't set route policy")
+		return
+	}
+
+	entity, ok := r.routes[messageID]
+	if !ok {
+		entity = &routeEntity{messageID: messageID}
+		r.routes[messageID] = entity
+	}
+	entity.options = RouteOptions{
+		Internal:    policy.Internal,
+		Stateful:    policy.Stateful,
+		Middlewares: policy.Middlewares,
+	}
+}
+
+// AddRouteHandler adds a per-message handler. Deprecated: bind one
+// MessageDispatcher and use SetRoutePolicy for routing metadata instead.
 func (r *Router) AddRouteHandler(messageID int32, handler RouteHandler, opts ...RouteOptions) {
 	if r.node.getState() != cluster.Shut {
 		log.Warnf("the node server is working, can't add route handler")
 		return
 	}
 
-	entity := &routeEntity{
-		messageID: messageID,
-		handler:   handler,
+	entity, ok := r.routes[messageID]
+	if !ok {
+		entity = &routeEntity{messageID: messageID}
+		r.routes[messageID] = entity
 	}
+	entity.handler = handler
 	if len(opts) > 0 {
 		entity.options = opts[0]
 	}
-
-	r.routes[messageID] = entity
 }
 
-// SetDefaultRouteHandler 设置默认路由处理器，所有未注册的路由均走默认路由处理器
+// SetDefaultRouteHandler 设置默认路由处理器，所有未注册的路由均走默认路由处理器。
+// Deprecated: 使用 BindMessageDispatcher。
 func (r *Router) SetDefaultRouteHandler(handler RouteHandler) {
 	if r.node.getState() != cluster.Shut {
 		log.Warnf("the node server is working, can't set default route handler")
@@ -216,9 +277,16 @@ func (r *Router) handle(req *request) {
 	version := req.incrVersion()
 
 	route, ok := r.routes[req.message.MessageID]
-	if !ok && r.defaultRouteHandler == nil {
+	handler := r.dispatcher
+	if handler == nil && ok {
+		handler = route.handler
+	}
+	if handler == nil {
+		handler = r.defaultRouteHandler
+	}
+	if handler == nil {
 		req.compareVersionRecycle(version)
-		log.Warnf("message routing does not register handler function, message: %v", req.message.MessageID)
+		log.Warnf("message dispatcher is not bound, message: %v", req.message.MessageID)
 		return
 	}
 
@@ -226,16 +294,12 @@ func (r *Router) handle(req *request) {
 		xcall.Call(func() { r.preRouteHandler(req) })
 	}
 
-	if ok {
-		if len(route.options.Middlewares) > 0 {
-			middleware := &Middleware{index: -1, middlewares: route.options.Middlewares, routeHandler: route.handler}
-			middleware.Next(req)
-			return
-		} else {
-			xcall.Call(func() { route.handler(req) })
-		}
+	if ok && len(route.options.Middlewares) > 0 {
+		middleware := &Middleware{index: -1, middlewares: route.options.Middlewares, routeHandler: handler}
+		middleware.Next(req)
+		return
 	} else {
-		xcall.Call(func() { r.defaultRouteHandler(req) })
+		xcall.Call(func() { handler(req) })
 	}
 
 	req.compareVersionExecDefer(version)
@@ -255,7 +319,7 @@ func (g *RouterGroup) Middleware(middlewares ...MiddlewareHandler) *RouterGroup 
 	return g
 }
 
-// AddRouteHandler 添加路由处理器
+// AddRouteHandler 添加路由处理器。Deprecated: 使用 BindMessageDispatcher。
 func (g *RouterGroup) AddRouteHandler(messageID int32, handler RouteHandler, opts ...RouteOptions) *RouterGroup {
 	var options RouteOptions
 
@@ -272,5 +336,15 @@ func (g *RouterGroup) AddRouteHandler(messageID int32, handler RouteHandler, opt
 
 	g.router.AddRouteHandler(messageID, handler, options)
 
+	return g
+}
+
+// SetRoutePolicy sets routing metadata for a grouped route.
+func (g *RouterGroup) SetRoutePolicy(messageID int32, policy RoutePolicy) *RouterGroup {
+	options := policy
+	options.Middlewares = make([]MiddlewareHandler, len(g.middlewares)+len(policy.Middlewares))
+	copy(options.Middlewares, g.middlewares)
+	copy(options.Middlewares[len(g.middlewares):], policy.Middlewares)
+	g.router.SetRoutePolicy(messageID, options)
 	return g
 }

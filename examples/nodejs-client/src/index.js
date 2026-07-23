@@ -16,7 +16,9 @@ xbase Node.js 测试客户端 — 连接 Gate 并发送/接收 packet 消息
   --endian <BE|LE>    字节序 (默认 BE，与 etc.packet.byteOrder=big 一致)
 
 消息:
-  --game <id>         GameID，Gate 选 Node 用 (默认 0)
+  --token <jwt>       连接后先向 Gate 发送登录 token
+  --login-message <id> 登录 MessageID (默认 1000)
+  --game <id>         GameID，Gate 选 Node 用 (默认 1，大厅)
   --message <id>      MessageID，Node 内路由 (必填，除非 --interactive)
   --body <text>       消息 body，UTF-8 字符串
   --json <text>       以 JSON 字符串作为 body（与 --body 二选一）
@@ -29,9 +31,9 @@ xbase Node.js 测试客户端 — 连接 Gate 并发送/接收 packet 消息
   --listen <sec>      发送后继续监听下行 sec 秒 (默认 5，0=立即退出)
 
 示例:
-  node src/index.js --host 127.0.0.1 --port 3553 --game 1 --message 1001 --body hello
-  node src/index.js --ws --port 3653 --game 1 --message 1001 --json '{"action":"ping"}'
-  node src/index.js --interactive --game 1 --listen 0
+  node src/index.js --token "$TOKEN" --host 127.0.0.1 --port 3553 --game 1 --message 1001 --body hello
+  node src/index.js --token "$TOKEN" --ws --port 3653 --game 1 --message 1001 --json '{"action":"ping"}'
+  node src/index.js --token "$TOKEN" --interactive --game 1 --listen 0
 `);
 }
 
@@ -41,7 +43,9 @@ function parseArgs(argv) {
     port: 3553,
     ws: false,
     endian: 'BE',
-    gameID: 0,
+    token: null,
+    loginMessageID: 1000,
+    gameID: 1,
     messageID: null,
     body: '',
     json: null,
@@ -74,6 +78,14 @@ function parseArgs(argv) {
         break;
       case '--endian':
         opts.endian = next === 'LE' ? 'LE' : 'BE';
+        i++;
+        break;
+      case '--token':
+        opts.token = next;
+        i++;
+        break;
+      case '--login-message':
+        opts.loginMessageID = Number(next);
         i++;
         break;
       case '--game':
@@ -128,6 +140,41 @@ function formatMessage(msg) {
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function login(client, opts) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      client.off('message', onMessage);
+      reject(new Error('login timeout'));
+    }, 5000);
+
+    const onMessage = (msg) => {
+      if (msg.gameID !== 0 || msg.messageID !== opts.loginMessageID) {
+        return;
+      }
+
+      clearTimeout(timeout);
+      client.off('message', onMessage);
+      try {
+        const reply = JSON.parse(msg.buffer.toString('utf8'));
+        if (reply.code !== 0) {
+          reject(new Error(reply.msg || `login failed with code ${reply.code}`));
+          return;
+        }
+        resolve(reply);
+      } catch (err) {
+        reject(new Error(`invalid login reply: ${err.message}`));
+      }
+    };
+
+    client.on('message', onMessage);
+    client.send({
+      gameID: 0,
+      messageID: opts.loginMessageID,
+      buffer: JSON.stringify({ token: opts.token }),
+    });
+  });
 }
 
 async function runInteractive(client, opts) {
@@ -200,8 +247,12 @@ async function main() {
   try {
     await client.connect();
     console.log(`[connect] ${opts.ws ? 'ws' : 'tcp'}://${opts.host}:${opts.port}`);
+    if (opts.token) {
+      const reply = await login(client, opts);
+      console.log(`[login] uid=${reply.uid}`);
+    }
   } catch (err) {
-    console.error('[connect failed]', err.message);
+    console.error('[startup failed]', err.message);
     process.exit(1);
   }
 

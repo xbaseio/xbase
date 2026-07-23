@@ -9,6 +9,7 @@ import (
 	"github.com/xbaseio/xbase/mode"
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/packet"
+	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xerrors"
 )
 
@@ -90,13 +91,13 @@ func (p *proxy) deliver(ctx context.Context, conn network.Conn, cid, uid int64, 
 		return
 	}
 
-	if p.isLoginMessage(message) {
-		p.handleLogin(ctx, conn, message)
+	if message.GameID == cluster.GateGameID {
+		p.dispatchGateMessage(ctx, conn, message)
 		return
 	}
 
-	if uid == 0 && p.routeWatcher.requiresAuth(message.GameID, message.MessageID) {
-		log.Warnf("unauthorized route rejected, cid: %d message: %d game: %d", cid, message.MessageID, message.GameID)
+	if uid == 0 && (p.requiresLogin() || p.routeWatcher.requiresAuth(message.GameID, message.MessageID)) {
+		log.Warnf("unauthenticated message rejected, cid: %d message: %d game: %d", cid, message.MessageID, message.GameID)
 		return
 	}
 
@@ -118,6 +119,23 @@ func (p *proxy) deliver(ctx context.Context, conn network.Conn, cid, uid int64, 
 			log.Debugf("deliver message success, cid: %d uid: %d seq: %d game: %d message: %d", cid, uid, message.Seq, message.GameID, message.MessageID)
 		}
 	}
+}
+
+// dispatchGateMessage sends Gate control messages directly to the upper
+// layer. Built-in Gate messages such as login take precedence.
+func (p *proxy) dispatchGateMessage(ctx context.Context, conn network.Conn, message *packet.Message) {
+	if p.isLoginMessage(message) {
+		p.handleLogin(ctx, conn, message)
+		return
+	}
+
+	dispatcher := p.gate.opts.messageDispatcher
+	if dispatcher == nil {
+		log.Warnf("gate message dispatcher is not bound, message: %d", message.MessageID)
+		return
+	}
+
+	xcall.Call(func() { dispatcher(ctx, conn, message) })
 }
 
 // 开始监听

@@ -77,12 +77,24 @@ func (p *Proxy) RouteGroup(groups ...func(group *RouterGroup)) *RouterGroup {
 	return p.node.router.Group(groups...)
 }
 
+// BindMessageDispatcher binds the node-level message dispatch function.
+func (p *Proxy) BindMessageDispatcher(dispatcher MessageDispatcher) {
+	p.node.router.BindMessageDispatcher(dispatcher)
+}
+
+// SetRoutePolicy sets optional cluster routing metadata without registering a
+// business handler. Messages are delivered to the bound MessageDispatcher.
+func (p *Proxy) SetRoutePolicy(messageID int32, policy RoutePolicy) {
+	p.node.router.SetRoutePolicy(messageID, policy)
+}
+
 // Trigger 事件触发器
 func (p *Proxy) Trigger() *Trigger {
 	return p.node.trigger
 }
 
-// AddRouteHandler 添加路由处理器，按 MessageID 注册
+// AddRouteHandler 添加路由处理器，按 MessageID 注册。Deprecated: 使用
+// BindMessageDispatcher 和 SetRoutePolicy。
 func (p *Proxy) AddRouteHandler(messageID int32, handler RouteHandler, opts ...RouteOptions) {
 	p.node.router.AddRouteHandler(messageID, handler, opts...)
 }

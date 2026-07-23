@@ -30,7 +30,7 @@ func (p *provider) Deliver(ctx context.Context, gid, nid string, cid, uid int64,
 
 	stateful, ok := p.node.router.CheckRouteStateful(msg.MessageID)
 	if !ok {
-		if ok = p.node.router.HasDefaultRouteHandler(); !ok {
+		if ok = p.node.router.HasMessageDispatcher() || p.node.router.HasDefaultRouteHandler(); !ok {
 			return nil
 		}
 	}
