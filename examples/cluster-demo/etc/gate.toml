@@ -19,15 +19,6 @@ grayTrafficPercent = 20
 grayTrafficSalt = "cluster-demo-lobby"
 testWhitelist = [10001, 10002]
 
-    [cluster.gate.login]
-    messageID = 1000
-    lobbyGameID = 1
-
-    [cluster.gate.jwt]
-    secretKey = "cluster-demo-secret"
-    identityKey = "uid"
-    signAlgorithm = "HS256"
-
 [network.tcp.server]
 addr = ":3553"
 maxConnNum = 2048

@@ -30,7 +30,6 @@ npm install
 node src/index.js \
   --host 127.0.0.1 \
   --port 3553 \
-  --token "$TOKEN" \
   --game 1 \
   --message 1001 \
   --body hello
@@ -45,7 +44,6 @@ node src/index.js \
   --ws \
   --host 127.0.0.1 \
   --port 3653 \
-  --token "$TOKEN" \
   --game 1 \
   --message 1001 \
   --json '{"action":"ping"}'
@@ -54,13 +52,13 @@ node src/index.js \
 ### 压测 / 连发
 
 ```bash
-node src/index.js --token "$TOKEN" --game 1 --message 1001 --body ping --count 100 --interval 10
+node src/index.js --game 1 --message 1001 --body ping --count 100 --interval 10
 ```
 
 ### 交互模式
 
 ```bash
-node src/index.js --token "$TOKEN" --interactive --game 1 --listen 0
+node src/index.js --interactive --game 1 --listen 0
 ```
 
 输入格式：`<messageID> [body]`，空行退出。
@@ -73,8 +71,6 @@ node src/index.js --token "$TOKEN" --interactive --game 1 --listen 0
 | `--port` | `3553` | Gate 监听端口 |
 | `--ws` | - | 使用 WebSocket |
 | `--endian` | `BE` | `BE` / `LE` |
-| `--token` | - | Gate 登录 JWT；设置后会先完成登录 |
-| `--login-message` | `1000` | Gate 登录 MessageID |
 | `--game` | `1` | 业务 GameID，默认为大厅 |
 | `--message` | - | MessageID |
 | `--body` | `''` | UTF-8 body |
@@ -89,7 +85,7 @@ node src/index.js --token "$TOKEN" --interactive --game 1 --listen 0
 1. 启动 Gate（TCP 或 WS），确认 **对外 network 端口**（不是 cluster link 端口）
 2. Node 绑定统一的 `MessageDispatcher`，由业务代码分发 `MessageID`
 3. 客户端 `--game` 与 Node 的 `WithGameID` 一致
-4. 业务消息需先在 Gate 完成登录；Node 只处理 Gate 转发的内部消息
+4. `GameID=0` 的登录和认证由 Gate 上层 dispatcher 处理；完成校验后调用 `ctx.Bind(uid)`
 
 ## 目录
 

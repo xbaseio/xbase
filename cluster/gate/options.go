@@ -15,9 +15,7 @@ import (
 	"github.com/xbaseio/xbase/locate"
 	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
-	"github.com/xbaseio/xbase/packet"
 	"github.com/xbaseio/xbase/registry"
-	"github.com/xbaseio/xbase/utils/xjwt"
 	"github.com/xbaseio/xbase/utils/xuuid"
 )
 
@@ -29,9 +27,6 @@ const (
 	defaultVersion        = "1"
 	defaultRetireDelay    = 10 * time.Minute
 	defaultReceiveQueue   = 8192
-	defaultLoginMessageID = 1000
-	defaultLobbyGameID    = cluster.LobbyGameID
-	defaultJWTIdentityKey = "uid"
 )
 
 const (
@@ -46,11 +41,6 @@ const (
 	defaultRetireDelayKey      = "etc.cluster.gate.retireDelay"
 	defaultReceiveQueueKey     = "etc.cluster.gate.receiveQueue"
 	defaultDeliverWorkersKey   = "etc.cluster.gate.deliverWorkers"
-	defaultLoginMessageIDKey   = "etc.cluster.gate.login.messageID"
-	defaultLobbyGameIDKey      = "etc.cluster.gate.login.lobbyGameID"
-	defaultJWTSecretKey        = "etc.cluster.gate.jwt.secretKey"
-	defaultJWTIdentityKeyKey   = "etc.cluster.gate.jwt.identityKey"
-	defaultJWTSignAlgorithmKey = "etc.cluster.gate.jwt.signAlgorithm"
 	defaultGrayWhitelistKey    = "etc.cluster.gate.grayWhitelist"
 	defaultGrayTrafficPctKey   = "etc.cluster.gate.grayTrafficPercent"
 	defaultGrayTrafficSaltKey  = "etc.cluster.gate.grayTrafficSalt"
@@ -59,9 +49,8 @@ const (
 
 type Option func(o *options)
 
-// MessageDispatcher handles Gate control messages (GameID = GateGameID)
-// that are not consumed by a built-in Gate handler.
-type MessageDispatcher func(ctx context.Context, conn network.Conn, message *packet.Message)
+// MessageDispatcher handles every Gate control message (GameID = GateGameID).
+type MessageDispatcher func(ctx Context)
 
 type options struct {
 	ctx              context.Context
@@ -81,12 +70,6 @@ type options struct {
 	receiveQueue     int
 	deliverWorkers   int
 	messageDispatcher MessageDispatcher
-	loginMessageID   int32
-	lobbyGameID      int32
-	jwt              *xjwt.JWT
-	jwtSecretKey     string
-	jwtIdentityKey   string
-	jwtSignAlgorithm xjwt.SignAlgorithm
 	metadata         map[string]string
 	policyMu         sync.RWMutex
 	grayWhitelist    map[int64]struct{}
@@ -121,10 +104,6 @@ func defaultOptions() *options {
 		retireDelay:      defaultRetireDelay,
 		receiveQueue:     defaultReceiveQueue,
 		deliverWorkers:   max(runtime.NumCPU(), 1),
-		loginMessageID:   defaultLoginMessageID,
-		lobbyGameID:      defaultLobbyGameID,
-		jwtIdentityKey:   defaultJWTIdentityKey,
-		jwtSignAlgorithm: xjwt.HS256,
 		grayWhitelist:    make(map[int64]struct{}),
 		testWhitelist:    make(map[int64]struct{}),
 	}
@@ -169,24 +148,6 @@ func defaultOptions() *options {
 
 	if n := etc.Get(defaultDeliverWorkersKey).Int(); n > 0 {
 		opts.deliverWorkers = n
-	}
-
-	if etc.Has(defaultLoginMessageIDKey) {
-		opts.loginMessageID = int32(etc.Get(defaultLoginMessageIDKey).Int())
-	}
-
-	if etc.Has(defaultLobbyGameIDKey) {
-		opts.lobbyGameID = int32(etc.Get(defaultLobbyGameIDKey).Int())
-	}
-
-	opts.jwtSecretKey = etc.Get(defaultJWTSecretKey).String()
-
-	if identityKey := etc.Get(defaultJWTIdentityKeyKey).String(); identityKey != "" {
-		opts.jwtIdentityKey = identityKey
-	}
-
-	if signAlgorithm := etc.Get(defaultJWTSignAlgorithmKey).String(); signAlgorithm != "" {
-		opts.jwtSignAlgorithm = xjwt.SignAlgorithm(signAlgorithm)
 	}
 
 	for _, uid := range etc.Get(defaultGrayWhitelistKey).Int64s() {
@@ -240,20 +201,6 @@ func WithReceiveQueue(size int) Option           { return func(o *options) { o.r
 func WithDeliverWorkers(n int) Option            { return func(o *options) { o.deliverWorkers = n } }
 func WithMessageDispatcher(dispatcher MessageDispatcher) Option {
 	return func(o *options) { o.messageDispatcher = dispatcher }
-}
-func WithLoginMessageID(messageID int32) Option {
-	return func(o *options) { o.loginMessageID = messageID }
-}
-func WithLobbyGameID(gameID int32) Option { return func(o *options) { o.lobbyGameID = gameID } }
-func WithJWT(jwt *xjwt.JWT) Option        { return func(o *options) { o.jwt = jwt } }
-func WithJWTSecretKey(secretKey string) Option {
-	return func(o *options) { o.jwtSecretKey = secretKey }
-}
-func WithJWTIdentityKey(identityKey string) Option {
-	return func(o *options) { o.jwtIdentityKey = identityKey }
-}
-func WithJWTSignAlgorithm(signAlgorithm xjwt.SignAlgorithm) Option {
-	return func(o *options) { o.jwtSignAlgorithm = signAlgorithm }
 }
 
 func WithGrayWhitelist(uids ...int64) Option {

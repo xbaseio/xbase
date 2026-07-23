@@ -16,7 +16,6 @@ import (
 type proxy struct {
 	gate         *Gate            // 网关服
 	nodeLinker   *link.NodeLinker // 节点链接器
-	routeWatcher *routeWatcher    // 路由策略
 }
 
 func newProxy(gate *Gate) *proxy {
@@ -32,7 +31,6 @@ func newProxy(gate *Gate) *proxy {
 			GameID:               gate.opts.gameID,
 			ResolveServiceStatus: gate.resolveServiceStatus,
 		}),
-		routeWatcher: newRouteWatcher(gate.ctx, gate.opts.registry),
 	}
 }
 
@@ -96,8 +94,8 @@ func (p *proxy) deliver(ctx context.Context, conn network.Conn, cid, uid int64, 
 		return
 	}
 
-	if uid == 0 && (p.requiresLogin() || p.routeWatcher.requiresAuth(message.GameID, message.MessageID)) {
-		log.Warnf("unauthenticated message rejected, cid: %d message: %d game: %d", cid, message.MessageID, message.GameID)
+	if uid == 0 {
+		log.Warnf("unbound connection message rejected, cid: %d message: %d game: %d", cid, message.MessageID, message.GameID)
 		return
 	}
 
@@ -121,27 +119,21 @@ func (p *proxy) deliver(ctx context.Context, conn network.Conn, cid, uid int64, 
 	}
 }
 
-// dispatchGateMessage sends Gate control messages directly to the upper
-// layer. Built-in Gate messages such as login take precedence.
+// dispatchGateMessage sends Gate control messages directly to the upper layer.
 func (p *proxy) dispatchGateMessage(ctx context.Context, conn network.Conn, message *packet.Message) {
-	if p.isLoginMessage(message) {
-		p.handleLogin(ctx, conn, message)
-		return
-	}
-
 	dispatcher := p.gate.opts.messageDispatcher
 	if dispatcher == nil {
 		log.Warnf("gate message dispatcher is not bound, message: %d", message.MessageID)
 		return
 	}
 
-	xcall.Call(func() { dispatcher(ctx, conn, message) })
+	xcall.Call(func() {
+		dispatcher(&messageContext{ctx: ctx, gate: p.gate, conn: conn, message: message})
+	})
 }
 
 // 开始监听
 func (p *proxy) watch() {
-	p.routeWatcher.start()
-
 	p.nodeLinker.WatchUserLocate()
 
 	p.nodeLinker.WatchClusterInstance()

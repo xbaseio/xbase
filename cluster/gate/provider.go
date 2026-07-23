@@ -16,16 +16,20 @@ type provider struct {
 
 // Bind 绑定用户与网关间的关系
 func (p *provider) Bind(ctx context.Context, cid, uid int64) error {
+	return p.gate.bind(ctx, cid, uid)
+}
+
+func (g *Gate) bind(ctx context.Context, cid, uid int64) error {
 	if cid <= 0 || uid <= 0 {
 		return xerrors.ErrInvalidArgument
 	}
 
-	if err := p.gate.session.Bind(cid, uid); err != nil {
+	if err := g.session.Bind(cid, uid); err != nil {
 		return err
 	}
 
-	if err := p.gate.proxy.bindGate(ctx, cid, uid); err != nil {
-		_, _ = p.gate.session.Unbind(cid, uid)
+	if err := g.proxy.bindGate(ctx, cid, uid); err != nil {
+		_, _ = g.session.Unbind(cid, uid)
 		return err
 	}
 

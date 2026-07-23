@@ -113,8 +113,9 @@ Gate 控制消息可以绑定上层处理函数：
 
 ```go
 gate.NewGate(
-	gate.WithMessageDispatcher(func(ctx context.Context, conn network.Conn, msg *packet.Message) {
+	gate.WithMessageDispatcher(func(ctx gate.Context) {
 		// 处理 GameID=0 的 Gate 消息
+		// 完成登录校验后调用 ctx.Bind(uid)
 	}),
 )
 ```

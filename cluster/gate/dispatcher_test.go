@@ -5,15 +5,14 @@ import (
 	"testing"
 
 	"github.com/xbaseio/xbase/cluster"
-	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/packet"
 )
 
 func TestDispatchGateMessageCallsUpperDispatcher(t *testing.T) {
 	var got *packet.Message
 	p := &proxy{gate: &Gate{opts: &options{
-		messageDispatcher: func(_ context.Context, _ network.Conn, message *packet.Message) {
-			got = message
+		messageDispatcher: func(ctx Context) {
+			got = ctx.Message()
 		},
 	}}}
 	want := &packet.Message{GameID: cluster.GateGameID, MessageID: 2000}

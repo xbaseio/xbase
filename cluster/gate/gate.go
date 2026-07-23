@@ -74,17 +74,6 @@ func (g *Gate) Init() {
 		log.Fatal("registry component is not injected")
 	}
 
-	if g.opts.lobbyGameID != cluster.LobbyGameID {
-		log.Fatal("lobby game id must be 1")
-	}
-
-	if err := initGateJWT(g.opts); err != nil {
-		log.Fatalf("init gate jwt failed: %v", err)
-	}
-
-	if g.opts.loginMessageID > 0 && g.opts.jwt == nil {
-		log.Warn("gate login is enabled but jwt is not configured")
-	}
 }
 
 // Start 启动组件
