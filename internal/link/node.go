@@ -118,6 +118,29 @@ func (l *NodeLinker) BindNode(ctx context.Context, uid int64, name, nid string) 
 	return nil
 }
 
+// BindGameNode binds a user to the selected node for a game route. Existing
+// bindings are preserved while their target remains available.
+func (l *NodeLinker) BindGameNode(ctx context.Context, uid int64, gameID int32) error {
+	route, err := l.dispatcher.FindGameRoute(gameID)
+	if err != nil {
+		return err
+	}
+
+	name := route.Group()
+	if nid, err := l.LocateNode(ctx, uid, name); err == nil && l.HasNode(nid) {
+		return nil
+	} else if err != nil && !xerrors.Is(err, xerrors.ErrNotFoundUserLocation) {
+		return err
+	}
+
+	_, nid, err := l.dispatcher.SelectGameNode(gameID, l.resolveServiceStatus(uid))
+	if err != nil {
+		return err
+	}
+
+	return l.BindNode(ctx, uid, name, nid)
+}
+
 // UnbindNode 解绑节点
 // 解绑时会对对应名称的节点服务器进行解绑，解绑时会对解绑节点ID进行校验，不匹配则解绑失败。
 // 解绑操作会通过发布订阅方式同步到网关服务器和其他相关节点服务器上。

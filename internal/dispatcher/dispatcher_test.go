@@ -55,6 +55,27 @@ func TestDispatcher_ReplaceServices(t *testing.T) {
 	}
 }
 
+func TestDispatcher_SelectGameNode(t *testing.T) {
+	d := dispatcher.NewDispatcher(cluster.Random)
+	d.ReplaceServices(&registry.ServiceInstance{
+		ID:       "lobby-1",
+		Name:     cluster.Node.String(),
+		Kind:     cluster.Node.String(),
+		Alias:    "lobby",
+		State:    cluster.Work.String(),
+		Endpoint: endpoint.NewEndpoint("grpc", "127.0.0.1:8001", false).String(),
+		GameID:   cluster.LobbyGameID,
+	})
+
+	group, nid, err := d.SelectGameNode(cluster.LobbyGameID, registry.ServiceStatusNormal)
+	if err != nil {
+		t.Fatalf("select lobby node failed: %v", err)
+	}
+	if group != "lobby" || nid != "lobby-1" {
+		t.Fatalf("selected lobby = (%q, %q), want (%q, %q)", group, nid, "lobby", "lobby-1")
+	}
+}
+
 func TestDispatcher_WeightRoundRobin(t *testing.T) {
 	var (
 		instance1 = &registry.ServiceInstance{

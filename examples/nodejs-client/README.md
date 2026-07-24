@@ -85,7 +85,7 @@ node src/index.js --interactive --game 1 --listen 0
 1. 启动 Gate（TCP 或 WS），确认 **对外 network 端口**（不是 cluster link 端口）
 2. Node 绑定统一的 `MessageDispatcher`，由业务代码分发 `MessageID`
 3. 客户端 `--game` 与 Node 的 `WithGameID` 一致
-4. `GameID=0` 的登录和认证由 Gate 上层 dispatcher 处理；完成校验后调用 `ctx.Bind(uid)`
+4. `GameID=0` 的登录和认证由 Gate 上层 dispatcher 处理；完成校验后调用 `ctx.Bind(uid)`，存在 `GameID=1` 大厅时会自动绑定大厅
 
 ## 目录
 

@@ -80,6 +80,22 @@ func (d *Dispatcher) FindRoute(gameID int32) (*GameRoute, error) {
 	return d.FindGameRoute(gameID)
 }
 
+// SelectGameNode chooses a node for a game route using the configured
+// dispatch policy and returns its locator group and instance ID.
+func (d *Dispatcher) SelectGameNode(gameID int32, status registry.ServiceStatus) (string, string, error) {
+	route, err := d.FindGameRoute(gameID)
+	if err != nil {
+		return "", "", err
+	}
+
+	service, err := route.findServiceEndpointForServiceStatus(status)
+	if err != nil {
+		return "", "", err
+	}
+
+	return route.Group(), service.insID, nil
+}
+
 // FindEvent 查找节点事件
 func (d *Dispatcher) FindEvent(event int) (*Event, error) {
 	d.rw.RLock()

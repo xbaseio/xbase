@@ -36,14 +36,12 @@ func newProxy(gate *Gate) *proxy {
 
 // 绑定用户与网关间的关系
 func (p *proxy) bindGate(ctx context.Context, cid, uid int64) error {
-	err := p.gate.opts.locator.BindGate(ctx, uid, p.gate.opts.id)
-	if err != nil {
-		return err
-	}
+	return p.gate.opts.locator.BindGate(ctx, uid, p.gate.opts.id)
+}
 
-	p.trigger(ctx, cluster.Reconnect, cid, uid)
-
-	return nil
+// bindLobby binds the user to the lobby route when the cluster has one.
+func (p *proxy) bindLobby(ctx context.Context, uid int64) error {
+	return p.nodeLinker.BindGameNode(ctx, uid, cluster.LobbyGameID)
 }
 
 // 解绑用户与网关间的关系

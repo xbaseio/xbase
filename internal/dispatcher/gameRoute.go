@@ -43,6 +43,15 @@ func (r *GameRoute) FindEndpointForUser(allowTest bool, insID ...string) (*endpo
 }
 
 func (r *GameRoute) FindEndpointForServiceStatus(status registry.ServiceStatus, insID ...string) (*endpoint.Endpoint, error) {
+	se, err := r.findServiceEndpointForServiceStatus(status, insID...)
+	if err != nil {
+		return nil, err
+	}
+
+	return se.endpoint, nil
+}
+
+func (r *GameRoute) findServiceEndpointForServiceStatus(status registry.ServiceStatus, insID ...string) (*serviceEndpoint, error) {
 	if len(insID) == 0 || insID[0] == "" {
 		switch r.dispatcher.dispatch {
 		case cluster.RoundRobin:
@@ -57,30 +66,30 @@ func (r *GameRoute) FindEndpointForServiceStatus(status registry.ServiceStatus, 
 	return r.directDispatch(insID[0])
 }
 
-func (r *GameRoute) directDispatch(insID string) (*endpoint.Endpoint, error) {
+func (r *GameRoute) directDispatch(insID string) (*serviceEndpoint, error) {
 	sep, ok := r.endpoints5[insID]
 	if !ok {
 		return nil, xerrors.ErrNotFoundEndpoint
 	}
-	return sep.endpoint, nil
+	return sep, nil
 }
 
-func (r *GameRoute) randomDispatch(status registry.ServiceStatus) (*endpoint.Endpoint, error) {
+func (r *GameRoute) randomDispatch(status registry.ServiceStatus) (*serviceEndpoint, error) {
 	if endpoints := r.balanceEndpoints(status); len(endpoints) > 0 {
-		return endpoints[rand.IntN(len(endpoints))].endpoint, nil
+		return endpoints[rand.IntN(len(endpoints))], nil
 	}
 	return nil, xerrors.ErrNotFoundEndpoint
 }
 
-func (r *GameRoute) roundRobinDispatch(status registry.ServiceStatus) (*endpoint.Endpoint, error) {
+func (r *GameRoute) roundRobinDispatch(status registry.ServiceStatus) (*serviceEndpoint, error) {
 	if endpoints := r.balanceEndpoints(status); len(endpoints) > 0 {
 		index := int(r.counter.Add(1) % uint64(len(endpoints)))
-		return endpoints[index].endpoint, nil
+		return endpoints[index], nil
 	}
 	return nil, xerrors.ErrNotFoundEndpoint
 }
 
-func (r *GameRoute) weightRoundRobinDispatch(status registry.ServiceStatus) (*endpoint.Endpoint, error) {
+func (r *GameRoute) weightRoundRobinDispatch(status registry.ServiceStatus) (*serviceEndpoint, error) {
 	var (
 		selected    *serviceEndpoint
 		totalWeight int
@@ -98,7 +107,7 @@ func (r *GameRoute) weightRoundRobinDispatch(status registry.ServiceStatus) (*en
 
 		if selected != nil {
 			selected.currWeight -= totalWeight
-			return selected.endpoint, nil
+			return selected, nil
 		}
 	}
 

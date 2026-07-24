@@ -115,7 +115,7 @@ Gate 控制消息可以绑定上层处理函数：
 gate.NewGate(
 	gate.WithMessageDispatcher(func(ctx gate.Context) {
 		// 处理 GameID=0 的 Gate 消息
-		// 完成登录校验后调用 ctx.Bind(uid)
+		// 完成登录校验后调用 ctx.Bind(uid)；存在 GameID=1 大厅时会自动绑定大厅
 	}),
 )
 ```

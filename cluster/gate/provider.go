@@ -16,10 +16,10 @@ type provider struct {
 
 // Bind 绑定用户与网关间的关系
 func (p *provider) Bind(ctx context.Context, cid, uid int64) error {
-	return p.gate.bind(ctx, cid, uid)
+	return p.gate.bind(ctx, cid, uid, false)
 }
 
-func (g *Gate) bind(ctx context.Context, cid, uid int64) error {
+func (g *Gate) bind(ctx context.Context, cid, uid int64, bindLobby bool) error {
 	if cid <= 0 || uid <= 0 {
 		return xerrors.ErrInvalidArgument
 	}
@@ -32,6 +32,16 @@ func (g *Gate) bind(ctx context.Context, cid, uid int64) error {
 		_, _ = g.session.Unbind(cid, uid)
 		return err
 	}
+
+	if bindLobby {
+		if err := g.proxy.bindLobby(ctx, uid); err != nil && !xerrors.Is(err, xerrors.ErrNotFoundRoute) {
+			_ = g.proxy.unbindGate(ctx, cid, uid)
+			_, _ = g.session.Unbind(cid, uid)
+			return err
+		}
+	}
+
+	g.proxy.trigger(ctx, cluster.Reconnect, cid, uid)
 
 	return nil
 }
