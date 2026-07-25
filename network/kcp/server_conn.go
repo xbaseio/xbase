@@ -12,7 +12,6 @@ import (
 	"github.com/xbaseio/xbase/packet"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/utils/xnet"
-	"github.com/xbaseio/xbase/utils/xtime"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xtaci/kcp-go/v5"
 )
@@ -36,8 +35,7 @@ type serverConn struct {
 	// generation 用来防止 serverConn 复用后，旧 read/write/timer 误关新连接
 	generation atomic.Int64
 
-	lastHeartbeatTime atomic.Int64 // 上次心跳时间
-	authorizeTimer    atomic.Value // 授权定时器
+	authorizeTimer atomic.Value // 授权定时器
 }
 
 var _ network.Conn = &serverConn{}
@@ -214,7 +212,6 @@ func (c *serverConn) init(cm *serverConnMgr, id int64, conn *kcp.UDPSession) {
 	c.chWrite = make(chan chWrite, network.DefaultWriteQueueSize)
 	c.done = make(chan struct{})
 	c.close = make(chan struct{})
-	c.lastHeartbeatTime.Store(xtime.Now().UnixNano())
 	c.authorizeTimer.Store((*time.Timer)(nil))
 
 	c.applyKCPOptions(conn)

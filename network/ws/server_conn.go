@@ -11,7 +11,6 @@ import (
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/utils/xnet"
-	"github.com/xbaseio/xbase/utils/xtime"
 	"github.com/xbaseio/xbase/xerrors"
 )
 
@@ -35,8 +34,7 @@ type serverConn struct {
 	doneOnce  sync.Once
 	closeOnce sync.Once
 
-	lastHeartbeatTime atomic.Int64 // 上次心跳时间
-	authorizeTimer    atomic.Value // 授权定时器
+	authorizeTimer atomic.Value // 授权定时器
 }
 
 var _ network.Conn = &serverConn{}
@@ -227,7 +225,6 @@ func (c *serverConn) init(cm *serverConnMgr, id int64, conn *websocket.Conn) {
 	c.chHighWrite = make(chan chWrite, network.DefaultWriteQueueSize/4)
 	c.done = make(chan struct{})
 	c.close = make(chan struct{})
-	c.lastHeartbeatTime.Store(xtime.Now().UnixNano())
 	c.authorizeTimer.Store((*time.Timer)(nil))
 
 	xcall.Go(func() { c.receiveLoop(c.ID(), c.recvQ) })

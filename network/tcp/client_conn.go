@@ -11,7 +11,6 @@ import (
 	"github.com/xbaseio/xbase/packet"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/utils/xnet"
-	"github.com/xbaseio/xbase/utils/xtime"
 	"github.com/xbaseio/xbase/xerrors"
 )
 
@@ -33,8 +32,6 @@ type clientConn struct {
 
 	doneOnce  sync.Once
 	closeOnce sync.Once
-
-	lastHeartbeatTime atomic.Int64 // 上次心跳时间
 }
 
 var _ network.Conn = &clientConn{}
@@ -51,8 +48,6 @@ func newClientConn(client *client, id int64, conn net.Conn) network.Conn {
 
 	c.conn.Store(&clientConnBox{conn: conn})
 	c.state.Store(int32(network.ConnOpened))
-	c.lastHeartbeatTime.Store(xtime.Now().UnixNano())
-
 	xcall.Go(c.read)
 	xcall.Go(c.write)
 

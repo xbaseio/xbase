@@ -10,7 +10,6 @@ import (
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/utils/xnet"
-	"github.com/xbaseio/xbase/utils/xtime"
 	"github.com/xbaseio/xbase/xerrors"
 )
 
@@ -22,17 +21,16 @@ type clientConn struct {
 	// 2. 保证 graceClose 的 closeSig 排在已经进入 Send/Push 的消息之后
 	sendMu sync.Mutex
 
-	id                int64           // 连接ID
-	uid               atomic.Int64    // 用户ID
-	attr              *attr           // 连接属性
-	conn              *websocket.Conn // WS源连接
-	state             atomic.Int32    // 连接状态
-	client            *client         // 客户端
-	chLowWrite        chan chWrite    // 低级队列
-	chHighWrite       chan chWrite    // 优先队列
-	lastHeartbeatTime atomic.Int64    // 上次心跳时间
-	done              chan struct{}   // 写入完成信号，使用 close 通知
-	close             chan struct{}   // 关闭信号
+	id          int64           // 连接ID
+	uid         atomic.Int64    // 用户ID
+	attr        *attr           // 连接属性
+	conn        *websocket.Conn // WS源连接
+	state       atomic.Int32    // 连接状态
+	client      *client         // 客户端
+	chLowWrite  chan chWrite    // 低级队列
+	chHighWrite chan chWrite    // 优先队列
+	done        chan struct{}   // 写入完成信号，使用 close 通知
+	close       chan struct{}   // 关闭信号
 
 	doneOnce  sync.Once
 	closeOnce sync.Once
@@ -53,8 +51,6 @@ func newClientConn(id int64, conn *websocket.Conn, client *client) network.Conn 
 	}
 
 	c.state.Store(int32(network.ConnOpened))
-	c.lastHeartbeatTime.Store(xtime.Now().UnixNano())
-
 	xcall.Go(c.read)
 	xcall.Go(c.write)
 
