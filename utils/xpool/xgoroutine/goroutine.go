@@ -3,8 +3,9 @@ package xgoroutine
 import (
 	"time"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xants"
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 const (
@@ -31,12 +32,12 @@ var DefaultWorkerPool = Default()
 type Pool = xants.Pool
 
 type antsLogger struct {
-	log.Logger
+	logger *zap.SugaredLogger
 }
 
 // Printf implements the xants.Logger interface.
 func (l antsLogger) Printf(format string, args ...any) {
-	l.Infof(format, args...)
+	l.logger.Infof(format, args...)
 }
 
 // Default instantiates a non-blocking goroutine pool with the capacity of DefaultAntsPoolSize.
@@ -44,9 +45,9 @@ func Default() *Pool {
 	options := xants.Options{
 		ExpiryDuration: ExpiryDuration,
 		Nonblocking:    Nonblocking,
-		Logger:         &antsLogger{log.GetLogger()},
+		Logger:         &antsLogger{logger: xlog.Sugar()},
 		PanicHandler: func(a any) {
-			log.Errorf("goroutine pool panic: %v", a)
+			xlog.Sugar().Errorf("goroutine pool panic: %v", a)
 		},
 	}
 	defaultAntsPool, _ := xants.NewPool(DefaultAntsPoolSize, xants.WithOptions(options))

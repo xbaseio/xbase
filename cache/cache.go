@@ -4,8 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 var globalCache Cache
@@ -45,13 +46,13 @@ type Cache interface {
 // SetCache 设置缓存
 func SetCache(cache Cache) {
 	if cache == nil {
-		log.Warn("cannot set a nil cache")
+		xlog.Logger().Warn("cannot set a nil cache")
 		return
 	}
 
 	if globalCache != nil {
 		if err := globalCache.Close(); err != nil {
-			log.Error("close cache failed: %v", err)
+			xlog.Logger().Error("close cache failed", zap.Error(err))
 		}
 	}
 

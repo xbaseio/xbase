@@ -6,8 +6,8 @@ import (
 	"math"
 
 	"github.com/xbaseio/xbase/core/buffer"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 const (
@@ -52,7 +52,7 @@ func NewPacker(opts ...Option) *defaultPacker {
 	}
 
 	if o.bufferBytes < 0 {
-		log.Fatalf("the number of buffer bytes must be greater than or equal to 0, and give %d", o.bufferBytes)
+		xlog.Sugar().Fatalf("the number of buffer bytes must be greater than or equal to 0, and give %d", o.bufferBytes)
 	}
 
 	return &defaultPacker{

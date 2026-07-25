@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xpool/xgoroutine"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 //
@@ -225,12 +225,12 @@ func (el *eventloop) run() (err error) {
 		}
 
 		if xerrors.Is(err, xerrors.ErrEngineShutdown) {
-			log.Debugf("event-loop(%d) exiting: %v", el.idx, err)
+			xlog.Sugar().Debugf("event-loop(%d) exiting: %v", el.idx, err)
 			break
 		}
 
 		if err != nil {
-			log.Debugf("event-loop(%d) error: %v", el.idx, err)
+			xlog.Sugar().Debugf("event-loop(%d) error: %v", el.idx, err)
 		}
 	}
 
@@ -362,7 +362,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 			if !shutdown {
 				shutdown = true
 				el.ch <- xerrors.ErrEngineShutdown
-				log.Debugf("ticker stop loop(%d)", el.idx)
+				xlog.Sugar().Debugf("ticker stop loop(%d)", el.idx)
 			}
 		}
 
@@ -374,7 +374,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 
 		select {
 		case <-ctx.Done():
-			log.Debugf("ticker stop by ctx loop(%d)", el.idx)
+			xlog.Sugar().Debugf("ticker stop by ctx loop(%d)", el.idx)
 			return
 		case <-timer.C:
 		}

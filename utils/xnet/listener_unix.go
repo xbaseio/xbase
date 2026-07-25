@@ -9,10 +9,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xnetpoll"
 	"github.com/xbaseio/xbase/utils/xsocket"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 )
 
@@ -89,13 +90,17 @@ func (ln *listener) open() (err error) {
 func (ln *listener) close() {
 	ln.closeOnce.Do(func() {
 		if ln.fd > 0 {
-			log.Error(os.NewSyscallError("close", unix.Close(ln.fd)))
+			if err := unix.Close(ln.fd); err != nil {
+				xlog.Logger().Error("close listener failed", zap.Error(os.NewSyscallError("close", err)))
+			}
 		}
 
 		ln.fd = -1
 
 		if ln.network == "unix" {
-			log.Error(os.RemoveAll(ln.address))
+			if err := os.RemoveAll(ln.address); err != nil {
+				xlog.Logger().Error("remove unix listener failed", zap.Error(err))
+			}
 		}
 	})
 }

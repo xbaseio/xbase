@@ -10,11 +10,11 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xnetpoll"
 	"github.com/xbaseio/xbase/utils/xqueue"
 	"github.com/xbaseio/xbase/utils/xsocket"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 //
@@ -52,7 +52,7 @@ func (eng *engine) isShutdown() bool {
 // shutdown 触发引擎关闭（只负责发信号）
 func (eng *engine) shutdown(err error) {
 	if err != nil && !xerrors.Is(err, xerrors.ErrEngineShutdown) {
-		log.Errorf("engine is being shutdown with error: %v", err)
+		xlog.Sugar().Errorf("engine is being shutdown with error: %v", err)
 	}
 	eng.turnOff()
 }
@@ -72,7 +72,7 @@ func (eng *engine) closeEventLoops() {
 			ln.close()
 		}
 		if err := eng.ingress.poller.Close(); err != nil {
-			log.Errorf("failed to close poller when stopping engine: %v", err)
+			xlog.Sugar().Errorf("failed to close poller when stopping engine: %v", err)
 		}
 	}
 }
@@ -250,7 +250,7 @@ func (eng *engine) stop(ctx context.Context, s Engine) {
 			nil,
 		)
 		if err != nil {
-			log.Errorf("failed to enqueue shutdown signal for event-loop(%d): %v", i, err)
+			xlog.Sugar().Errorf("failed to enqueue shutdown signal for event-loop(%d): %v", i, err)
 		}
 		return true
 	})
@@ -262,13 +262,13 @@ func (eng *engine) stop(ctx context.Context, s Engine) {
 			func(_ any) error { return xerrors.ErrEngineShutdown },
 			nil,
 		); err != nil {
-			log.Errorf("failed to enqueue shutdown signal for main event-loop: %v", err)
+			xlog.Sugar().Errorf("failed to enqueue shutdown signal for main event-loop: %v", err)
 		}
 	}
 
 	// 等待全部退出
 	if err := eng.concurrency.Wait(); err != nil {
-		log.Errorf("engine shutdown error: %v", err)
+		xlog.Sugar().Errorf("engine shutdown error: %v", err)
 	}
 
 	// 关闭资源
@@ -287,8 +287,7 @@ func (eng *engine) stop(ctx context.Context, s Engine) {
 // run 启动整个 xnet 引擎
 func run(eventHandler EventHandler, listeners []*listener, options *Options, addrs []string) error {
 	numEventLoop := determineEventLoops(options)
-
-	log.Infof(
+	xlog.Sugar().Infof(
 		"Launching xnet with %d event-loops, listening on: %s",
 		numEventLoop,
 		strings.Join(addrs, " | "),
@@ -337,7 +336,7 @@ func run(eventHandler EventHandler, listeners []*listener, options *Options, add
 	// 启动 engine
 	if err := eng.start(ctx, numEventLoop); err != nil {
 		eng.closeEventLoops()
-		log.Errorf("xnet engine is stopping with error: %v", err)
+		xlog.Sugar().Errorf("xnet engine is stopping with error: %v", err)
 		return err
 	}
 

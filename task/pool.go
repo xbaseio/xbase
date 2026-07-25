@@ -1,9 +1,9 @@
 package task
 
 import (
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xants"
 	"github.com/xbaseio/xbase/utils/xcall"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type Pool interface {
@@ -71,7 +71,7 @@ func AddTask(task func()) {
 
 	if err := globalPool.AddTask(task); err != nil {
 		xcall.Go(task)
-		log.Warnf("add task to the task pool failed: %v", err)
+		xlog.Sugar().Warnf("add task to the task pool failed: %v", err)
 		return
 	}
 }
@@ -87,5 +87,5 @@ type logger struct {
 }
 
 func (l *logger) Printf(format string, args ...any) {
-	log.Infof(format, args...)
+	xlog.Sugar().Infof(format, args...)
 }

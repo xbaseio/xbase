@@ -14,11 +14,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xbuffer/xring"
 	"github.com/xbaseio/xbase/utils/xgfd"
 	"github.com/xbaseio/xbase/utils/xmath"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 // Action 是在事件完成后的操作。
@@ -514,13 +515,12 @@ var MaxStreamBufferCap = 64 * 1024 // 64KB
 
 func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, error) {
 	options := loadOptions(opts...)
-
-	log.Debugf("default log level is %s", log.LogLevel())
+	xlog.Sugar().Debugf("default log level is %s", zap.L().Level().String())
 
 	// Go 程序可以使用的最大操作系统线程数最初设置为 10000，
 	// 这也应该是用户可以启动的锁定到 OS 线程的 I/O 事件循环的最大数量。
 	if options.LockOSThread && options.NumEventLoop > 10000 {
-		log.Errorf("too many event-loops under LockOSThread mode, should be less than 10,000 "+
+		xlog.Sugar().Errorf("too many event-loops under LockOSThread mode, should be less than 10,000 "+
 			"while you are trying to set up %d\n", options.NumEventLoop)
 		return nil, nil, xerrors.ErrTooManyEventLoopThreads
 	}

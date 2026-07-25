@@ -10,10 +10,10 @@ import (
 	"github.com/xbaseio/xbase/encoding"
 	"github.com/xbaseio/xbase/etc"
 	"github.com/xbaseio/xbase/locate"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/transport"
 	"github.com/xbaseio/xbase/utils/xuuid"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 const (
@@ -25,10 +25,10 @@ const (
 )
 
 const (
-	defaultIDKey       = "etc.cluster.mesh.id"
-	defaultNameKey     = "etc.cluster.mesh.name"
-	defaultCodecKey    = "etc.cluster.mesh.codec"
-	defaultTimeoutKey  = "etc.cluster.mesh.timeout"
+	defaultIDKey          = "etc.cluster.mesh.id"
+	defaultNameKey        = "etc.cluster.mesh.name"
+	defaultCodecKey       = "etc.cluster.mesh.codec"
+	defaultTimeoutKey     = "etc.cluster.mesh.timeout"
 	defaultMetadataKey    = "etc.cluster.mesh.metadata"
 	defaultVersionKey     = "etc.cluster.mesh.version"
 	defaultRetireDelayKey = "etc.cluster.mesh.retireDelay"
@@ -55,11 +55,11 @@ type options struct {
 
 func defaultOptions() *options {
 	opts := &options{
-		ctx:      context.Background(),
-		name:     defaultName,
-		codec:    encoding.Invoke(defaultCodec),
-		timeout:  defaultTimeout,
-		metadata: make(map[string]string),
+		ctx:         context.Background(),
+		name:        defaultName,
+		codec:       encoding.Invoke(defaultCodec),
+		timeout:     defaultTimeout,
+		metadata:    make(map[string]string),
 		nodeKind:    cluster.Node_Normal,
 		gameID:      -1,
 		version:     defaultVersion,
@@ -85,7 +85,7 @@ func defaultOptions() *options {
 	}
 
 	if err := etc.Get(defaultMetadataKey).Scan(&opts.metadata); err != nil {
-		log.Warnf("scan mesh metadata failed: %v", err)
+		xlog.Sugar().Warnf("scan mesh metadata failed: %v", err)
 	}
 
 	if version := etc.Get(defaultVersionKey).String(); version != "" {

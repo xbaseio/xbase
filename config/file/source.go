@@ -3,7 +3,7 @@ package file
 import (
 	"github.com/xbaseio/xbase/config"
 	"github.com/xbaseio/xbase/config/file/core"
-	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 const Name = core.Name
@@ -19,7 +19,7 @@ func NewSource(opts ...Option) config.Source {
 	}
 
 	if o.path == "" {
-		log.Fatal("no config file path specified")
+		xlog.Logger().Fatal("no config file path specified")
 	}
 
 	return core.NewSource(o.path, o.mode)

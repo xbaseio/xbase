@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/network/ws"
 	"github.com/xbaseio/xbase/packet"
 	"github.com/xbaseio/xbase/utils/xcall"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 func TestServer(t *testing.T) {
@@ -56,7 +56,7 @@ func TestServer(t *testing.T) {
 	xcall.Go(func() {
 		err := http.ListenAndServe(":8089", nil)
 		if err != nil {
-			log.Errorf("pprof server start failed: %v", err)
+			xlog.Sugar().Errorf("pprof server start failed: %v", err)
 		}
 	})
 
@@ -99,7 +99,7 @@ func TestServer_Benchmark(t *testing.T) {
 	xcall.Go(func() {
 		err := http.ListenAndServe(":8089", nil)
 		if err != nil {
-			log.Errorf("pprof server start failed: %v", err)
+			xlog.Sugar().Errorf("pprof server start failed: %v", err)
 		}
 	})
 

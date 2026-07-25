@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/xbaseio/xbase/cluster"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type Creator func(actor *Actor, args ...any) Processor
@@ -193,7 +193,7 @@ func (a *Actor) Next(ctx Context) error {
 	case a.mailbox <- ctx:
 		return nil
 	case <-timer.C:
-		log.Warnf("actor mailbox full, drop message: %d uid: %d kind: %s id: %s",
+		xlog.Sugar().Warnf("actor mailbox full, drop message: %d uid: %d kind: %s id: %s",
 			ctx.MessageID(), ctx.UID(), a.Kind(), a.ID())
 		return xerrors.ErrMailboxFull
 	}

@@ -12,10 +12,10 @@ import (
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 	"github.com/xbaseio/xbase/encoding/json"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/utils/xconv"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 const name = "nacos"
@@ -101,7 +101,7 @@ func NewRegistry(opts ...Option) *Registry {
 			}
 		} else {
 			if err != nil {
-				log.Warnf("%s parse failed: %v", endpoint, err)
+				xlog.Sugar().Warnf("%s parse failed: %v", endpoint, err)
 			}
 
 			o.client, r.err = clients.NewNamingClient(param)

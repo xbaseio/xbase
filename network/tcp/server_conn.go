@@ -7,12 +7,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/packet"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/utils/xnet"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type serverConnBox struct {
@@ -130,7 +130,7 @@ func (c *serverConn) enqueueWrite(msg []byte) error {
 		return xerrors.ErrConnectionClosed
 
 	case <-timer.C:
-		log.Warnf("tcp write queue timeout, close conn: %d", c.id)
+		xlog.Sugar().Warnf("tcp write queue timeout, close conn: %d", c.id)
 		_ = c.forceClose(true)
 		return xerrors.ErrWriteQueueTimeout
 	}
@@ -466,7 +466,7 @@ func (c *serverConn) read() {
 		}
 
 		if !network.TryEnqueueRecv(c.recvQ, data) {
-			log.Warnf("tcp receive queue full, close conn: %d", c.id)
+			xlog.Sugar().Warnf("tcp receive queue full, close conn: %d", c.id)
 			_ = c.forceCloseIfCurrent(gen, true)
 			return
 		}
@@ -535,7 +535,7 @@ func (c *serverConn) write() {
 			}
 
 			if err := c.writeFull(conn, r.msg); err != nil {
-				log.Errorf("write data message error: %v", err)
+				xlog.Sugar().Errorf("write data message error: %v", err)
 				_ = c.forceCloseIfCurrent(gen, true)
 				return
 			}

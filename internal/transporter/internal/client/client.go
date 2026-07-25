@@ -8,8 +8,8 @@ import (
 
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/core/buffer"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -54,7 +54,7 @@ func (c *Client) Establish() error {
 			conn := newConn(c)
 
 			if err := conn.dial(); err != nil {
-				log.Warnf("conn dial failed: %v", err)
+				xlog.Sugar().Warnf("conn dial failed: %v", err)
 				return err
 			}
 

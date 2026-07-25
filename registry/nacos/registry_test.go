@@ -8,10 +8,10 @@ import (
 
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/core/net"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/registry/nacos"
 	"github.com/xbaseio/xbase/utils/xconv"
+	"github.com/xbaseio/xbase/xlog"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -193,7 +193,7 @@ func (n *node) start() {
 	n.watch()
 
 	if err := n.register(); err != nil {
-		log.Fatalf("register cluster instances failed: %v", err)
+		xlog.Sugar().Fatalf("register cluster instances failed: %v", err)
 	}
 
 }
@@ -219,7 +219,7 @@ func (n *node) watch() {
 	watcher, err := n.registry.Watch(ctx, cluster.Node.String())
 	cancel()
 	if err != nil {
-		log.Fatalf("the dispatcher instance watch failed: %v", err)
+		xlog.Sugar().Fatalf("the dispatcher instance watch failed: %v", err)
 	}
 
 	go func() {

@@ -1,8 +1,6 @@
 package crypto
 
-import (
-	"github.com/xbaseio/xbase/log"
-)
+import "github.com/xbaseio/xbase/xlog"
 
 type Encryptor interface {
 	// Name 名称
@@ -18,17 +16,17 @@ var encryptors = make(map[string]Encryptor)
 // RegisterEncryptor 注册加密器
 func RegisterEncryptor(encryptor Encryptor) {
 	if encryptor == nil {
-		log.Fatal("can't register a invalid encryptor")
+		xlog.Logger().Fatal("can't register a invalid encryptor")
 	}
 
 	name := encryptor.Name()
 
 	if name == "" {
-		log.Fatal("can't register a encryptor without name")
+		xlog.Logger().Fatal("can't register a encryptor without name")
 	}
 
 	if _, ok := encryptors[name]; ok {
-		log.Warnf("the old %s encryptor will be overwritten", name)
+		xlog.Sugar().Warnf("the old %s encryptor will be overwritten", name)
 	}
 
 	encryptors[name] = encryptor
@@ -38,7 +36,7 @@ func RegisterEncryptor(encryptor Encryptor) {
 func InvokeEncryptor(name string) Encryptor {
 	encryptor, ok := encryptors[name]
 	if !ok {
-		log.Fatalf("%s encryptor is not registered", name)
+		xlog.Sugar().Fatalf("%s encryptor is not registered", name)
 	}
 
 	return encryptor

@@ -6,9 +6,10 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xpool/xgoroutine"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 // Client 表示 xnet 客户端。
@@ -44,7 +45,7 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 // Start 启动客户端事件循环。
 func (cli *Client) Start() error {
 	numEventLoop := determineEventLoops(cli.opts)
-	log.Infof("Starting xnet client with %d event loops", numEventLoop)
+	xlog.Sugar().Infof("Starting xnet client with %d event loops", numEventLoop)
 
 	cli.eng.eventHandler.OnBoot(Engine{cli.eng})
 
@@ -74,8 +75,7 @@ func (cli *Client) Start() error {
 			return nil
 		})
 	}
-
-	log.Debugf("default log level is %s", log.LogLevel())
+	xlog.Sugar().Debugf("default log level is %s", zap.L().Level().String())
 	return nil
 }
 

@@ -1,6 +1,6 @@
 # 进程号
 pid = "./run/xbase.pid"
-# 开发模式。支持模式：debug、test、release（设置优先级：配置文件 < 环境变量 < 运行参数 < mode.SetMode()）
+# 运行模式。支持模式：debug、develop、test、release（设置优先级：配置文件 < 环境变量 < 运行参数 < mode.SetMode()）
 mode = "debug"
 # 统一时区设置。项目中的时间获取请使用xtime.Now()
 timezone = "Local"
@@ -23,6 +23,22 @@ shutdownMaxWaitTime = "0s"
         timeout = "3s"
         # 无状态路由消息分发策略。支持策略：随机（random）、轮询（rr）、加权轮询（wrr）。默认为random
         dispatch = "random"
+        # 服务版本号；同名服务发现更高版本后，当前低版本实例会进入退役流程。默认为1
+        version = "1"
+        # 低版本实例发现更高版本后的退役等待时间。默认为10m
+        retireDelay = "10m"
+        # 网络消息接收队列容量。默认为8192
+        receiveQueue = 8192
+        # 向节点投递消息的并发工作协程数。默认为CPU核心数
+        deliverWorkers = 4
+        # 灰度用户白名单
+        grayWhitelist = []
+        # 灰度流量百分比，范围0到100
+        grayTrafficPercent = 0
+        # 灰度流量一致性哈希盐值；相同用户和盐值会稳定命中同一结果
+        grayTrafficSalt = ""
+        # 测试用户白名单
+        testWhitelist = []
         # 实例元数据
         [cluster.gate.metadata]
             # 键值对，且均为字符串类型。由于注册中心的元数据参数限制，建议将键值对的数量控制在20个以内，键的字符长度控制在127个字符内，值得字符长度控制在512个字符内。
@@ -43,6 +59,22 @@ shutdownMaxWaitTime = "0s"
         timeout = "3s"
         # 节点权重，用于节点无状态路由消息的加权轮询策略，权重值必需大于0才生效。默认为1
         weight = 1
+        # 节点承载的游戏ID；大厅通常为1，其他游戏使用对应游戏ID。默认为1
+        gameID = 1
+        # 服务版本号；同名服务发现更高版本后，当前低版本实例会进入退役流程。默认为1
+        version = "1"
+        # 服务状态。支持normal、gray、test。默认为normal
+        serviceStatus = "normal"
+        # 低版本实例发现更高版本后的退役等待时间。默认为10m
+        retireDelay = "10m"
+        # 请求分发工作协程数。默认为CPU核心数
+        requestWorkers = 4
+        # 事件分发工作协程数。默认为2
+        eventWorkers = 2
+        # 请求投递到Actor邮箱的最大等待时间。默认为3s
+        deliverTimeout = "3s"
+        # Actor邮箱处理请求的超时时间。默认为3s
+        mailboxTimeout = "3s"
         # 实例元数据
         [cluster.node.metadata]
             # 键值对，且均为字符串类型。由于注册中心的元数据参数限制，建议将键值对的数量控制在20个以内，键的字符长度控制在127个字符内，值得字符长度控制在512个字符内。
@@ -57,6 +89,12 @@ shutdownMaxWaitTime = "0s"
         expose = false
         # 编解码器。可选：json | proto。默认为proto
         codec = "proto"
+        # RPC调用超时时间。默认为3s
+        timeout = "3s"
+        # 服务版本号；同名服务发现更高版本后，当前低版本实例会进入退役流程。默认为1
+        version = "1"
+        # 低版本实例发现更高版本后的退役等待时间。默认为10m
+        retireDelay = "10m"
         # 实例元数据
         [cluster.mesh.metadata]
             # 键值对，且均为字符串类型。由于注册中心的元数据参数限制，建议将键值对的数量控制在20个以内，键的字符长度控制在127个字符内，值得字符长度控制在512个字符内。
@@ -69,6 +107,8 @@ shutdownMaxWaitTime = "0s"
         name = "client"
         # 编解码器。可选：json | proto。默认为proto
         codec = "proto"
+        # RPC调用超时时间，单位为秒。默认为3
+        timeout = 3
 
 # 任务池模块
 [task]
@@ -185,6 +225,21 @@ shutdownMaxWaitTime = "0s"
     # pprof服务器监听地址
     addr = ":0"
 
+# SSE服务器模块
+[sse]
+    # 组件名称。默认为sse
+    name = "sse"
+    # 客户端订阅事件的访问路径。默认为/events
+    path = "/events"
+    # 健康检查路径。默认为/healthz
+    healthPath = "/healthz"
+    # URL中用于传递订阅主题的查询参数名。默认为topic
+    topicQueryKey = "topic"
+    # 每个客户端的发送缓冲区容量。默认为64
+    clientBuffer = 64
+    # 服务端心跳发送间隔。默认为15s
+    heartbeatInterval = "15s"
+
 # 传输模块
 [transport]
     # GRPC相关配置
@@ -248,6 +303,7 @@ shutdownMaxWaitTime = "0s"
 # +---------------------------------------------------------------+-+-------------+-------------------------------+-------------------------------+
 # |                                                                message data ...                                                               |
 # +-----------------------------------------------------------------------------------------------------------------------------------------------+
+# 数据包模块
 [packet]
     # 字节序，默认为big。可选：little | big
     byteOrder = "big"
@@ -262,72 +318,54 @@ shutdownMaxWaitTime = "0s"
 
 # 日志模块
 [log]
-    # 日志输出级别，可选：debug | info | warn | error | fatal | panic
+    # 最低日志级别：debug、info、warn、error、dpanic、panic、fatal
     level = "info"
-    # 堆栈的最低输出级别，可选：debug | info | warn | error | fatal | panic
-    stackLevel = "error"
-    # 时间格式，标准库时间格式
-    timeFormat = "2006/01/02 15:04:05.000000"
-    # 输出栈的跳过深度
-    callSkip = 2
-    # 是否启用调用文件全路径
-    callFullPath = true
-    # 日志输出终端（数组和对象两种配置形式任选其一）
-    terminals = ["console", "file"]
-    # 日志输出终端（数组和对象两种配置形式任选其一）
-    [log.terminals]
-        # 控制台 -> 日志级别
-        console = ["debug", "info", "warn", "error", "fatal", "panic"]
-        # 文件 -> 日志级别
-        file = ["debug", "info", "warn", "error", "fatal", "panic"]
-        # 阿里云日志 -> 日志级别
-        aliyun = ["debug", "info", "warn", "error", "fatal", "panic"]
-        # 腾讯云日志 -> 日志级别
-        tencent = ["debug", "info", "warn", "error", "fatal", "panic"]
-    # 控制台同步器配置
-    [log.console]
-        # 日志输出格式，可选：text | json
-        format = "text"
-    # 文件同步器配置
-    [log.file]
-        # 输出文件路径
-        path = "./log/xbase.log"
-        # 日志输出格式，可选：text | json
-        format = "text"
-        # 文件最大留存时间，d:天、h:时、m:分、s:秒
-        maxAge = "7d"
-        # 文件最大尺寸限制，支持单位： B | K | KB | M | MB | G | GB | T | TB | P | PB | E | EB | Z | ZB，默认为100M
-        maxSize = "100M"
-        # 文件翻转方式，可选：none | year | month | week | day | hour，默认为none
-        rotate = "none"
-        # 文件翻转时是否对文件进行压缩
-        compress = false
-    # 阿里云SLS日志同步器配置
-    [log.aliyun]
-        # 服务域名，公网使用公网域名，内网使用私网域名
-        endpoint = "cn-chengdu.log.aliyuncs.com"
-        # 访问密钥ID
-        accessKeyID = ""
-        # 访问密钥密码
-        accessKeySecret = ""
-        # 项目名称
-        project = "xbase-test"
-        # 日志存储
-        logstore = "app"
-        # 主题标签，默认为空
-        topic = ""
-        # 来源标签，默认为空
-        source = ""
-    # 腾讯云CLS日志服务同步器
-    [log.tencent]
-        # 服务域名，公网使用公网域名，内网使用私网域名
-        endpoint = "ap-guangzhou.cls.tencentcs.com"
-        # 访问密钥ID
-        accessKeyID = ""
-        # 访问密钥密码
-        accessKeySecret = ""
-        # 主题ID
-        topicID = ""
+    # 输出编码：console 或 json
+    encoding = "console"
+    # 应用日志输出目标；支持 stdout、stderr、文件路径和 URL sink
+    outputPaths = ["stdout", "./log/xbase.log"]
+    # Zap 内部错误输出目标
+    errorOutputPaths = ["stderr"]
+    # 是否启用开发模式；启用后 DPanic 会触发 panic
+    development = false
+    # 是否关闭调用位置输出
+    disableCaller = false
+    # 是否输出调用文件的完整路径
+    callerFullPath = true
+    # 是否关闭堆栈输出
+    disableStacktrace = false
+    # 输出堆栈的最低级别
+    stacktraceLevel = "error"
+    # 时间编码：iso8601、rfc3339nano、epoch、millis、nanos
+    timeEncoding = "iso8601"
+    # console 编码时是否为日志级别着色
+    color = true
+
+    # 文件轮转配置；stdout、stderr 和 URL sink 不参与轮转
+    [log.rotation]
+        # 是否启用文件轮转
+        enabled = true
+        # 是否在日期变化后的第一条日志写入前切换文件
+        daily = true
+        # 单个日志文件最大容量，单位MB
+        maxSize = 100
+        # 旧日志最长保留天数，0表示不按天数删除
+        maxAge = 7
+        # 旧日志最多保留数量，0表示不按数量删除
+        maxBackups = 30
+        # 是否使用本地时间生成备份文件名和判断日期
+        localTime = true
+        # 是否压缩旧日志
+        compress = true
+
+    # 高频重复日志采样配置
+    [log.sampling]
+        # 是否启用采样
+        enabled = true
+        # 每秒最先完整输出的日志条数
+        initial = 100
+        # 超过initial后每隔多少条再输出一条
+        thereafter = 100
 
 # 注册中心模块
 [registry]
@@ -520,6 +558,52 @@ shutdownMaxWaitTime = "0s"
             # 心跳间隔时间；设置为0则不启用心跳检测，支持单位：纳秒（ns）、微秒（us | µs）、毫秒（ms）、秒（s）、分（m）、小时（h）、天（d）。默认为10s
             heartbeatInterval = "10s"
 
+    # KCP网络模块
+    [network.kcp]
+        # KCP服务器
+        [network.kcp.server]
+            # 服务器监听地址。默认为:3553
+            addr = ":3553"
+            # 最大连接数。默认为5000
+            maxConnNum = 5000
+            # 未绑定用户连接的授权超时时间；0表示不检测。默认为0s
+            authorizeTimeout = "0s"
+            # 最大传输单元；0表示使用KCP默认值
+            mtu = 0
+            # KCP无延迟参数：[nodelay, interval, resend, nc]；空数组表示使用默认值
+            noDelay = []
+            # 是否开启ACK立即确认
+            ackNoDelay = false
+            # 是否延迟批量写入
+            writeDelay = false
+            # 收发窗口大小：[发送窗口, 接收窗口]；空数组表示使用默认值
+            windowSize = []
+            # UDP读取缓冲区大小；0表示使用系统默认值
+            readBuffer = "0B"
+            # UDP写入缓冲区大小；0表示使用系统默认值
+            writeBuffer = "0B"
+
+        # KCP客户端
+        [network.kcp.client]
+            # 服务器拨号地址。默认为127.0.0.1:3553
+            addr = "127.0.0.1:3553"
+            # 拨号超时时间。默认为5s
+            timeout = "5s"
+            # 最大传输单元；0表示使用KCP默认值
+            mtu = 0
+            # KCP无延迟参数：[nodelay, interval, resend, nc]；空数组表示使用默认值
+            noDelay = []
+            # 是否开启ACK立即确认
+            ackNoDelay = false
+            # 是否延迟批量写入
+            writeDelay = false
+            # 收发窗口大小：[发送窗口, 接收窗口]；空数组表示使用默认值
+            windowSize = []
+            # UDP读取缓冲区大小；0表示使用系统默认值
+            readBuffer = "0B"
+            # UDP写入缓冲区大小；0表示使用系统默认值
+            writeBuffer = "0B"
+
 # 用户定位器模块
 [locate]
     # redis定位模块
@@ -633,6 +717,7 @@ shutdownMaxWaitTime = "0s"
 [crypto]
     # RSA加密模块
     [crypto.rsa]
+        # RSA加密器配置
         [crypto.rsa.encryptor]
             # hash算法，不区分大小写。可选：SHA1 | SHA224 | SHA256 | SHA384 | SHA512
             hash = "SHA256"
@@ -644,6 +729,9 @@ shutdownMaxWaitTime = "0s"
             blockSize = 0
             # 公钥，可设置文件路径或公钥串
             publicKey = ""
+            # 私钥，可设置文件路径或私钥串；同一配置同时用于解密时填写
+            privateKey = ""
+        # RSA解密器配置
         [crypto.rsa.decryptor]
             # hash算法，不区分大小写。可选：SHA1 | SHA224 | SHA256 | SHA384 | SHA512
             hash = "SHA256"
@@ -653,6 +741,7 @@ shutdownMaxWaitTime = "0s"
             label = ""
             # 私钥。可设置文件路径或私钥串
             privateKey = ""
+        # RSA签名器配置
         [crypto.rsa.signer]
             # hash算法，不区分大小写。可选：SHA1 | SHA224 | SHA256 | SHA384 | SHA512
             hash = "SHA256"
@@ -660,6 +749,9 @@ shutdownMaxWaitTime = "0s"
             padding = "PSS"
             # 私钥。可设置文件路径或私钥串
             privateKey = ""
+            # 公钥。Signer通常不需要；需要从同一配置构造验签能力时填写
+            publicKey = ""
+        # RSA验签器配置
         [crypto.rsa.verifier]
             # hash算法，不区分大小写。可选：SHA1 | SHA224 | SHA256 | SHA384 | SHA512
             hash = "SHA256"
@@ -669,6 +761,7 @@ shutdownMaxWaitTime = "0s"
             publicKey = ""
     # ECC加密模块
     [crypto.ecc]
+        # ECC加密器配置
         [crypto.ecc.encryptor]
             # 共享信息。加解密时必需一致
             s1 = ""
@@ -676,6 +769,9 @@ shutdownMaxWaitTime = "0s"
             s2 = ""
             # 公钥，可设置文件路径或公钥串
             publicKey = ""
+            # 私钥，可设置文件路径或私钥串；同一配置同时用于解密时填写
+            privateKey = ""
+        # ECC解密器配置
         [crypto.ecc.decryptor]
             # 共享信息。加解密时必需一致
             s1 = ""
@@ -683,6 +779,7 @@ shutdownMaxWaitTime = "0s"
             s2 = ""
             # 私钥。可设置文件路径或私钥串
             privateKey = ""
+        # ECC签名器配置
         [crypto.ecc.signer]
             # hash算法，不区分大小写。可选：SHA1 | SHA224 | SHA256 | SHA384 | SHA512
             hash = "SHA256"
@@ -690,6 +787,9 @@ shutdownMaxWaitTime = "0s"
             delimiter = " "
             # 私钥。可设置文件路径或私钥串
             privateKey = ""
+            # 公钥。Signer通常不需要；需要从同一配置构造验签能力时填写
+            publicKey = ""
+        # ECC验签器配置
         [crypto.ecc.verifier]
             # hash算法，不区分大小写。可选：SHA1 | SHA224 | SHA256 | SHA384 | SHA512
             hash = "SHA256"

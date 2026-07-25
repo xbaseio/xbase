@@ -26,6 +26,7 @@ deregisterCriticalServiceAfter = 30
 
 [log]
 level = "info"
-
-    [log.console]
-    format = "text"
+encoding = "console"
+outputPaths = ["stdout"]
+errorOutputPaths = ["stderr"]
+stacktraceLevel = "error"

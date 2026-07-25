@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/xbaseio/xbase/cluster"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/session"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type provider struct {
@@ -87,7 +87,7 @@ func (p *provider) Push(ctx context.Context, kind session.Kind, target int64, me
 	if kind == session.User && xerrors.Is(err, xerrors.ErrNotFoundSession) {
 		xcall.Go(func() {
 			if e := p.gate.opts.locator.UnbindGate(ctx, target, p.gate.opts.id); e != nil {
-				log.Errorf("unbind gate failed, uid = %d gid = %s err = %v", target, p.gate.opts.id, e)
+				xlog.Sugar().Errorf("unbind gate failed, uid = %d gid = %s err = %v", target, p.gate.opts.id, e)
 			}
 		})
 	}

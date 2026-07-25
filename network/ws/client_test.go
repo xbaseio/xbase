@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/network/ws"
 	"github.com/xbaseio/xbase/packet"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 var pprofOnce sync.Once
@@ -77,11 +77,11 @@ func TestNewClient(t *testing.T) {
 	client := ws.NewClient()
 
 	client.OnConnect(func(conn network.Conn) {
-		log.Info("connection is opened")
+		xlog.Logger().Info("connection is opened")
 	})
 
 	client.OnDisconnect(func(conn network.Conn) {
-		log.Info("connection is closed")
+		xlog.Logger().Info("connection is closed")
 	})
 
 	client.OnReceive(func(conn network.Conn, data []byte) {
@@ -151,7 +151,7 @@ func startPprof() {
 	pprofOnce.Do(func() {
 		go func() {
 			if err := http.ListenAndServe(":8090", nil); err != nil {
-				log.Errorf("pprof server start failed: %v", err)
+				xlog.Sugar().Errorf("pprof server start failed: %v", err)
 			}
 		}()
 	})
@@ -214,7 +214,7 @@ func doPressureTest(t *testing.T, concurrency int, total int) {
 				if err := conn.Push(msg); err != nil {
 					fail := atomic.AddInt64(&totalFail, 1)
 					if fail <= 10 {
-						log.Errorf("push message failed: %v", err)
+						xlog.Sugar().Errorf("push message failed: %v", err)
 					}
 					continue
 				}
@@ -237,7 +237,7 @@ func doPressureTest(t *testing.T, concurrency int, total int) {
 	sent := atomic.LoadInt64(&totalSent)
 
 	if ok := waitRecv(&totalRecv, sent, 5*time.Minute); !ok {
-		log.Warnf(
+		xlog.Sugar().Warnf(
 			"wait receive timeout, sent: %d, recv: %d, fail: %d",
 			sent,
 			atomic.LoadInt64(&totalRecv),
@@ -273,7 +273,7 @@ func dialClients(dial func() (network.Conn, error), concurrency int) []network.C
 	for attempts := 0; len(conns) < concurrency && attempts < maxAttempts; attempts++ {
 		conn, err := dial()
 		if err != nil {
-			log.Errorf("client dial failed: %v", err)
+			xlog.Sugar().Errorf("client dial failed: %v", err)
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
@@ -287,7 +287,7 @@ func dialClients(dial func() (network.Conn, error), concurrency int) []network.C
 	}
 
 	if len(conns) < concurrency {
-		log.Warnf("dial connections not enough, want: %d, got: %d", concurrency, len(conns))
+		xlog.Sugar().Warnf("dial connections not enough, want: %d, got: %d", concurrency, len(conns))
 	}
 
 	return conns

@@ -13,13 +13,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xio"
 	"github.com/xbaseio/xbase/utils/xnetpoll"
 	"github.com/xbaseio/xbase/utils/xpool/xgoroutine"
 	"github.com/xbaseio/xbase/utils/xqueue"
 	"github.com/xbaseio/xbase/utils/xsocket"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 	"golang.org/x/sys/unix"
 )
 
@@ -448,7 +448,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 				func(_ any) error { return xerrors.ErrEngineShutdown },
 				nil,
 			)
-			log.Debugf("failed to enqueue shutdown signal of high-priority for event-loop(%d): %v", el.idx, err)
+			xlog.Sugar().Debugf("failed to enqueue shutdown signal of high-priority for event-loop(%d): %v", el.idx, err)
 		}
 
 		if timer == nil {
@@ -459,7 +459,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 
 		select {
 		case <-ctx.Done():
-			log.Debugf("stopping ticker in event-loop(%d) from Engine, error:%v", el.idx, ctx.Err())
+			xlog.Sugar().Debugf("stopping ticker in event-loop(%d) from Engine, error:%v", el.idx, ctx.Err())
 			return
 		case <-timer.C:
 		}

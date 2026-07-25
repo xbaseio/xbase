@@ -3,8 +3,8 @@ package tgSet
 import (
 	"github.com/xbaseio/xbase/utils/xtelegram/telegram/telegram"
 	"github.com/xbaseio/xbase/utils/xtelegram/telegram/types"
+	"github.com/xbaseio/xbase/xlog"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xconv"
 )
 
@@ -16,7 +16,7 @@ func SetChatMenuButton(botToken, username string, chatID int64) error {
 
 	botApi, err := telegram.New(botToken)
 	if err != nil {
-		log.Errorf("%v", err)
+		xlog.Sugar().Errorf("%v", err)
 		return nil
 	}
 
@@ -29,10 +29,10 @@ func SetChatMenuButton(botToken, username string, chatID int64) error {
 
 	//6867997452:AAFYZXHAC_TDvcfBiYto2ShutRSiUcboa04
 	if err != nil {
-		log.Errorf("%v", err)
+		xlog.Sugar().Errorf("%v", err)
 		return err
 	}
-	log.Warnf("botToken,botToken:%v %#v", botToken, rst)
+	xlog.Sugar().Warnf("botToken,botToken:%v %#v", botToken, rst)
 
 	return nil
 

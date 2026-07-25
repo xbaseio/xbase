@@ -5,8 +5,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type server struct {
@@ -143,20 +143,18 @@ func (s *server) serve() {
 				if max := 1 * time.Second; tempDelay > max {
 					tempDelay = max
 				}
-
-				log.Warnf("tcp accept error: %v; retrying in %v", err, tempDelay)
+				xlog.Sugar().Warnf("tcp accept error: %v; retrying in %v", err, tempDelay)
 				time.Sleep(tempDelay)
 				continue
 			}
-
-			log.Warnf("tcp accept error: %v", err)
+			xlog.Sugar().Warnf("tcp accept error: %v", err)
 			return
 		}
 
 		tempDelay = 0
 
 		if err = s.connMgr.allocate(conn); err != nil {
-			log.Errorf("connection allocate error: %v", err)
+			xlog.Sugar().Errorf("connection allocate error: %v", err)
 			_ = conn.Close()
 		}
 	}

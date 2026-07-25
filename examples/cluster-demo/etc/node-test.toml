@@ -38,6 +38,7 @@ prefix = "xbase:cluster-demo"
 
 [log]
 level = "info"
-
-    [log.console]
-    format = "text"
+encoding = "console"
+outputPaths = ["stdout"]
+errorOutputPaths = ["stderr"]
+stacktraceLevel = "error"

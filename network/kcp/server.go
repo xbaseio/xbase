@@ -1,8 +1,8 @@
 package kcp
 
 import (
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
+	"github.com/xbaseio/xbase/xlog"
 	"github.com/xtaci/kcp-go/v5"
 )
 
@@ -113,7 +113,7 @@ func (s *server) serve() {
 	for {
 		conn, err := s.listener.AcceptKCP()
 		if err != nil {
-			log.Warnf("kcp accept error: %v", err)
+			xlog.Sugar().Warnf("kcp accept error: %v", err)
 			return
 		}
 

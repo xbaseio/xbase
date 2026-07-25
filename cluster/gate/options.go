@@ -13,38 +13,38 @@ import (
 	gatepolicy "github.com/xbaseio/xbase/component/eventbus"
 	"github.com/xbaseio/xbase/etc"
 	"github.com/xbaseio/xbase/locate"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/utils/xuuid"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 const (
-	defaultName           = "gate"
-	defaultAddr           = ":0"
-	defaultTimeout        = 3 * time.Second
-	defaultDispatch       = cluster.Random
-	defaultVersion        = "1"
-	defaultRetireDelay    = 10 * time.Minute
-	defaultReceiveQueue   = 8192
+	defaultName         = "gate"
+	defaultAddr         = ":0"
+	defaultTimeout      = 3 * time.Second
+	defaultDispatch     = cluster.Random
+	defaultVersion      = "1"
+	defaultRetireDelay  = 10 * time.Minute
+	defaultReceiveQueue = 8192
 )
 
 const (
-	defaultIDKey               = "etc.cluster.gate.id"
-	defaultNameKey             = "etc.cluster.gate.name"
-	defaultAddrKey             = "etc.cluster.gate.addr"
-	defaultExposeKey           = "etc.cluster.gate.expose"
-	defaultTimeoutKey          = "etc.cluster.gate.timeout"
-	defaultDispatchKey         = "etc.cluster.gate.dispatch"
-	defaultMetadataKey         = "etc.cluster.gate.metadata"
-	defaultVersionKey          = "etc.cluster.gate.version"
-	defaultRetireDelayKey      = "etc.cluster.gate.retireDelay"
-	defaultReceiveQueueKey     = "etc.cluster.gate.receiveQueue"
-	defaultDeliverWorkersKey   = "etc.cluster.gate.deliverWorkers"
-	defaultGrayWhitelistKey    = "etc.cluster.gate.grayWhitelist"
-	defaultGrayTrafficPctKey   = "etc.cluster.gate.grayTrafficPercent"
-	defaultGrayTrafficSaltKey  = "etc.cluster.gate.grayTrafficSalt"
-	defaultTestWhitelistKey    = "etc.cluster.gate.testWhitelist"
+	defaultIDKey              = "etc.cluster.gate.id"
+	defaultNameKey            = "etc.cluster.gate.name"
+	defaultAddrKey            = "etc.cluster.gate.addr"
+	defaultExposeKey          = "etc.cluster.gate.expose"
+	defaultTimeoutKey         = "etc.cluster.gate.timeout"
+	defaultDispatchKey        = "etc.cluster.gate.dispatch"
+	defaultMetadataKey        = "etc.cluster.gate.metadata"
+	defaultVersionKey         = "etc.cluster.gate.version"
+	defaultRetireDelayKey     = "etc.cluster.gate.retireDelay"
+	defaultReceiveQueueKey    = "etc.cluster.gate.receiveQueue"
+	defaultDeliverWorkersKey  = "etc.cluster.gate.deliverWorkers"
+	defaultGrayWhitelistKey   = "etc.cluster.gate.grayWhitelist"
+	defaultGrayTrafficPctKey  = "etc.cluster.gate.grayTrafficPercent"
+	defaultGrayTrafficSaltKey = "etc.cluster.gate.grayTrafficSalt"
+	defaultTestWhitelistKey   = "etc.cluster.gate.testWhitelist"
 )
 
 type Option func(o *options)
@@ -53,31 +53,31 @@ type Option func(o *options)
 type MessageDispatcher func(ctx Context)
 
 type options struct {
-	ctx              context.Context
-	id               string
-	name             string
-	addr             string
-	expose           bool
-	timeout          time.Duration
-	server           network.Server
-	locator          locate.Locator
-	registry         registry.Registry
-	dispatch         cluster.Dispatch
-	nodeKind         cluster.NodeKind
-	gameID           int32
-	version          string
-	retireDelay      time.Duration
-	receiveQueue     int
-	deliverWorkers   int
+	ctx               context.Context
+	id                string
+	name              string
+	addr              string
+	expose            bool
+	timeout           time.Duration
+	server            network.Server
+	locator           locate.Locator
+	registry          registry.Registry
+	dispatch          cluster.Dispatch
+	nodeKind          cluster.NodeKind
+	gameID            int32
+	version           string
+	retireDelay       time.Duration
+	receiveQueue      int
+	deliverWorkers    int
 	messageDispatcher MessageDispatcher
-	metadata         map[string]string
-	policyMu         sync.RWMutex
-	grayWhitelist    map[int64]struct{}
-	grayUserChecker  func(uid int64) bool
-	grayTrafficPct   int
-	grayTrafficSalt  string
-	testWhitelist    map[int64]struct{}
-	testUserChecker  func(uid int64) bool
+	metadata          map[string]string
+	policyMu          sync.RWMutex
+	grayWhitelist     map[int64]struct{}
+	grayUserChecker   func(uid int64) bool
+	grayTrafficPct    int
+	grayTrafficSalt   string
+	testWhitelist     map[int64]struct{}
+	testUserChecker   func(uid int64) bool
 }
 
 type serviceStatusDecision struct {
@@ -91,21 +91,21 @@ type serviceStatusDecision struct {
 
 func defaultOptions() *options {
 	opts := &options{
-		ctx:              context.Background(),
-		name:             defaultName,
-		addr:             defaultAddr,
-		timeout:          defaultTimeout,
-		dispatch:         defaultDispatch,
-		metadata:         make(map[string]string),
-		expose:           etc.Get(defaultExposeKey).Bool(),
-		nodeKind:         cluster.Node_Normal,
-		gameID:           -1,
-		version:          defaultVersion,
-		retireDelay:      defaultRetireDelay,
-		receiveQueue:     defaultReceiveQueue,
-		deliverWorkers:   max(runtime.NumCPU(), 1),
-		grayWhitelist:    make(map[int64]struct{}),
-		testWhitelist:    make(map[int64]struct{}),
+		ctx:            context.Background(),
+		name:           defaultName,
+		addr:           defaultAddr,
+		timeout:        defaultTimeout,
+		dispatch:       defaultDispatch,
+		metadata:       make(map[string]string),
+		expose:         etc.Get(defaultExposeKey).Bool(),
+		nodeKind:       cluster.Node_Normal,
+		gameID:         -1,
+		version:        defaultVersion,
+		retireDelay:    defaultRetireDelay,
+		receiveQueue:   defaultReceiveQueue,
+		deliverWorkers: max(runtime.NumCPU(), 1),
+		grayWhitelist:  make(map[int64]struct{}),
+		testWhitelist:  make(map[int64]struct{}),
 	}
 
 	if id := etc.Get(defaultIDKey).String(); id != "" {
@@ -131,7 +131,7 @@ func defaultOptions() *options {
 	}
 
 	if err := etc.Get(defaultMetadataKey).Scan(&opts.metadata); err != nil {
-		log.Warnf("scan gate metadata failed: %v", err)
+		xlog.Sugar().Warnf("scan gate metadata failed: %v", err)
 	}
 
 	if version := etc.Get(defaultVersionKey).String(); version != "" {

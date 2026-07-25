@@ -7,13 +7,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/core/tls"
 	"github.com/xbaseio/xbase/encoding/json"
 	"github.com/xbaseio/xbase/locate"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/xerrors"
-	"github.com/redis/go-redis/v9"
+	"github.com/xbaseio/xbase/xlog"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -164,7 +164,7 @@ func (l *Locator) BindGate(ctx context.Context, uid int64, gid string) error {
 	}
 
 	if err := l.broadcast(ctx, locate.BindGate, uid, gid); err != nil {
-		log.Errorf("location event broadcast failed: %v", err)
+		xlog.Sugar().Errorf("location event broadcast failed: %v", err)
 	}
 
 	return nil
@@ -183,7 +183,7 @@ func (l *Locator) BindNode(ctx context.Context, uid int64, name, nid string) err
 	}
 
 	if err := l.broadcast(ctx, locate.BindNode, uid, nid, name); err != nil {
-		log.Errorf("location event broadcast failed: %v", err)
+		xlog.Sugar().Errorf("location event broadcast failed: %v", err)
 	}
 
 	return nil
@@ -204,7 +204,7 @@ func (l *Locator) UnbindGate(ctx context.Context, uid int64, gid string) error {
 
 	if rst[0] == "OK" {
 		if err = l.broadcast(ctx, locate.UnbindGate, uid, gid); err != nil {
-			log.Errorf("location event broadcast failed: %v", err)
+			xlog.Sugar().Errorf("location event broadcast failed: %v", err)
 		}
 	}
 
@@ -226,7 +226,7 @@ func (l *Locator) UnbindNode(ctx context.Context, uid int64, name, nid string) e
 
 	if rst[0] == "OK" {
 		if err = l.broadcast(ctx, locate.UnbindNode, uid, nid, name); err != nil {
-			log.Errorf("location event broadcast failed: %v", err)
+			xlog.Sugar().Errorf("location event broadcast failed: %v", err)
 		}
 	}
 

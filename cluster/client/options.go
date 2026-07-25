@@ -18,11 +18,10 @@ const (
 )
 
 const (
-	defaultIDKey       = "etc.cluster.client.id"
-	defaultNameKey     = "etc.cluster.client.name"
-	defaultCodecKey    = "etc.cluster.client.codec"
-	defaultTimeoutKey  = "etc.cluster.client.timeout"
-	defaultAutoDialKey = "etc.cluster.client.autoDial"
+	defaultIDKey      = "etc.cluster.client.id"
+	defaultNameKey    = "etc.cluster.client.name"
+	defaultCodecKey   = "etc.cluster.client.codec"
+	defaultTimeoutKey = "etc.cluster.client.timeout"
 )
 
 type Option func(o *options)

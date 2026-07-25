@@ -7,8 +7,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 	"golang.org/x/sys/windows"
 )
 
@@ -103,12 +104,16 @@ func (l *listener) open() (err error) {
 func (l *listener) close() {
 	l.closeOnce.Do(func() {
 		if l.pc != nil {
-			log.Error(os.NewSyscallError("close", l.pc.Close()))
+			if err := l.pc.Close(); err != nil {
+				xlog.Logger().Error("close packet listener failed", zap.Error(os.NewSyscallError("close", err)))
+			}
 			return
 		}
 
 		l.pc = nil
-		log.Error(os.NewSyscallError("close", l.ln.Close()))
+		if err := l.ln.Close(); err != nil {
+			xlog.Logger().Error("close listener failed", zap.Error(os.NewSyscallError("close", err)))
+		}
 	})
 }
 

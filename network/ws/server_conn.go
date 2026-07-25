@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/utils/xnet"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type serverConn struct {
@@ -449,7 +449,7 @@ func (c *serverConn) read() {
 		if err != nil {
 			if !xerrors.Is(err, net.ErrClosed) {
 				if _, ok := err.(*websocket.CloseError); !ok {
-					log.Warnf("read message failed: %d %v", c.id, err)
+					xlog.Sugar().Warnf("read message failed: %d %v", c.id, err)
 				}
 			}
 
@@ -478,7 +478,7 @@ func (c *serverConn) read() {
 		}
 
 		if !network.TryEnqueueRecv(c.recvQ, msgData) {
-			log.Warnf("ws receive queue full, close conn: %d", c.id)
+			xlog.Sugar().Warnf("ws receive queue full, close conn: %d", c.id)
 			_ = c.forceCloseIfCurrent(connID, true)
 			return
 		}
@@ -591,7 +591,7 @@ func (c *serverConn) doWrite(connID int64, r chWrite) bool {
 	if err := conn.WriteMessage(websocket.BinaryMessage, r.msg); err != nil {
 		if !xerrors.Is(err, net.ErrClosed) {
 			if _, ok := err.(*websocket.CloseError); !ok {
-				log.Errorf("write message error: %v", err)
+				xlog.Sugar().Errorf("write message error: %v", err)
 			}
 		}
 

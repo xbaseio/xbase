@@ -11,10 +11,10 @@ import (
 	"github.com/xbaseio/xbase/encoding"
 	"github.com/xbaseio/xbase/etc"
 	"github.com/xbaseio/xbase/locate"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/transport"
 	"github.com/xbaseio/xbase/utils/xuuid"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 const (
@@ -122,7 +122,7 @@ func defaultOptions() *options {
 	}
 
 	if err := etc.Get(defaultMetadataKey).Scan(&opts.metadata); err != nil {
-		log.Warnf("scan node metadata failed: %v", err)
+		xlog.Sugar().Warnf("scan node metadata failed: %v", err)
 	}
 
 	if etc.Has(defaultGameIDKey) {

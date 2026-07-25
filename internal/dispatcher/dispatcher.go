@@ -5,9 +5,9 @@ import (
 
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/core/endpoint"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type Dispatcher struct {
@@ -122,7 +122,7 @@ func (d *Dispatcher) ReplaceServices(services ...*registry.ServiceInstance) {
 	for _, service := range services {
 		ep, err := endpoint.ParseEndpoint(service.Endpoint)
 		if err != nil {
-			log.Errorf("service endpoint parse failed, insID: %s kind: %s name: %s alias: %s endpoint: %s err: %v",
+			xlog.Sugar().Errorf("service endpoint parse failed, insID: %s kind: %s name: %s alias: %s endpoint: %s err: %v",
 				service.ID, service.Kind, service.Name, service.Alias, service.Endpoint, err)
 			continue
 		}

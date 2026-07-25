@@ -9,11 +9,11 @@ import (
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/component"
 	"github.com/xbaseio/xbase/core/info"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/packet"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type HookHandler func(proxy *Proxy)
@@ -63,11 +63,11 @@ func (c *Client) Name() string {
 // Init 初始化节点
 func (c *Client) Init() {
 	if c.opts.client == nil {
-		log.Fatal("client plugin is not injected")
+		xlog.Logger().Fatal("client plugin is not injected")
 	}
 
 	if c.opts.codec == nil {
-		log.Fatal("codec plugin is not injected")
+		xlog.Logger().Fatal("codec plugin is not injected")
 	}
 
 	c.runHookFunc(cluster.Init)
@@ -127,7 +127,7 @@ func (c *Client) handleReceive(conn network.Conn, data []byte) {
 
 	message, _, err := packet.UnpackMessage(data)
 	if err != nil {
-		log.Errorf("unpack message failed: %v", err)
+		xlog.Sugar().Errorf("unpack message failed: %v", err)
 		return
 	}
 
@@ -149,7 +149,7 @@ func (c *Client) handleReceive(conn network.Conn, data []byte) {
 			message: message,
 		})
 	} else {
-		log.Debugf("route handler is not registered, message: %v", message.MessageID)
+		xlog.Sugar().Debugf("route handler is not registered, message: %v", message.MessageID)
 	}
 }
 
@@ -193,7 +193,7 @@ func (c *Client) addRouteHandler(messageID int32, handler RouteHandler) {
 	if c.getState() == cluster.Shut {
 		c.routes[messageID] = append(c.routes[messageID], handler)
 	} else {
-		log.Warnf("client is working, can't add route handler")
+		xlog.Sugar().Warnf("client is working, can't add route handler")
 	}
 }
 
@@ -202,7 +202,7 @@ func (c *Client) setDefaultRouteHandler(handler RouteHandler) {
 	if c.getState() == cluster.Shut {
 		c.defaultRouteHandler = handler
 	} else {
-		log.Warnf("client is working, can't set default route handler")
+		xlog.Sugar().Warnf("client is working, can't set default route handler")
 	}
 }
 
@@ -211,7 +211,7 @@ func (c *Client) addEventListener(event cluster.Event, handler EventHandler) {
 	if c.getState() == cluster.Shut {
 		c.events[event] = append(c.events[event], handler)
 	} else {
-		log.Warnf("client is working, can't add event handler")
+		xlog.Sugar().Warnf("client is working, can't add event handler")
 	}
 }
 
@@ -226,7 +226,7 @@ func (c *Client) addHookListener(hook cluster.Hook, handler HookHandler) {
 		if c.getState() == cluster.Shut {
 			c.hooks[hook] = append(c.hooks[hook], handler)
 		} else {
-			log.Warnf("server is working, can't add hook handler")
+			xlog.Sugar().Warnf("server is working, can't add hook handler")
 		}
 	}
 }

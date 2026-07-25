@@ -6,7 +6,7 @@ import (
 
 	"github.com/xbaseio/xbase/config"
 	"github.com/xbaseio/xbase/config/file"
-	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/xlog"
 
 	//optionChannelDao "github.com/xbaseio/xbase/utils/dao/option-channel"
 	//optionListenerAddressDao "github.com/xbaseio/xbase/utils/dao/option-listener-address"
@@ -49,7 +49,7 @@ func TestClient_SendMessage(t *testing.T) {
 		xtelegram.WithMsgType(tgtypes.RobotMsgTypePhoto),
 		xtelegram.WithParseMode(tgtypes.ModeMarkdown))
 	if err == nil {
-		log.Errorf("%v", err)
+		xlog.Sugar().Errorf("%v", err)
 		return
 	}
 	xMsg.SendMessage(33, replaces)

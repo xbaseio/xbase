@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/registry"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type Options struct {
@@ -43,7 +43,7 @@ func Start(opts Options) {
 		watcher, err := opts.Registry.Watch(ctx, opts.ServiceName)
 		cancel()
 		if err != nil {
-			log.Fatalf("%s version watch failed: %v", opts.Kind, err)
+			xlog.Sugar().Fatalf("%s version watch failed: %v", opts.Kind, err)
 		}
 
 		defer watcher.Stop()
@@ -84,8 +84,7 @@ func (w *watcher) check(services []*registry.ServiceInstance) {
 		w.cancelSchedule()
 		return
 	}
-
-	log.Warnf("%s %s version %s is lower than cluster max %s, will retire in %v",
+	xlog.Sugar().Warnf("%s %s version %s is lower than cluster max %s, will retire in %v",
 		w.opts.Kind, w.opts.ID, w.opts.Version, maxVersion, w.opts.RetireDelay)
 	w.schedule()
 }
@@ -120,19 +119,19 @@ func (w *watcher) schedule() {
 	}
 
 	w.timer = time.AfterFunc(w.opts.RetireDelay, func() {
-		log.Warnf("%s %s version %s retiring after %v", w.opts.Kind, w.opts.ID, w.opts.Version, w.opts.RetireDelay)
+		xlog.Sugar().Warnf("%s %s version %s retiring after %v", w.opts.Kind, w.opts.ID, w.opts.Version, w.opts.RetireDelay)
 
 		w.opts.Shutdown()
 
 		proc, err := os.FindProcess(os.Getpid())
 		if err != nil {
-			log.Errorf("find process failed: %v", err)
+			xlog.Sugar().Errorf("find process failed: %v", err)
 			os.Exit(0)
 			return
 		}
 
 		if err = proc.Signal(syscall.SIGTERM); err != nil {
-			log.Errorf("send retire signal failed: %v", err)
+			xlog.Sugar().Errorf("send retire signal failed: %v", err)
 			os.Exit(0)
 		}
 	})

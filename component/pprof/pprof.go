@@ -8,7 +8,7 @@ import (
 	"github.com/xbaseio/xbase/component"
 	"github.com/xbaseio/xbase/core/info"
 	xnet "github.com/xbaseio/xbase/core/net"
-	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 var _ component.Component = &PProf{}
@@ -34,12 +34,12 @@ func (*PProf) Name() string {
 func (p *PProf) Start() {
 	listenAddr, exposeAddr, err := xnet.ParseAddr(p.opts.addr)
 	if err != nil {
-		log.Fatalf("pprof addr parse failed: %v", err)
+		xlog.Sugar().Fatalf("pprof addr parse failed: %v", err)
 	}
 
 	go func() {
 		if err := http.ListenAndServe(listenAddr, nil); err != nil {
-			log.Fatalf("pprof server start failed: %v", err)
+			xlog.Sugar().Fatalf("pprof server start failed: %v", err)
 		}
 	}()
 

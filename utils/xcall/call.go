@@ -5,7 +5,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 // Call 安全地调用函数
@@ -18,9 +19,9 @@ func Call(fn func()) {
 		if err := recover(); err != nil {
 			switch err.(type) {
 			case runtime.Error:
-				log.Panic(err)
+				xlog.Logger().Panic("runtime panic", zap.Any("panic", err))
 			default:
-				log.Panicf("panic error: %v", err)
+				xlog.Sugar().Panicf("panic error: %v", err)
 			}
 		}
 	}()

@@ -1,0 +1,50 @@
+# Zap 日志配置
+[log]
+    # 最低日志级别：debug、info、warn、error、dpanic、panic、fatal
+    level = "debug"
+    # 是否启用开发模式；启用后 DPanic 会触发 panic
+    development = false
+    # 输出编码：console 或 json；text 会按 console 处理
+    encoding = "console"
+    # 普通日志输出目标，支持 stdout、stderr、文件路径和 URL sink
+    outputPaths = ["stdout", "./log/xbase.log"]
+    # Zap 内部错误的输出目标
+    errorOutputPaths = ["stderr"]
+    # 是否关闭调用位置输出
+    disableCaller = false
+    # 是否输出调用文件的完整路径
+    callerFullPath = false
+    # 是否关闭堆栈输出
+    disableStacktrace = false
+    # 开始输出堆栈的最低日志级别
+    stacktraceLevel = "error"
+    # 时间编码：iso8601、rfc3339nano、epoch、millis、nanos
+    timeEncoding = "iso8601"
+    # console 编码时是否为日志级别着色
+    color = true
+
+    # 文件轮转配置；stdout、stderr 和 URL sink 不参与轮转
+    [log.rotation]
+        # 是否为文件输出启用轮转
+        enabled = true
+        # 是否在日期变化后的第一条日志写入前切换文件
+        daily = true
+        # 单个日志文件最大容量，单位 MB
+        maxSize = 100
+        # 旧日志最长保留天数，0 表示不按天数删除
+        maxAge = 7
+        # 旧日志最多保留数量，0 表示不按数量删除
+        maxBackups = 30
+        # 是否使用本地时间生成备份文件名和判断日期
+        localTime = true
+        # 是否使用 gzip 压缩旧日志
+        compress = true
+
+    # 相同日志的采样配置，用于限制高频重复日志
+    [log.sampling]
+        # 是否启用采样
+        enabled = true
+        # 每秒最先完整输出的日志条数
+        initial = 100
+        # 超过 initial 后，每隔多少条再输出一条
+        thereafter = 100

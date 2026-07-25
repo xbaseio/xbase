@@ -6,12 +6,12 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/packet"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/utils/xnet"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 	"github.com/xtaci/kcp-go/v5"
 )
 
@@ -411,7 +411,7 @@ func (c *clientConn) write() {
 			}
 
 			if err := c.writeFull(conn, r.msg); err != nil {
-				log.Errorf("write data message error: %v", err)
+				xlog.Sugar().Errorf("write data message error: %v", err)
 				_ = c.forceClose()
 				return
 			}

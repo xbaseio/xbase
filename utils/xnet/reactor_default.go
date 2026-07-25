@@ -5,9 +5,10 @@ package xnet
 import (
 	"runtime"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xnetpoll"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 // rotate 运行主 reactor，负责接收新连接。
@@ -19,10 +20,10 @@ func (el *eventloop) rotate() error {
 
 	err := el.poller.Polling(el.accept0)
 	if xerrors.Is(err, xerrors.ErrEngineShutdown) {
-		log.Debugf("main reactor is exiting in terms of the demand from user, %v", err)
+		xlog.Sugar().Debugf("main reactor is exiting in terms of the demand from user, %v", err)
 		err = nil
 	} else if err != nil {
-		log.Errorf("main reactor is exiting xbase to error: %v", err)
+		xlog.Sugar().Errorf("main reactor is exiting xbase to error: %v", err)
 	}
 
 	el.engine.shutdown(err)
@@ -39,13 +40,14 @@ func (el *eventloop) orbit() error {
 	err := el.poller.Polling(func(fd int, ev xnetpoll.IOEvent, flags xnetpoll.IOFlags) error {
 		c := el.connections.getConn(fd)
 		if c == nil {
+			zap.S(
 			// 对于 kqueue，这可能发生在连接已经关闭之后，
 			// fd 会按照手册说明自动从 kqueue 中移除。
 			//
 			// 对于 epoll，它有时会为一个已经过期的 fd 继续投递事件，
 			// 而这个 fd 已经不在我们的连接集合中。
 			// 这里需要显式把它从 epoll 集合中删除，并记录警告日志。
-			log.Warnf(
+			).Warnf(
 				"received event[fd=%d|ev=%d|flags=%d] of a stale connection from event-loop(%d)",
 				fd, ev, flags, el.idx,
 			)
@@ -56,10 +58,10 @@ func (el *eventloop) orbit() error {
 	})
 
 	if xerrors.Is(err, xerrors.ErrEngineShutdown) {
-		log.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+		xlog.Sugar().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 		err = nil
 	} else if err != nil {
-		log.Errorf("event-loop(%d) is exiting xbase to error: %v", el.idx, err)
+		xlog.Sugar().Errorf("event-loop(%d) is exiting xbase to error: %v", el.idx, err)
 	}
 
 	el.closeConns()
@@ -82,14 +84,7 @@ func (el *eventloop) run() error {
 			if _, ok := el.listeners[fd]; ok {
 				return el.accept(fd, ev, flags)
 			}
-
-			// 对于 kqueue，这可能发生在连接已经关闭之后，
-			// fd 会按照手册说明自动从 kqueue 中移除。
-			//
-			// 对于 epoll，它有时会为一个已经过期的 fd 继续投递事件，
-			// 而这个 fd 已经不在我们的连接集合中。
-			// 这里需要显式把它从 epoll 集合中删除，并记录警告日志。
-			log.Warnf(
+			xlog.Sugar().Warnf(
 				"received event[fd=%d|ev=%d|flags=%d] of a stale connection from event-loop(%d)",
 				fd, ev, flags, el.idx,
 			)
@@ -100,10 +95,10 @@ func (el *eventloop) run() error {
 	})
 
 	if xerrors.Is(err, xerrors.ErrEngineShutdown) {
-		log.Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+		xlog.Sugar().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
 		err = nil
 	} else if err != nil {
-		log.Errorf("event-loop(%d) is exiting xbase to error: %v", el.idx, err)
+		xlog.Sugar().Errorf("event-loop(%d) is exiting xbase to error: %v", el.idx, err)
 	}
 
 	el.closeConns()

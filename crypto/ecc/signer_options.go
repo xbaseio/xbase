@@ -8,10 +8,10 @@ import (
 )
 
 const (
-	defaultSignerHashKey       = "etc.crypto.rsa.signer.hash"
-	defaultSignerDelimiterKey  = "etc.crypto.rsa.signer.delimiter"
-	defaultSignerPublicKeyKey  = "etc.crypto.rsa.signer.publicKey"
-	defaultSignerPrivateKeyKey = "etc.crypto.rsa.signer.privateKey"
+	defaultSignerHashKey       = "etc.crypto.ecc.signer.hash"
+	defaultSignerDelimiterKey  = "etc.crypto.ecc.signer.delimiter"
+	defaultSignerPublicKeyKey  = "etc.crypto.ecc.signer.publicKey"
+	defaultSignerPrivateKeyKey = "etc.crypto.ecc.signer.privateKey"
 )
 
 type SignerOption func(o *signerOptions)

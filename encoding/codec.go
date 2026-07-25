@@ -7,7 +7,7 @@ import (
 	"github.com/xbaseio/xbase/encoding/toml"
 	"github.com/xbaseio/xbase/encoding/xml"
 	"github.com/xbaseio/xbase/encoding/yaml"
-	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 var codecs = make(map[string]Codec)
@@ -33,17 +33,17 @@ type Codec interface {
 // Register 注册编解码器
 func Register(codec Codec) {
 	if codec == nil {
-		log.Fatal("can't register a invalid codec")
+		xlog.Logger().Fatal("can't register a invalid codec")
 	}
 
 	name := codec.Name()
 
 	if name == "" {
-		log.Fatal("can't register a codec without name")
+		xlog.Logger().Fatal("can't register a codec without name")
 	}
 
 	if _, ok := codecs[name]; ok {
-		log.Warnf("the old %s codec will be overwritten", name)
+		xlog.Sugar().Warnf("the old %s codec will be overwritten", name)
 	}
 
 	codecs[name] = codec
@@ -53,7 +53,7 @@ func Register(codec Codec) {
 func Invoke(name string) Codec {
 	codec, ok := codecs[name]
 	if !ok {
-		log.Fatalf("%s codec is not registered", name)
+		xlog.Sugar().Fatalf("%s codec is not registered", name)
 	}
 
 	return codec

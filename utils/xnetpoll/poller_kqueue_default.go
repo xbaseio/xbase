@@ -11,9 +11,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xqueue"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 // Poller 表示一个轮询器，负责监听文件描述符（基于 kqueue）
@@ -110,7 +110,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 			runtime.Gosched()
 			continue
 		} else if err != nil {
-			log.Errorf("error occurs in kqueue: %v", os.NewSyscallError("kevent wait", err))
+			xlog.Sugar().Errorf("error occurs in kqueue: %v", os.NewSyscallError("kevent wait", err))
 			return err
 		}
 

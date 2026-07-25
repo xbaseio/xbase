@@ -12,9 +12,9 @@ import (
 	"github.com/xbaseio/xbase/core/buffer"
 	"github.com/xbaseio/xbase/internal/transporter/internal/def"
 	"github.com/xbaseio/xbase/internal/transporter/internal/protocol"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xtime"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 const writeTimeout = 3 * time.Second
@@ -128,7 +128,7 @@ func (c *Conn) Send(buf *buffer.NocopyBuffer) error {
 	}
 
 	if needClose {
-		log.Warn("connection business write channel timeout")
+		xlog.Logger().Warn("connection business write channel timeout")
 		_ = c.close(true)
 	}
 
@@ -164,7 +164,7 @@ func (c *Conn) sendHeartbeat() error {
 	c.sendMu.RUnlock()
 
 	if needClose {
-		log.Warn("connection heartbeat channel full")
+		xlog.Logger().Warn("connection heartbeat channel full")
 		_ = c.close(true)
 	}
 
@@ -233,7 +233,7 @@ func (c *Conn) read() {
 		}
 
 		if err := handler(c, data); err != nil && !xerrors.Is(err, xerrors.ErrNotFoundUserLocation) {
-			log.Warnf("process route %d message failed: %v", routeID, err)
+			xlog.Sugar().Warnf("process route %d message failed: %v", routeID, err)
 		}
 	}
 }
@@ -256,7 +256,7 @@ func (c *Conn) write() {
 		select {
 		case hb := <-c.chHeartbeat:
 			if err := writeAllWithDeadline(conn, hb, writeTimeout); err != nil {
-				log.Warnf("write heartbeat message error: %v", err)
+				xlog.Sugar().Warnf("write heartbeat message error: %v", err)
 				_ = c.close(true)
 				return
 			}
@@ -272,14 +272,14 @@ func (c *Conn) write() {
 		case <-ticker.C:
 			deadline := xtime.Now().Add(-2 * def.HeartbeatInterval).Unix()
 			if atomic.LoadInt64(&c.lastHeartbeatTime) < deadline {
-				log.Warn("connection heartbeat timeout")
+				xlog.Logger().Warn("connection heartbeat timeout")
 				_ = c.close(true)
 				return
 			}
 
 		case hb := <-c.chHeartbeat:
 			if err := writeAllWithDeadline(conn, hb, writeTimeout); err != nil {
-				log.Warnf("write heartbeat message error: %v", err)
+				xlog.Sugar().Warnf("write heartbeat message error: %v", err)
 				_ = c.close(true)
 				return
 			}
@@ -300,7 +300,7 @@ func (c *Conn) write() {
 				}
 
 				if err := writeAllWithDeadline(conn, data, writeTimeout); err != nil {
-					log.Warnf("write business message error: %v", err)
+					xlog.Sugar().Warnf("write business message error: %v", err)
 					return false
 				}
 

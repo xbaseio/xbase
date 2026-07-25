@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
 	xnet "github.com/xbaseio/xbase/utils/xnet"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type server struct {
@@ -193,7 +193,7 @@ func (eh *gnetEventHandler) OnShutdown(eng xnet.Engine) {
 func (eh *gnetEventHandler) OnOpen(c xnet.Conn) ([]byte, xnet.Action) {
 	conn, err := eh.s.connMgr.allocate(c)
 	if err != nil {
-		log.Errorf("connection allocate error: %v", err)
+		xlog.Sugar().Errorf("connection allocate error: %v", err)
 		return nil, xnet.Close
 	}
 

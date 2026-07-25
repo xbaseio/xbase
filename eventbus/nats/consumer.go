@@ -4,10 +4,10 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/xbaseio/xbase/eventbus"
-	"github.com/xbaseio/xbase/log"
-	"github.com/xbaseio/xbase/task"
 	"github.com/nats-io/nats.go"
+	"github.com/xbaseio/xbase/eventbus"
+	"github.com/xbaseio/xbase/task"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type consumer struct {
@@ -48,7 +48,7 @@ func (c *consumer) delHandler(handler eventbus.EventHandler) int {
 func (c *consumer) dispatch(data []byte) {
 	event, err := deserialize(data)
 	if err != nil {
-		log.Error("invalid event data")
+		xlog.Logger().Error("invalid event data")
 		return
 	}
 

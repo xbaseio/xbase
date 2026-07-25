@@ -5,11 +5,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 func Info(event string, kv ...any) {
-	log.Infof("%s", render(event, kv...))
+	xlog.Sugar().Infof("%s", render(event, kv...))
 }
 
 func Warn(event string, err error, kv ...any) {
@@ -17,7 +17,7 @@ func Warn(event string, err error, kv ...any) {
 	if err != nil {
 		items = append(items, "err", err)
 	}
-	log.Warnf("%s", render(event, items...))
+	xlog.Sugar().Warnf("%s", render(event, items...))
 }
 
 func Error(event string, err error, kv ...any) {
@@ -25,7 +25,7 @@ func Error(event string, err error, kv ...any) {
 	if err != nil {
 		items = append(items, "err", err)
 	}
-	log.Errorf("%s", render(event, items...))
+	xlog.Sugar().Errorf("%s", render(event, items...))
 }
 
 func render(event string, kv ...any) string {

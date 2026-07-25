@@ -3,9 +3,9 @@ package http
 import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/xbaseio/xbase/etc"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/transport"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 const (
@@ -150,15 +150,15 @@ func defaultOptions() *options {
 	}
 
 	if err := etc.Get(defaultTrustProxyConfigKey).Scan(&opts.trustProxyConfig); err != nil {
-		log.Warnf("scan trust proxy options failed: %v", err)
+		xlog.Sugar().Warnf("scan trust proxy options failed: %v", err)
 	}
 
 	if err := etc.Get(defaultCorsKey).Scan(&opts.corsOpts); err != nil {
-		log.Warnf("scan cors options failed: %v", err)
+		xlog.Sugar().Warnf("scan cors options failed: %v", err)
 	}
 
 	if err := etc.Get(defaultSwaggerKey).Scan(&opts.swagOpts); err != nil {
-		log.Warnf("scan swag options failed: %v", err)
+		xlog.Sugar().Warnf("scan swag options failed: %v", err)
 	}
 
 	return opts

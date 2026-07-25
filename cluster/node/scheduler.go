@@ -4,8 +4,8 @@ import (
 	"sync"
 
 	"github.com/xbaseio/xbase/cluster"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type Scheduler struct {
@@ -221,7 +221,7 @@ func (s *Scheduler) dispatchRequest(ctx Context) error {
 
 	act, ok := s.loadActor(uid, kind.(string))
 	if !ok {
-		log.Errorf("dispatch request failed, uid = %v message = %v kind = %v", uid, ctx.MessageID(), kind)
+		xlog.Sugar().Errorf("dispatch request failed, uid = %v message = %v kind = %v", uid, ctx.MessageID(), kind)
 		return xerrors.ErrNotBindActor
 	}
 
@@ -233,7 +233,7 @@ func (s *Scheduler) dispatchEvent(ctx Context) error {
 	s.actors.Range(func(_, actor any) bool {
 		if act := actor.(*Actor); act.opts.dispatch {
 			if err := act.Next(ctx); err != nil {
-				log.Warnf("dispatch event to actor failed: %v", err)
+				xlog.Sugar().Warnf("dispatch event to actor failed: %v", err)
 			}
 		}
 

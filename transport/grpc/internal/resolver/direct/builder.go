@@ -8,9 +8,9 @@ import (
 
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/core/endpoint"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 	"google.golang.org/grpc/resolver"
 )
 
@@ -36,7 +36,7 @@ func NewBuilder(dis registry.Discovery) *Builder {
 	b.ctx, b.cancel = context.WithCancel(context.Background())
 
 	if err := b.init(); err != nil {
-		log.Fatalf("init client builder failed: %v", err)
+		xlog.Sugar().Fatalf("init client builder failed: %v", err)
 	}
 
 	return b
@@ -127,7 +127,7 @@ func (b *Builder) updateInstances(instances []*registry.ServiceInstance) {
 
 		ep, err := endpoint.ParseEndpoint(instance.Endpoint)
 		if err != nil {
-			log.Errorf("parse discovery endpoint failed: %v", err)
+			xlog.Sugar().Errorf("parse discovery endpoint failed: %v", err)
 			continue
 		}
 

@@ -16,10 +16,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xbaseio/xbase/log"
+	"github.com/stretchr/testify/assert"
 	"github.com/xbaseio/xbase/utils/xpool/xgoroutine"
 	"github.com/xbaseio/xbase/xerrors"
-	"github.com/stretchr/testify/assert"
+	"github.com/xbaseio/xbase/xlog"
 	"golang.org/x/sys/unix"
 )
 
@@ -119,7 +119,7 @@ func (s *testMcastServer) startMcastClient() {
 	s.mcast.Store(c.LocalAddr().String(), ch)
 
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
-	log.Debugf("test duration: %v", duration)
+	xlog.Sugar().Debugf("test duration: %v", duration)
 	start := time.Now()
 
 	for time.Since(start) < duration {

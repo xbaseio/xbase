@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/xbaseio/xbase/cluster"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type EventHandler func(ctx Context)
@@ -49,7 +49,7 @@ func (e *Trigger) trigger(kind cluster.Event, gid string, cid, uid int64) error 
 	case <-timer.C:
 		evt.reset()
 		e.node.evtPool.Put(evt)
-		log.Warnf("node event queue full, drop event: %v uid: %d", kind.String(), uid)
+		xlog.Sugar().Warnf("node event queue full, drop event: %v uid: %d", kind.String(), uid)
 		return xerrors.ErrDeliverQueueFull
 	}
 }
@@ -78,7 +78,7 @@ func (e *Trigger) handle(evt *event) {
 // AddEventHandler 添加事件处理器
 func (e *Trigger) AddEventHandler(event cluster.Event, handler EventHandler) {
 	if e.node.getState() != cluster.Shut {
-		log.Warnf("the node server is working, can't add Event handler")
+		xlog.Sugar().Warnf("the node server is working, can't add Event handler")
 		return
 	}
 

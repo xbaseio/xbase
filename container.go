@@ -16,10 +16,11 @@ import (
 	"github.com/xbaseio/xbase/etc"
 	"github.com/xbaseio/xbase/eventbus"
 	"github.com/xbaseio/xbase/lock"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/task"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/utils/xos"
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 const (
@@ -113,30 +114,30 @@ func (c *Container) doWaitSystemSignal() {
 
 	signal.Stop(sig)
 
-	log.Warnf("process got signal %v, container will close", s)
+	xlog.Logger().Warn("process got signal, container will close", zap.Any("signal", s))
 }
 
 // 清理所有模块
 func (c *Container) doClearModules() {
 	if err := eventbus.Close(); err != nil {
-		log.Warnf("eventbus close failed: %v", err)
+		xlog.Logger().Warn("eventbus close failed", zap.Error(err))
 	}
 
 	if err := lock.Close(); err != nil {
-		log.Warnf("lock-maker close failed: %v", err)
+		xlog.Logger().Warn("lock-maker close failed", zap.Error(err))
 	}
 
 	if err := cache.Close(); err != nil {
-		log.Warnf("cache close failed: %v", err)
+		xlog.Logger().Warn("cache close failed", zap.Error(err))
 	}
 
 	task.Release()
 
 	config.Close()
 
-	etc.Close()
+	_ = xlog.Sync()
 
-	log.Close()
+	etc.Close()
 }
 
 // 保存进程号
@@ -147,7 +148,7 @@ func (c *Container) doSaveProcessID() {
 	}
 
 	if err := xos.WriteFile(filename, []byte(strconv.Itoa(syscall.Getpid()))); err != nil {
-		log.Fatalf("pid save failed: %v", err)
+		xlog.Logger().Fatal("pid save failed", zap.Error(err))
 	}
 }
 

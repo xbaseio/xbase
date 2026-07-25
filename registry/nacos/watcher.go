@@ -5,10 +5,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/xbaseio/xbase/log"
-	"github.com/xbaseio/xbase/registry"
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
+	"github.com/xbaseio/xbase/registry"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type watcher struct {
@@ -101,13 +101,13 @@ func (wm *watcherMgr) subscribe() error {
 		GroupName:   wm.registry.opts.groupName,
 		SubscribeCallback: func(instances []model.Instance, err error) {
 			if err != nil {
-				log.Warnf("%s subscribe callback failed: %v", wm.serviceName, err)
+				xlog.Sugar().Warnf("%s subscribe callback failed: %v", wm.serviceName, err)
 				return
 			}
 
 			services, err := parseInstances(instances)
 			if err != nil {
-				log.Warnf("%s instances parse failed: %v", wm.serviceName, err)
+				xlog.Sugar().Warnf("%s instances parse failed: %v", wm.serviceName, err)
 				return
 			}
 

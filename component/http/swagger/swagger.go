@@ -9,7 +9,7 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
-	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type Config struct {
@@ -30,14 +30,14 @@ const (
 func New(cfg Config) fiber.Handler {
 	// Verify Swagger file exists
 	if _, err := os.Stat(cfg.FilePath); os.IsNotExist(err) {
-		log.Warnf("%s file does not exist", cfg.FilePath)
+		xlog.Sugar().Warnf("%s file does not exist", cfg.FilePath)
 		return nil
 	}
 
 	// Read Swagger Spec into memory
 	rawSpec, err := os.ReadFile(cfg.FilePath)
 	if err != nil {
-		log.Warnf("Failed to read provided Swagger file (%s): %v", cfg.FilePath, err)
+		xlog.Sugar().Warnf("Failed to read provided Swagger file (%s): %v", cfg.FilePath, err)
 		return nil
 	}
 

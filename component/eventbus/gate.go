@@ -6,7 +6,7 @@ import (
 
 	"github.com/xbaseio/xbase/component"
 	"github.com/xbaseio/xbase/eventbus"
-	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 const DefaultServiceStatusPolicyTopic = "cluster.gate.service_status_policy"
@@ -49,7 +49,7 @@ func PublishServiceStatusPolicy(payload *ServiceStatusPolicyEvent) {
 	}
 
 	if err := eventbus.Publish(context.Background(), DefaultServiceStatusPolicyTopic, payload); err != nil {
-		log.Errorf("publish service status policy failed, payload=%#v err=%v", payload, err)
+		xlog.Sugar().Errorf("publish service status policy failed, payload=%#v err=%v", payload, err)
 	}
 }
 
@@ -68,7 +68,7 @@ func SubscribeServiceStatusPolicy(handler func(uuid string, payload *ServiceStat
 	}
 
 	if err := eventbus.Subscribe(context.Background(), DefaultServiceStatusPolicyTopic, wrapper); err != nil {
-		log.Errorf("subscribe service status policy failed: %v", err)
+		xlog.Sugar().Errorf("subscribe service status policy failed: %v", err)
 	}
 
 	return wrapper

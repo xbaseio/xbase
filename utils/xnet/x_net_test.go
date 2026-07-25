@@ -21,10 +21,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xpool/xbytebuffer"
 	"github.com/xbaseio/xbase/utils/xpool/xgoroutine"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -617,7 +617,7 @@ func (s *testServer) OnShutdown(_ Engine) {
 
 func (s *testServer) OnClose(c Conn, err error) (action Action) {
 	if err != nil {
-		log.Debugf("error occurred on closed, %v\n", err)
+		xlog.Sugar().Debugf("error occurred on closed, %v\n", err)
 	}
 
 	assert.Equal(s.tester, c.Context(), c, "invalid context")
@@ -642,7 +642,7 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 						bs[1] = buf.B[mid:]
 						err := c.AsyncWritev(bs, func(c Conn, err error) error {
 							if c.RemoteAddr() != nil {
-								log.Debugf("conn=%s done writev: %v", c.RemoteAddr().String(), err)
+								xlog.Sugar().Debugf("conn=%s done writev: %v", c.RemoteAddr().String(), err)
 							}
 							xbytebuffer.Put(buf)
 							return nil
@@ -651,7 +651,7 @@ func (s *testServer) OnTraffic(c Conn) (action Action) {
 					} else {
 						err := c.AsyncWrite(buf.Bytes(), func(c Conn, err error) error {
 							if c.RemoteAddr() != nil {
-								log.Debugf("conn=%s done write: %v", c.RemoteAddr().String(), err)
+								xlog.Sugar().Debugf("conn=%s done write: %v", c.RemoteAddr().String(), err)
 							}
 							xbytebuffer.Put(buf)
 							return nil
@@ -837,7 +837,7 @@ func startClient(t *testing.T, network, addr string, multicore, async bool, pack
 	}
 
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
-	log.Debugf("test duration: %v", duration)
+	xlog.Sugar().Debugf("test duration: %v", duration)
 	start := time.Now()
 	if packetSize == 0 {
 		packetSize = streamLen
@@ -983,7 +983,7 @@ func (t *testWakeConnServer) OnTick() (delay time.Duration, action Action) {
 	}
 	t.c = <-t.conn
 	_ = t.c.Wake(func(c Conn, err error) error {
-		log.Debugf("conn=%s done wake: %v", c.RemoteAddr().String(), err)
+		xlog.Sugar().Debugf("conn=%s done wake: %v", c.RemoteAddr().String(), err)
 		return nil
 	})
 	delay = time.Millisecond * 100
@@ -1232,7 +1232,7 @@ func (t *testShutdownActionOnOpenServer) OnShutdown(e Engine) {
 	assert.Greaterf(t.tester, fd, 2, "expected fd: > 2, but got: %d", fd)
 	assert.NoErrorf(t.tester, err, "dup error")
 	assert.NoErrorf(t.tester, SysClose(fd), "close error")
-	log.Debugf("dup fd: %d with error: %v\n", fd, err)
+	xlog.Sugar().Debugf("dup fd: %d with error: %v\n", fd, err)
 }
 
 func (t *testShutdownActionOnOpenServer) OnTick() (delay time.Duration, action Action) {
@@ -1390,7 +1390,7 @@ func (t *testStopServer) OnBoot(eng Engine) (action Action) {
 }
 
 func (t *testStopServer) OnClose(Conn, error) (action Action) {
-	log.Debugf("closing connection...")
+	xlog.Sugar().Debugf("closing connection...")
 	return
 }
 
@@ -1417,7 +1417,7 @@ func (t *testStopServer) OnTick() (delay time.Duration, action Action) {
 			err = xgoroutine.DefaultWorkerPool.Submit(func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
-				log.Debugf("stop engine...", t.eng.Stop(ctx))
+				xlog.Sugar().Debugf("stop engine...", t.eng.Stop(ctx))
 			})
 			assert.NoError(t.tester, err)
 
@@ -1457,7 +1457,7 @@ func (t *testStopEngine) OnBoot(eng Engine) (action Action) {
 }
 
 func (t *testStopEngine) OnClose(Conn, error) (action Action) {
-	log.Debugf("closing connection...")
+	xlog.Sugar().Debugf("closing connection...")
 	return
 }
 
@@ -1484,7 +1484,7 @@ func (t *testStopEngine) OnTick() (delay time.Duration, action Action) {
 		if iter <= 0 {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
-			log.Debugf("stop engine...", t.eng.Stop(ctx))
+			xlog.Sugar().Debugf("stop engine...", t.eng.Stop(ctx))
 			// waiting the engine shutdown.
 			_, err = conn.Read(data)
 			assert.Error(t.tester, err)
@@ -1564,8 +1564,7 @@ func (s *testClosedWakeUpServer) OnBoot(eng Engine) (action Action) {
 
 		close(s.clientClosed)
 		<-s.serverClosed
-
-		log.Debugf("stop engine...", eng.Stop(context.TODO()))
+		xlog.Sugar().Debugf("stop engine...", eng.Stop(context.TODO()))
 	})
 	assert.NoError(s.tester, err)
 
@@ -1746,7 +1745,7 @@ func (s *simServer) OnOpen(c Conn) (out []byte, action Action) {
 
 func (s *simServer) OnClose(_ Conn, err error) (action Action) {
 	if err != nil {
-		log.Debugf("error occurred on closed, %v\n", err)
+		xlog.Sugar().Debugf("error occurred on closed, %v\n", err)
 	}
 
 	atomic.AddInt32(&s.disconnected, 1)
@@ -1767,7 +1766,7 @@ func (s *simServer) OnTraffic(c Conn) (action Action) {
 			break
 		}
 		if err != nil {
-			log.Errorf("invalid packet: %v", err)
+			xlog.Sugar().Errorf("invalid packet: %v", err)
 			return Close
 		}
 		packet, _ := codec.Encode(data)
@@ -1963,7 +1962,7 @@ func runSimClient(t *testing.T, network, addr string, packetSize, batch int) {
 	default:
 		duration = 5 * time.Second
 	}
-	log.Debugf("test duration: %v", duration)
+	xlog.Sugar().Debugf("test duration: %v", duration)
 	start := time.Now()
 	for time.Since(start) < duration {
 		batchSendAndRecv(t, c, rd, packetSize, batch)
@@ -2243,10 +2242,10 @@ func (p *streamProxyServer) OnClose(c Conn, err error) (action Action) {
 	if c.LocalAddr().String() == p.ListenerAddr {
 		connType = "server"
 	}
-	log.Debugf("closing %s connection: %s", connType, c.LocalAddr().String())
+	xlog.Sugar().Debugf("closing %s connection: %s", connType, c.LocalAddr().String())
 
 	if err != nil {
-		log.Debugf("error occurred on server connnection closing, %v", err)
+		xlog.Sugar().Debugf("error occurred on server connnection closing, %v", err)
 	}
 
 	if c.LocalAddr().String() == p.ListenerAddr { // it's a server connection

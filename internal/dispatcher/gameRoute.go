@@ -2,6 +2,7 @@ package dispatcher
 
 import (
 	"math/rand/v2"
+	"sync"
 	"sync/atomic"
 
 	"github.com/xbaseio/xbase/cluster"
@@ -16,6 +17,7 @@ type GameRoute struct {
 	counter    atomic.Uint64
 	dispatcher *Dispatcher
 	gameID     int32
+	mu         sync.Mutex // 保护 weightRoundRobinDispatch 中 currWeight 的并发修改
 }
 
 func newRoute_001(dispatcher *Dispatcher, group string, gameID int32) *GameRoute {

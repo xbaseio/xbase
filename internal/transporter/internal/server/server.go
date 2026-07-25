@@ -12,7 +12,7 @@ import (
 	"github.com/xbaseio/xbase/internal/transporter/internal/codes"
 	"github.com/xbaseio/xbase/internal/transporter/internal/protocol"
 	"github.com/xbaseio/xbase/internal/transporter/internal/route"
-	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 const scheme = "drpc"
@@ -113,13 +113,11 @@ func (s *Server) Start() error {
 				if tempDelay > time.Second {
 					tempDelay = time.Second
 				}
-
-				log.Warnf("tcp accept connect error: %v; retrying in %v", err, tempDelay)
+				xlog.Sugar().Warnf("tcp accept connect error: %v; retrying in %v", err, tempDelay)
 				time.Sleep(tempDelay)
 				continue
 			}
-
-			log.Warnf("tcp accept connect error: %v", err)
+			xlog.Sugar().Warnf("tcp accept connect error: %v", err)
 			return err
 		}
 

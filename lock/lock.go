@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 var globalMaker Maker
@@ -33,13 +34,13 @@ type Locker interface {
 // SetMaker 设置Locker制造商
 func SetMaker(maker Maker) {
 	if maker == nil {
-		log.Warn("cannot set a nil lock-maker")
+		xlog.Logger().Warn("cannot set a nil lock-maker")
 		return
 	}
 
 	if globalMaker != nil {
 		if err := globalMaker.Close(); err != nil {
-			log.Error("close lock-maker failed: %v", err)
+			xlog.Logger().Error("close lock-maker failed", zap.Error(err))
 		}
 	}
 

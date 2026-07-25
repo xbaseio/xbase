@@ -12,8 +12,8 @@ import (
 	"github.com/xbaseio/xbase/component/http/swagger"
 	"github.com/xbaseio/xbase/core/info"
 	xnet "github.com/xbaseio/xbase/core/net"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type Server struct {
@@ -132,7 +132,7 @@ func (s *Server) Proxy() *Proxy {
 func (s *Server) Start() {
 	listenAddr, exposeAddr, err := xnet.ParseAddr(s.opts.addr)
 	if err != nil {
-		log.Fatalf("http addr parse failed: %v", err)
+		xlog.Sugar().Fatalf("http addr parse failed: %v", err)
 	}
 
 	if s.opts.transporter != nil && s.opts.registry != nil {
@@ -147,7 +147,7 @@ func (s *Server) Start() {
 			CertKeyFile:           s.opts.keyFile,
 			DisableStartupMessage: true,
 		}); err != nil {
-			log.Fatalf("http server startup failed: %v", xerrors.Unwrap(xerrors.Unwrap(err)))
+			xlog.Sugar().Fatalf("http server startup failed: %v", xerrors.Unwrap(xerrors.Unwrap(err)))
 		}
 	}()
 }

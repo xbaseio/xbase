@@ -1,8 +1,8 @@
 package direct
 
 import (
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/resolver"
 )
@@ -30,7 +30,7 @@ func (r *Resolver) updateState(state resolver.State) {
 		r.cc.ReportError(err)
 
 		if !(len(state.Addresses) == 0 && xerrors.Is(err, balancer.ErrBadResolverState)) {
-			log.Warnf("update client conn state failed: %v", err)
+			xlog.Sugar().Warnf("update client conn state failed: %v", err)
 		}
 	}
 }

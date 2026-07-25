@@ -8,7 +8,7 @@ import (
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/internal/transporter/internal/server"
 	"github.com/xbaseio/xbase/internal/transporter/node"
-	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 func TestServer(t *testing.T) {
@@ -36,7 +36,7 @@ func (p *provider) Trigger(ctx context.Context, gid string, cid, uid int64, even
 
 // Deliver 投递消息
 func (p *provider) Deliver(ctx context.Context, gid, nid string, cid, uid int64, message []byte) error {
-	log.Infof("gid: %s, nid: %s, cid: %d, uid: %d message: %s", gid, nid, cid, uid, string(message))
+	xlog.Sugar().Infof("gid: %s, nid: %s, cid: %d, uid: %d message: %s", gid, nid, cid, uid, string(message))
 	return nil
 }
 

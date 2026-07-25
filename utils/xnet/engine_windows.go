@@ -7,8 +7,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 // engine 是 xnet 的核心调度器。
@@ -35,7 +35,7 @@ func (eng *engine) isShutdown() bool {
 // shutdown 发出关闭信号。
 func (eng *engine) shutdown(err error) {
 	if err != nil && !xerrors.Is(err, xerrors.ErrEngineShutdown) {
-		log.Errorf("engine is being shutdown with error: %v", err)
+		xlog.Sugar().Errorf("engine is being shutdown with error: %v", err)
 	}
 
 	eng.turnOff()
@@ -109,7 +109,7 @@ func (eng *engine) stop(ctx context.Context, engine Engine) {
 	eng.closeEventLoops()
 
 	if err := eng.concurrency.Wait(); err != nil && !xerrors.Is(err, xerrors.ErrEngineShutdown) {
-		log.Errorf("engine shutdown error: %v", err)
+		xlog.Sugar().Errorf("engine shutdown error: %v", err)
 	}
 
 	eng.inShutdown.Store(true)
@@ -118,8 +118,7 @@ func (eng *engine) stop(ctx context.Context, engine Engine) {
 // run 启动整个 xnet 引擎。
 func run(eventHandler EventHandler, listeners []*listener, options *Options, addrs []string) error {
 	numEventLoop := determineEventLoops(options)
-
-	log.Infof(
+	xlog.Sugar().Infof(
 		"Launching xnet with %d event-loops, listening on: %s",
 		numEventLoop,
 		strings.Join(addrs, " | "),
@@ -166,7 +165,7 @@ func run(eventHandler EventHandler, listeners []*listener, options *Options, add
 	}
 
 	if err := eng.start(ctx, numEventLoop); err != nil {
-		log.Errorf("xnet engine is stopping with error: %v", err)
+		xlog.Sugar().Errorf("xnet engine is stopping with error: %v", err)
 		return err
 	}
 	defer eng.stop(rootCtx, engine)

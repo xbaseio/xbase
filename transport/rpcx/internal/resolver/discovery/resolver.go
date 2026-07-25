@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xbaseio/xbase/log"
 	cli "github.com/smallnest/rpcx/client"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type Resolver struct {
@@ -108,7 +108,7 @@ func (r *Resolver) updateState(list []*cli.KVPair) {
 			select {
 			case ch <- pairs:
 			case <-time.After(time.Minute):
-				log.Warn("chan is full and new change has been dropped")
+				xlog.Logger().Warn("chan is full and new change has been dropped")
 			}
 		}(ch)
 	}

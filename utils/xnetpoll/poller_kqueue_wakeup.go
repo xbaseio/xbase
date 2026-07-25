@@ -3,7 +3,7 @@
 package xnetpoll
 
 import (
-	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/xlog"
 	"golang.org/x/sys/unix"
 )
 
@@ -31,7 +31,7 @@ retry:
 		// 但这里仍然选择谨慎处理，再重试一次，确保 100% 提交成功。
 		goto retry
 	}
-	log.Warnf("failed to wake up the poller: %v", err)
+	xlog.Sugar().Warnf("failed to wake up the poller: %v", err)
 	return err
 }
 

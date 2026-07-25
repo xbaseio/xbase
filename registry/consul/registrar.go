@@ -10,9 +10,9 @@ import (
 
 	"github.com/hashicorp/consul/api"
 	"github.com/xbaseio/xbase/encoding/json"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/utils/xconv"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 const (
@@ -190,7 +190,7 @@ func (r *registrar) heartbeat(ctx context.Context, insID string) {
 
 	err := r.registry.opts.client.Agent().UpdateTTL(checkID, checkUpdateOutput, api.HealthPassing)
 	if err != nil {
-		log.Warnf("update heartbeat ttl failed: %v", err)
+		xlog.Sugar().Warnf("update heartbeat ttl failed: %v", err)
 	}
 
 	ticker := time.NewTicker(time.Duration(r.registry.opts.heartbeatCheckInterval) * time.Second / 2)
@@ -203,7 +203,7 @@ func (r *registrar) heartbeat(ctx context.Context, insID string) {
 			}
 
 			if err = r.registry.opts.client.Agent().UpdateTTL(checkID, checkUpdateOutput, api.HealthPassing); err != nil {
-				log.Warnf("update heartbeat ttl failed: %v", err)
+				xlog.Sugar().Warnf("update heartbeat ttl failed: %v", err)
 			}
 		case <-ctx.Done():
 			return

@@ -5,10 +5,13 @@ import (
 	gatepolicy "github.com/xbaseio/xbase/component/eventbus"
 	"github.com/xbaseio/xbase/etc"
 	"github.com/xbaseio/xbase/examples/cluster-demo/internal/bootstrap"
-	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 func main() {
+	defer func() { _ = xlog.Sync() }()
+
 	eventbuscomponent.NewGlobal(bootstrap.NewEventbus()).Init()
 
 	payload := gatepolicy.ServiceStatusPolicyEvent{
@@ -22,7 +25,10 @@ func main() {
 	}
 
 	gatepolicy.PublishServiceStatusPolicy(&payload)
-
-	log.Infof("publish service status policy success, gateNames=%v grayTrafficPercent=%d grayWhitelist=%d testWhitelist=%d",
-		payload.GateNames, payload.Policy.GrayTrafficPercent, len(payload.Policy.GrayWhitelist), len(payload.Policy.TestWhitelist))
+	xlog.Logger().Info("publish service status policy success",
+		zap.Strings("gateNames", payload.GateNames),
+		zap.Int("grayTrafficPercent", payload.Policy.GrayTrafficPercent),
+		zap.Int("grayWhitelist", len(payload.Policy.GrayWhitelist)),
+		zap.Int("testWhitelist", len(payload.Policy.TestWhitelist)),
+	)
 }

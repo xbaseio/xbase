@@ -6,11 +6,11 @@ import (
 	"sync/atomic"
 
 	"github.com/gorilla/websocket"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/utils/xnet"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type clientConn struct {
@@ -338,7 +338,7 @@ func (c *clientConn) read() {
 		if err != nil {
 			if !xerrors.Is(err, net.ErrClosed) {
 				if _, ok := err.(*websocket.CloseError); !ok {
-					log.Warnf("read message failed: %v", err)
+					xlog.Sugar().Warnf("read message failed: %v", err)
 				}
 			}
 
@@ -460,7 +460,7 @@ func (c *clientConn) doWrite(r chWrite) bool {
 	if err := conn.WriteMessage(websocket.BinaryMessage, r.msg); err != nil {
 		if !xerrors.Is(err, net.ErrClosed) {
 			if _, ok := err.(*websocket.CloseError); !ok {
-				log.Errorf("write message error: %v", err)
+				xlog.Sugar().Errorf("write message error: %v", err)
 			}
 		}
 

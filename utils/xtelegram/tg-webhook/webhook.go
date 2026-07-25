@@ -1,8 +1,6 @@
 package tgwebhook
 
-import (
-	"github.com/xbaseio/xbase/log"
-)
+import "github.com/xbaseio/xbase/xlog"
 
 func SetWebHook(botToken, channelCode, webHookUrl string) error {
 
@@ -21,7 +19,7 @@ func SetWebHook(botToken, channelCode, webHookUrl string) error {
 
 	var res any
 	err := client.Get("/setWebhook", data, res)
-	log.Warnf("channelCode:%v CallBack:%v, %#v:%v", channelCode, webHookUrl, res, err)
+	xlog.Sugar().Warnf("channelCode:%v CallBack:%v, %#v:%v", channelCode, webHookUrl, res, err)
 	if err != nil {
 		return err
 	}

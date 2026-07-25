@@ -3,16 +3,15 @@
 package xnetpoll
 
 import (
+	"github.com/xbaseio/xbase/xlog"
 	"golang.org/x/sys/unix"
-
-	"github.com/xbaseio/xbase/log"
 )
 
 func (p *Poller) addWakeupEvent() error {
 	// 创建 pipe（用于唤醒 poller）
 	p.pipe = make([]int, 2)
 	if err := unix.Pipe2(p.pipe[:], unix.O_NONBLOCK|unix.O_CLOEXEC); err != nil {
-		log.Fatalf("failed to create pipe for wakeup event: %v", err)
+		xlog.Sugar().Fatalf("failed to create pipe for wakeup event: %v", err)
 	}
 
 	// 将 pipe 的读端注册到 kqueue，监听读事件
@@ -36,8 +35,7 @@ retry:
 		// 被信号中断，重试
 		goto retry
 	}
-
-	log.Warnf("failed to write to the wakeup pipe: %v", err)
+	xlog.Sugar().Warnf("failed to write to the wakeup pipe: %v", err)
 	return err
 }
 

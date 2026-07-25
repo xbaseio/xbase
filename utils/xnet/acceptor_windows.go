@@ -5,9 +5,9 @@ import (
 	"net"
 	"runtime"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xpool/xgoroutine"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 func (eng *engine) listenStream(ln net.Listener) (err error) {
@@ -24,7 +24,7 @@ func (eng *engine) listenStream(ln net.Listener) (err error) {
 		if e != nil {
 			err = e
 			if !eng.beingShutdown.Load() {
-				log.Errorf("Accept() fails xbase to error: %v", err)
+				xlog.Sugar().Errorf("Accept() fails xbase to error: %v", err)
 			} else if errors.Is(err, net.ErrClosed) {
 				err = errors.Join(err, xerrors.ErrEngineShutdown)
 			}
@@ -62,7 +62,7 @@ func (eng *engine) ListenUDP(pc net.PacketConn) (err error) {
 		if e != nil {
 			err = e
 			if !eng.beingShutdown.Load() {
-				log.Errorf("failed to receive data from UDP fd xbase to error:%v", err)
+				xlog.Sugar().Errorf("failed to receive data from UDP fd xbase to error:%v", err)
 			} else if errors.Is(err, net.ErrClosed) {
 				err = errors.Join(err, xerrors.ErrEngineShutdown)
 			}

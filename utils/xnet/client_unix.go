@@ -12,9 +12,10 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xbuffer/xring"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 
 	"github.com/xbaseio/xbase/utils/xmath"
 	"github.com/xbaseio/xbase/utils/xnetpoll"
@@ -99,7 +100,7 @@ func normalizeBufferCap(size int) int {
 // Start 启动客户端事件循环
 func (cli *Client) Start() error {
 	numEventLoop := determineEventLoops(cli.opts)
-	log.Infof("Starting xnet client with %d event loops", numEventLoop)
+	xlog.Sugar().Infof("Starting xnet client with %d event loops", numEventLoop)
 
 	cli.eng.eventHandler.OnBoot(Engine{cli.eng})
 
@@ -144,8 +145,7 @@ func (cli *Client) Start() error {
 			return nil
 		})
 	}
-
-	log.Debugf("default log level is %s", log.LogLevel())
+	xlog.Sugar().Debugf("default log level is %s", zap.L().Level().String())
 	return nil
 }
 
@@ -157,11 +157,13 @@ func (cli *Client) Stop() error {
 
 	// 通知所有 event loop 退出
 	cli.eng.eventLoops.iterate(func(_ int, el *eventloop) bool {
-		log.Error(el.poller.Trigger(
+		if err := el.poller.Trigger(
 			xqueue.HighPriority,
 			func(_ any) error { return xerrors.ErrEngineShutdown },
 			nil,
-		))
+		); err != nil {
+			xlog.Logger().Error("trigger event-loop shutdown failed", zap.Error(err))
+		}
 		return true
 	})
 

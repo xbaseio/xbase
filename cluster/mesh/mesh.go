@@ -9,10 +9,10 @@ import (
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/component"
 	"github.com/xbaseio/xbase/core/info"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/transport"
 	"github.com/xbaseio/xbase/utils/xcall"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type HookHandler func(proxy *Proxy)
@@ -62,15 +62,15 @@ func (m *Mesh) Name() string {
 // Init 初始化节点
 func (m *Mesh) Init() {
 	if m.opts.codec == nil {
-		log.Fatal("codec component is not injected")
+		xlog.Logger().Fatal("codec component is not injected")
 	}
 
 	if m.opts.registry == nil {
-		log.Fatal("registry component is not injected")
+		xlog.Logger().Fatal("registry component is not injected")
 	}
 
 	if m.opts.transporter == nil {
-		log.Fatal("transporter component is not injected")
+		xlog.Logger().Fatal("transporter component is not injected")
 	}
 
 	m.runHookFunc(cluster.Init)
@@ -136,32 +136,32 @@ func (m *Mesh) startTransportServer() {
 
 	transporter, err := m.opts.transporter.NewServer()
 	if err != nil {
-		log.Fatalf("transport server create failed: %v", err)
+		xlog.Sugar().Fatalf("transport server create failed: %v", err)
 	}
 
 	m.transporter = transporter
 
 	for _, entity := range m.services {
 		if err = m.transporter.RegisterService(entity.desc, entity.provider); err != nil {
-			log.Fatalf("register service failed: %v", err)
+			xlog.Sugar().Fatalf("register service failed: %v", err)
 		}
 	}
 
 	go func() {
 		if err = m.transporter.Start(); err != nil {
-			log.Fatalf("transport server start failed: %v", err)
+			xlog.Sugar().Fatalf("transport server start failed: %v", err)
 		}
 	}()
 
 	if err = cluster.WaitForTCPListen(m.transporter.Addr(), defaultTimeout); err != nil {
-		log.Fatalf("transport server listen timeout: %v", err)
+		xlog.Sugar().Fatalf("transport server listen timeout: %v", err)
 	}
 }
 
 // 停止传输服务器
 func (m *Mesh) stopTransportServer() {
 	if err := m.transporter.Stop(); err != nil {
-		log.Errorf("transport server stop failed: %v", err)
+		xlog.Sugar().Errorf("transport server stop failed: %v", err)
 	}
 }
 
@@ -187,7 +187,7 @@ func (m *Mesh) registerServiceInstance() {
 	defer cancel()
 
 	if err := m.opts.registry.Register(ctx, m.instance); err != nil {
-		log.Fatalf("register cluster instance failed: %v", err)
+		xlog.Sugar().Fatalf("register cluster instance failed: %v", err)
 	}
 }
 
@@ -203,7 +203,7 @@ func (m *Mesh) refreshServiceInstance() {
 	defer cancel()
 
 	if err := m.opts.registry.Register(ctx, m.instance); err != nil {
-		log.Fatalf("refresh cluster instance failed: %v", err)
+		xlog.Sugar().Fatalf("refresh cluster instance failed: %v", err)
 	}
 }
 
@@ -213,7 +213,7 @@ func (m *Mesh) deregisterServiceInstance() {
 	defer cancel()
 
 	if err := m.opts.registry.Deregister(ctx, m.instance); err != nil {
-		log.Errorf("deregister cluster instance failed: %v", err)
+		xlog.Sugar().Errorf("deregister cluster instance failed: %v", err)
 	}
 }
 
@@ -257,7 +257,7 @@ func (m *Mesh) addHookListener(hook cluster.Hook, handler HookHandler) {
 		if m.getState() == cluster.Shut {
 			m.hooks[hook] = append(m.hooks[hook], handler)
 		} else {
-			log.Warnf("server is working, can't add hook handler")
+			xlog.Sugar().Warnf("server is working, can't add hook handler")
 		}
 	}
 }
@@ -271,7 +271,7 @@ func (m *Mesh) addServiceProvider(name string, desc, provider any) {
 			provider: provider,
 		})
 	} else {
-		log.Warnf("mesh server is working, can't add service provider")
+		xlog.Sugar().Warnf("mesh server is working, can't add service provider")
 	}
 }
 

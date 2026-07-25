@@ -101,7 +101,14 @@ func (p *partition) delete(c *kcp.UDPSession) (*serverConn, bool) {
 
 // 关闭该分片内的所有连接
 func (p *partition) close() {
+	p.rw.Lock()
+	conns := make([]*serverConn, 0, len(p.connections))
 	for _, conn := range p.connections {
+		conns = append(conns, conn)
+	}
+	p.rw.Unlock()
+
+	for _, conn := range conns {
 		_ = conn.Close()
 	}
 }

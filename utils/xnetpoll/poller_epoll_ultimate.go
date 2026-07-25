@@ -10,7 +10,6 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/utils/xqueue"
 	"github.com/xbaseio/xbase/xerrors"
 )
@@ -131,7 +130,7 @@ func (p *Poller) Polling() error {
 			runtime.Gosched()
 			continue
 		} else if err != nil {
-			log.Errorf("error occurs in epoll: %v", os.NewSyscallError("epoll_wait", err))
+			xlog.Sugar().Errorf("error occurs in epoll: %v", os.NewSyscallError("epoll_wait", err))
 			return err
 		}
 
@@ -194,7 +193,7 @@ func (p *Poller) Polling() error {
 						continue
 					}
 					if err != nil {
-						log.Errorf("failed to notify next round of event-loop for leftover tasks, %v",
+						xlog.Sugar().Errorf("failed to notify next round of event-loop for leftover tasks, %v",
 							os.NewSyscallError("write", err))
 					}
 					break

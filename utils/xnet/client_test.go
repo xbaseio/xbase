@@ -15,10 +15,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/xbaseio/xbase/log"
 	bbPool "github.com/xbaseio/xbase/utils/xpool/xbytebuffer"
 	goPool "github.com/xbaseio/xbase/utils/xpool/xgoroutine"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type connHandler struct {
@@ -422,7 +422,7 @@ func (s *testClient) OnOpen(c Conn) (out []byte, action Action) {
 
 func (s *testClient) OnClose(c Conn, err error) (action Action) {
 	if err != nil {
-		log.Debugf("error occurred on closed, %v\n", err)
+		xlog.Sugar().Debugf("error occurred on closed, %v\n", err)
 	}
 
 	if s.network != "udp" {
@@ -601,7 +601,7 @@ func startxnetClient(t *testing.T, cli *Client, network, addr string, multicore,
 
 	rspCh := handler.rspCh
 	duration := time.Duration((rand.Float64()*2+1)*float64(time.Second)) / 2
-	log.Debugf("test duration: %v", duration)
+	xlog.Sugar().Debugf("test duration: %v", duration)
 
 	start := time.Now()
 	for time.Since(start) < duration {

@@ -11,10 +11,10 @@ import (
 	"github.com/xbaseio/xbase/component"
 	"github.com/xbaseio/xbase/core/info"
 	"github.com/xbaseio/xbase/internal/transporter/node"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/transport"
 	"github.com/xbaseio/xbase/utils/xcall"
+	"github.com/xbaseio/xbase/xlog"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -94,33 +94,33 @@ func (n *Node) Name() string {
 // Init 初始化节点
 func (n *Node) Init() {
 	if n.opts.id == "" {
-		log.Fatal("instance id can not be empty")
+		xlog.Logger().Fatal("instance id can not be empty")
 	}
 
 	if n.opts.name == "" {
-		log.Fatal("instance name can not be empty")
+		xlog.Logger().Fatal("instance name can not be empty")
 	}
 
 	if n.opts.gameID <= cluster.GateGameID {
-		log.Fatal("node game id must be greater than gate game id")
+		xlog.Logger().Fatal("node game id must be greater than gate game id")
 	}
 
 	if n.opts.codec == nil {
-		log.Fatal("codec component is not injected")
+		xlog.Logger().Fatal("codec component is not injected")
 	}
 
 	if n.opts.locator == nil {
-		log.Fatal("locator component is not injected")
+		xlog.Logger().Fatal("locator component is not injected")
 	}
 
 	if n.opts.registry == nil {
-		log.Fatal("registry component is not injected")
+		xlog.Logger().Fatal("registry component is not injected")
 	}
 
 	n.runHookFunc(cluster.Init)
 
 	if n.router.StatefulRouteCount() > 0 {
-		log.Warnf("node %s has %d stateful routes; ensure BindNode is called before stateful traffic",
+		xlog.Sugar().Warnf("node %s has %d stateful routes; ensure BindNode is called before stateful traffic",
 			n.opts.name, n.router.StatefulRouteCount())
 	}
 }
@@ -234,26 +234,26 @@ func (n *Node) startLinkServer() {
 		Expose: n.opts.expose,
 	})
 	if err != nil {
-		log.Fatalf("link server create failed: %v", err)
+		xlog.Sugar().Fatalf("link server create failed: %v", err)
 	}
 
 	n.linker = linker
 
 	go func() {
 		if err = n.linker.Start(); err != nil {
-			log.Fatalf("link server start failed: %v", err)
+			xlog.Sugar().Fatalf("link server start failed: %v", err)
 		}
 	}()
 
 	if err = cluster.WaitForTCPListen(n.linker.ListenAddr(), defaultTimeout); err != nil {
-		log.Fatalf("link server listen timeout: %v", err)
+		xlog.Sugar().Fatalf("link server listen timeout: %v", err)
 	}
 }
 
 // 停止连接服务器
 func (n *Node) stopLinkServer() {
 	if err := n.linker.Stop(); err != nil {
-		log.Errorf("link server stop failed: %v", err)
+		xlog.Sugar().Errorf("link server stop failed: %v", err)
 	}
 }
 
@@ -271,25 +271,25 @@ func (n *Node) startTransportServer() {
 
 	transporter, err := n.opts.transporter.NewServer()
 	if err != nil {
-		log.Fatalf("transport server create failed: %v", err)
+		xlog.Sugar().Fatalf("transport server create failed: %v", err)
 	}
 
 	n.transporter = transporter
 
 	for _, entity := range n.services {
 		if err = n.transporter.RegisterService(entity.desc, entity.provider); err != nil {
-			log.Fatalf("register service failed: %v", err)
+			xlog.Sugar().Fatalf("register service failed: %v", err)
 		}
 	}
 
 	go func() {
 		if err = n.transporter.Start(); err != nil {
-			log.Fatalf("transport server start failed: %v", err)
+			xlog.Sugar().Fatalf("transport server start failed: %v", err)
 		}
 	}()
 
 	if err = cluster.WaitForTCPListen(n.transporter.Addr(), defaultTimeout); err != nil {
-		log.Fatalf("transport server listen timeout: %v", err)
+		xlog.Sugar().Fatalf("transport server listen timeout: %v", err)
 	}
 }
 
@@ -300,7 +300,7 @@ func (n *Node) stopTransportServer() {
 	}
 
 	if err := n.transporter.Stop(); err != nil {
-		log.Errorf("transport server stop failed: %v", err)
+		xlog.Sugar().Errorf("transport server stop failed: %v", err)
 	}
 }
 
@@ -349,14 +349,14 @@ func (n *Node) registerServiceInstances() {
 	}
 
 	if err := n.doRegisterServiceInstances(); err != nil {
-		log.Fatalf("register cluster instances failed: %v", err)
+		xlog.Sugar().Fatalf("register cluster instances failed: %v", err)
 	}
 }
 
 // 刷新服务实例状态
 func (n *Node) refreshServiceInstances() {
 	if err := n.doRefreshServiceInstances(); err != nil {
-		log.Errorf("refresh cluster instances failed: %v", err)
+		xlog.Sugar().Errorf("refresh cluster instances failed: %v", err)
 	}
 }
 
@@ -373,7 +373,7 @@ func (n *Node) deregisterServiceInstances() {
 	}
 
 	if err := eg.Wait(); err != nil {
-		log.Errorf("deregister cluster instances failed: %v", err)
+		xlog.Sugar().Errorf("deregister cluster instances failed: %v", err)
 	}
 }
 
@@ -449,7 +449,7 @@ func (n *Node) addHookListener(hook cluster.Hook, handler HookHandler) {
 		if n.getState() == cluster.Shut {
 			n.hooks[hook] = append(n.hooks[hook], handler)
 		} else {
-			log.Warnf("server is working, can't add hook handler")
+			xlog.Sugar().Warnf("server is working, can't add hook handler")
 		}
 	}
 }
@@ -463,7 +463,7 @@ func (n *Node) addServiceProvider(name string, desc, provider any) {
 			provider: provider,
 		})
 	} else {
-		log.Warnf("server is working, can't add service provider")
+		xlog.Sugar().Warnf("server is working, can't add service provider")
 	}
 }
 

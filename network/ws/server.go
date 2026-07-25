@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/utils/xcall"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type UpgradeHandler func(w http.ResponseWriter, r *http.Request) (allowed bool)
@@ -178,7 +178,7 @@ func (s *server) serve() {
 	}
 
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Errorf("websocket server shutdown, addr=%s, err=%v", s.opts.addr, err)
+		xlog.Sugar().Errorf("websocket server shutdown, addr=%s, err=%v", s.opts.addr, err)
 	}
 }
 
@@ -196,12 +196,12 @@ func (s *server) handleUpgrade(w http.ResponseWriter, r *http.Request, upgrader 
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Errorf("websocket upgrade error, remote=%s, path=%s, err=%v", r.RemoteAddr, r.URL.Path, err)
+		xlog.Sugar().Errorf("websocket upgrade error, remote=%s, path=%s, err=%v", r.RemoteAddr, r.URL.Path, err)
 		return
 	}
 
 	if err = s.connMgr.allocate(conn); err != nil {
-		log.Errorf("connection allocate error, remote=%s, err=%v", r.RemoteAddr, err)
+		xlog.Sugar().Errorf("connection allocate error, remote=%s, err=%v", r.RemoteAddr, err)
 		_ = conn.Close()
 		return
 	}

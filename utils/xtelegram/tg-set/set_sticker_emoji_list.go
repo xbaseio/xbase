@@ -3,8 +3,7 @@ package tgSet
 import (
 	"github.com/xbaseio/xbase/utils/xtelegram/telegram/telegram"
 	"github.com/xbaseio/xbase/utils/xtelegram/telegram/types"
-
-	"github.com/xbaseio/xbase/log"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 func SetStickerEmojiList(botToken string) error {
@@ -15,7 +14,7 @@ func SetStickerEmojiList(botToken string) error {
 
 	botApi, err := telegram.New(botToken)
 	if err != nil {
-		log.Errorf("%v", err)
+		xlog.Sugar().Errorf("%v", err)
 		return nil
 	}
 
@@ -30,10 +29,10 @@ func SetStickerEmojiList(botToken string) error {
 	})
 
 	if err != nil {
-		log.Errorf("%v", err)
+		xlog.Sugar().Errorf("%v", err)
 		return err
 	}
-	log.Warnf("botToken,botToken:%v %#v", botToken, rst)
+	xlog.Sugar().Warnf("botToken,botToken:%v %#v", botToken, rst)
 
 	return nil
 

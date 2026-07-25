@@ -11,10 +11,10 @@ import (
 	"github.com/xbaseio/xbase/core/buffer"
 	"github.com/xbaseio/xbase/internal/transporter/internal/def"
 	"github.com/xbaseio/xbase/internal/transporter/internal/protocol"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/mode"
 	"github.com/xbaseio/xbase/utils/xtime"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 const (
@@ -272,7 +272,7 @@ func (c *conn) enqueue(msg *message) error {
 	c.sendMu.RUnlock()
 
 	if needClose {
-		log.Warn("transporter client write queue timeout")
+		xlog.Logger().Warn("transporter client write queue timeout")
 		c.close()
 	}
 
@@ -338,13 +338,13 @@ func (c *conn) write(ctx context.Context, conn net.Conn) {
 		case t := <-ticker.C:
 			deadline := t.Add(-2 * def.HeartbeatInterval).Unix()
 			if c.lastHeartbeatTime.Load() < deadline {
-				log.Warn("connection heartbeat timeout")
+				xlog.Logger().Warn("connection heartbeat timeout")
 				c.retry(conn)
 				return
 			}
 
 			if err := writeAllWithDeadline(conn, protocol.Heartbeat(), writeTimeout); err != nil {
-				log.Warnf("write heartbeat message error: %v", err)
+				xlog.Sugar().Warnf("write heartbeat message error: %v", err)
 				c.retry(conn)
 				return
 			}
@@ -384,7 +384,7 @@ func (c *conn) doWrite(conn net.Conn, msg *message) bool {
 		}
 
 		if err := writeAllWithDeadline(conn, data, writeTimeout); err != nil {
-			log.Warnf("write transporter message error: %v", err)
+			xlog.Sugar().Warnf("write transporter message error: %v", err)
 			return false
 		}
 
@@ -425,7 +425,7 @@ func (c *conn) retry(conn net.Conn) {
 	}
 
 	if err := c.dial(); err != nil {
-		log.Warnf("retry dial failed: %v", err)
+		xlog.Sugar().Warnf("retry dial failed: %v", err)
 	}
 }
 

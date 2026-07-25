@@ -5,8 +5,8 @@ import (
 	"sync"
 
 	"github.com/xbaseio/xbase/cluster"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/registry"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type routePolicy struct {
@@ -49,7 +49,7 @@ func (w *routeWatcher) watch() {
 	watcher, err := w.registry.Watch(tctx, cluster.Node.String())
 	cancel()
 	if err != nil {
-		log.Warnf("gate route watch failed: %v", err)
+		xlog.Sugar().Warnf("gate route watch failed: %v", err)
 		return
 	}
 

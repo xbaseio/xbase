@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/xbaseio/xbase/eventbus/internal"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/xerrors"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 var globalEventbus Eventbus
@@ -29,13 +29,13 @@ type Eventbus interface {
 // SetEventbus 设置事件总线
 func SetEventbus(eb Eventbus) {
 	if eb == nil {
-		log.Warn("cannot set a nil eventbus")
+		xlog.Logger().Warn("cannot set a nil eventbus")
 		return
 	}
 
 	if globalEventbus != nil {
 		if err := globalEventbus.Close(); err != nil {
-			log.Errorf("the old eventbus close failed: %v", err)
+			xlog.Sugar().Errorf("the old eventbus close failed: %v", err)
 		}
 	}
 

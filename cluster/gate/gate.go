@@ -11,10 +11,10 @@ import (
 	"github.com/xbaseio/xbase/core/info"
 	"github.com/xbaseio/xbase/core/net"
 	"github.com/xbaseio/xbase/internal/transporter/gate"
-	"github.com/xbaseio/xbase/log"
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/session"
+	"github.com/xbaseio/xbase/xlog"
 )
 
 type Gate struct {
@@ -59,19 +59,19 @@ func (g *Gate) Name() string {
 // Init 初始化
 func (g *Gate) Init() {
 	if g.opts.id == "" {
-		log.Fatal("instance id can not be empty")
+		xlog.Logger().Fatal("instance id can not be empty")
 	}
 
 	if g.opts.server == nil {
-		log.Fatal("server component is not injected")
+		xlog.Logger().Fatal("server component is not injected")
 	}
 
 	if g.opts.locator == nil {
-		log.Fatal("locator component is not injected")
+		xlog.Logger().Fatal("locator component is not injected")
 	}
 
 	if g.opts.registry == nil {
-		log.Fatal("registry component is not injected")
+		xlog.Logger().Fatal("registry component is not injected")
 	}
 
 }
@@ -175,14 +175,14 @@ func (g *Gate) startNetworkServer() {
 	g.opts.server.OnReceive(g.handleReceive)
 
 	if err := g.opts.server.Start(); err != nil {
-		log.Fatalf("network server start failed: %v", err)
+		xlog.Sugar().Fatalf("network server start failed: %v", err)
 	}
 }
 
 // 停止网关服务器
 func (g *Gate) stopNetworkServer() {
 	if err := g.opts.server.Stop(); err != nil {
-		log.Errorf("network server stop failed: %v", err)
+		xlog.Sugar().Errorf("network server stop failed: %v", err)
 	}
 }
 
@@ -227,7 +227,7 @@ func (g *Gate) handleReceive(conn network.Conn, data []byte) {
 	select {
 	case g.inbound <- msg:
 	default:
-		log.Warnf("gate receive queue full, close conn: %d", conn.ID())
+		xlog.Sugar().Warnf("gate receive queue full, close conn: %d", conn.ID())
 		_ = conn.Close(true)
 	}
 }
@@ -239,26 +239,26 @@ func (g *Gate) startLinkerServer() {
 		Expose: g.opts.expose,
 	})
 	if err != nil {
-		log.Fatalf("link server create failed: %v", err)
+		xlog.Sugar().Fatalf("link server create failed: %v", err)
 	}
 
 	g.linker = transporter
 
 	go func() {
 		if err = g.linker.Start(); err != nil {
-			log.Errorf("link server start failed: %v", err)
+			xlog.Sugar().Errorf("link server start failed: %v", err)
 		}
 	}()
 
 	if err = cluster.WaitForTCPListen(g.linker.ListenAddr(), defaultTimeout); err != nil {
-		log.Fatalf("link server listen timeout: %v", err)
+		xlog.Sugar().Fatalf("link server listen timeout: %v", err)
 	}
 }
 
 // 停止传输服务器
 func (g *Gate) stopLinkerServer() {
 	if err := g.linker.Stop(); err != nil {
-		log.Errorf("link server stop failed: %v", err)
+		xlog.Sugar().Errorf("link server stop failed: %v", err)
 	}
 }
 
@@ -279,7 +279,7 @@ func (g *Gate) registerServiceInstance() {
 	defer cancel()
 
 	if err := g.opts.registry.Register(ctx, g.instance); err != nil {
-		log.Fatalf("register cluster instance failed: %v", err)
+		xlog.Sugar().Fatalf("register cluster instance failed: %v", err)
 	}
 }
 
@@ -295,7 +295,7 @@ func (g *Gate) refreshServiceInstance() {
 	defer cancel()
 
 	if err := g.opts.registry.Register(ctx, g.instance); err != nil {
-		log.Fatalf("refresh cluster instance failed: %v", err)
+		xlog.Sugar().Fatalf("refresh cluster instance failed: %v", err)
 	}
 }
 
@@ -305,7 +305,7 @@ func (g *Gate) deregisterServiceInstance() {
 	defer cancel()
 
 	if err := g.opts.registry.Deregister(ctx, g.instance); err != nil {
-		log.Errorf("deregister cluster instance failed: %v", err)
+		xlog.Sugar().Errorf("deregister cluster instance failed: %v", err)
 	}
 }
 
