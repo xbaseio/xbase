@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/xbaseio/xbase/etc"
 	"go.uber.org/zap"
@@ -53,10 +54,10 @@ func configure() error {
 		return err
 	}
 	if rotation := loadRotationConfig(); rotation.Enabled {
-		cfg.OutputPaths = rotatingOutputPaths(cfg.OutputPaths, rotation)
+		applyRotation(&cfg, rotation)
 	}
 
-	next, err := cfg.Build(buildOpts...)
+	next, err := buildLogger(cfg, buildOpts...)
 	if err != nil {
 		return err
 	}
@@ -69,6 +70,103 @@ func configure() error {
 	}
 
 	return nil
+}
+
+func applyRotation(cfg *zap.Config, rotation rotationConfig) {
+	cfg.OutputPaths = rotatingOutputPaths(cfg.OutputPaths, rotation)
+	cfg.ErrorOutputPaths = rotatingOutputPaths(cfg.ErrorOutputPaths, rotation)
+}
+
+func buildLogger(cfg zap.Config, buildOpts ...zap.Option) (*zap.Logger, error) {
+	errSink, closeErrorSink, err := zap.Open(cfg.ErrorOutputPaths...)
+	if err != nil {
+		return nil, err
+	}
+
+	cores := make([]zapcore.Core, 0, 2)
+	closeOutputs := make([]func(), 0, 2)
+	closeOnError := func() {
+		for _, closeOutput := range closeOutputs {
+			closeOutput()
+		}
+		closeErrorSink()
+	}
+
+	terminalPaths, otherPaths := splitOutputPaths(cfg.OutputPaths)
+	if len(terminalPaths) > 0 {
+		core, closeOutput, openErr := buildCore(cfg, terminalPaths, true)
+		if openErr != nil {
+			closeOnError()
+			return nil, openErr
+		}
+		cores = append(cores, core)
+		closeOutputs = append(closeOutputs, closeOutput)
+	}
+	if len(otherPaths) > 0 {
+		core, closeOutput, openErr := buildCore(cfg, otherPaths, false)
+		if openErr != nil {
+			closeOnError()
+			return nil, openErr
+		}
+		cores = append(cores, core)
+		closeOutputs = append(closeOutputs, closeOutput)
+	}
+
+	core := zapcore.NewTee(cores...)
+	if cfg.Sampling != nil {
+		samplerOpts := make([]zapcore.SamplerOption, 0, 1)
+		if cfg.Sampling.Hook != nil {
+			samplerOpts = append(samplerOpts, zapcore.SamplerHook(cfg.Sampling.Hook))
+		}
+		core = zapcore.NewSamplerWithOptions(
+			core,
+			time.Second,
+			cfg.Sampling.Initial,
+			cfg.Sampling.Thereafter,
+			samplerOpts...,
+		)
+	}
+
+	opts := []zap.Option{zap.ErrorOutput(errSink)}
+	if cfg.Development {
+		opts = append(opts, zap.Development())
+	}
+	if !cfg.DisableCaller {
+		opts = append(opts, zap.AddCaller())
+	}
+	opts = append(opts, buildOpts...)
+	return zap.New(core, opts...), nil
+}
+
+func buildCore(cfg zap.Config, paths []string, colored bool) (zapcore.Core, func(), error) {
+	sink, closeOutput, err := zap.Open(paths...)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	encoderConfig := cfg.EncoderConfig
+	if !colored {
+		encoderConfig.EncodeLevel = zapcore.LowercaseLevelEncoder
+	}
+
+	var encoder zapcore.Encoder
+	if cfg.Encoding == "json" {
+		encoder = zapcore.NewJSONEncoder(encoderConfig)
+	} else {
+		encoder = zapcore.NewConsoleEncoder(encoderConfig)
+	}
+	return zapcore.NewCore(encoder, sink, cfg.Level), closeOutput, nil
+}
+
+func splitOutputPaths(paths []string) (terminal []string, other []string) {
+	for _, path := range paths {
+		if path == "stdout" || path == "stderr" {
+			terminal = append(terminal, path)
+		} else {
+			other = append(other, path)
+		}
+	}
+	return terminal, other
 }
 
 // Logger returns the process-wide zap logger installed during package initialization.

@@ -74,6 +74,25 @@ func TestRotatingSinkPreservesWholeWritesAtDayBoundary(t *testing.T) {
 	assertWritesPreserved(t, dir, first, second)
 }
 
+func TestRotatingSinkRotatesPreviousDayFileAfterRestart(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "xbase.log")
+	previous := []byte("previous day\n")
+	if err := os.WriteFile(path, previous, 0o600); err != nil {
+		t.Fatalf("write previous log: %v", err)
+	}
+	yesterday := time.Now().AddDate(0, 0, -1)
+	if err := os.Chtimes(path, yesterday, yesterday); err != nil {
+		t.Fatalf("set previous log time: %v", err)
+	}
+
+	sink := newRotatingFileSink(path, rotationConfig{Daily: true, MaxSize: 100, LocalTime: true})
+	current := []byte("current day\n")
+	writeAndClose(t, sink, current)
+
+	assertWritesPreserved(t, dir, previous, current)
+}
+
 func writeAndClose(t *testing.T, sink *rotatingSink, writes ...[]byte) {
 	t.Helper()
 	for _, data := range writes {

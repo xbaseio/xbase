@@ -813,17 +813,23 @@ func (l *GateLinker) WatchUserLocate() {
 	}
 
 	go func() {
-		defer watcher.Stop()
-		for {
-			select {
-			case <-l.ctx.Done():
-				return
-			default:
-				// exec watch
-			}
+		var once sync.Once
+		stop := func() { _ = watcher.Stop() }
+		defer once.Do(stop)
 
+		// 当上下文取消时主动调用 Stop()，确保阻塞中的 Next() 能立即返回，
+		// 避免 goroutine 在关闭期间长时间挂起。
+		go func() {
+			<-l.ctx.Done()
+			once.Do(stop)
+		}()
+
+		for {
 			events, err := watcher.Next()
 			if err != nil {
+				if l.ctx.Err() != nil {
+					return
+				}
 				continue
 			}
 
@@ -850,18 +856,31 @@ func (l *GateLinker) WatchClusterInstance() {
 		xlog.Sugar().Fatalf("the dispatcher instance watch failed: %v", err)
 	}
 
-	go func() {
-		defer watcher.Stop()
-		for {
-			select {
-			case <-l.ctx.Done():
-				return
-			default:
-				// exec watch
-			}
+// WatchClusterInstance 监听集群实例
+func (l *GateLinker) WatchClusterInstance() {
+	ctx, cancel := context.WithTimeout(l.ctx, 3*time.Second)
+	watcher, err := l.opts.Registry.Watch(ctx, cluster.Gate.String())
+	cancel()
+	if err != nil {
+		xlog.Sugar().Fatalf("the dispatcher instance watch failed: %v", err)
+	}
 
+	go func() {
+		var once sync.Once
+		stop := func() { _ = watcher.Stop() }
+		defer once.Do(stop)
+
+		go func() {
+			<-l.ctx.Done()
+			once.Do(stop)
+		}()
+
+		for {
 			services, err := watcher.Next()
 			if err != nil {
+				if l.ctx.Err() != nil {
+					return
+				}
 				continue
 			}
 

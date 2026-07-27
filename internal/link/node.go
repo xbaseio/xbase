@@ -286,9 +286,10 @@ func (l *NodeLinker) doRPC(ctx context.Context, gameID int32, uid int64, fn func
 	}
 
 	var (
-		nid   string
-		prev  string
-		reply any
+		nid       string
+		prev      string
+		reply     any
+		continued bool
 	)
 
 	for range 2 {
@@ -305,17 +306,21 @@ func (l *NodeLinker) doRPC(ctx context.Context, gameID int32, uid int64, fn func
 			}
 		}
 
-		ep, err := route.FindEndpointForServiceStatus(l.resolveServiceStatus(uid), nid)
+		// 使用 var + = 而非 :=，避免在 for-body 块内创建新的局部变量遮蔽
+		// 外层 reply/err，导致循环结束时 return reply, err 返回过期值。
+		var ep *endpoint.Endpoint
+		ep, err = route.FindEndpointForServiceStatus(l.resolveServiceStatus(uid), nid)
 		if err != nil {
 			return nil, err
 		}
 
-		client, err := l.builder.Build(ep.Address())
+		var client *node.Client
+		client, err = l.builder.Build(ep.Address())
 		if err != nil {
 			return nil, err
 		}
 
-		continued, reply, err := fn(ctx, client)
+		continued, reply, err = fn(ctx, client)
 		if continued {
 			if uid != 0 && prev != "" {
 				l.doDeleteSource(uid, route.Group(), prev)
@@ -495,17 +500,21 @@ func (l *NodeLinker) WatchUserLocate() {
 	}
 
 	go func() {
-		defer watcher.Stop()
-		for {
-			select {
-			case <-l.ctx.Done():
-				return
-			default:
-				// exec watch
-			}
+		var once sync.Once
+		stop := func() { _ = watcher.Stop() }
+		defer once.Do(stop)
 
+		go func() {
+			<-l.ctx.Done()
+			once.Do(stop)
+		}()
+
+		for {
 			events, err := watcher.Next()
 			if err != nil {
+				if l.ctx.Err() != nil {
+					return
+				}
 				continue
 			}
 
@@ -533,17 +542,21 @@ func (l *NodeLinker) WatchClusterInstance() {
 	}
 
 	go func() {
-		defer watcher.Stop()
-		for {
-			select {
-			case <-l.ctx.Done():
-				return
-			default:
-				// exec watch
-			}
+		var once sync.Once
+		stop := func() { _ = watcher.Stop() }
+		defer once.Do(stop)
 
+		go func() {
+			<-l.ctx.Done()
+			once.Do(stop)
+		}()
+
+		for {
 			services, err := watcher.Next()
 			if err != nil {
+				if l.ctx.Err() != nil {
+					return
+				}
 				continue
 			}
 

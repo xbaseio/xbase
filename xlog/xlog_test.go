@@ -1,6 +1,7 @@
 package xlog
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -91,6 +92,54 @@ func TestPrepareOutputPathsCreatesDirectory(t *testing.T) {
 	}
 	if !info.IsDir() {
 		t.Fatalf("prepared path %q is not a directory", dir)
+	}
+}
+
+func TestApplyRotationIncludesErrorOutputFiles(t *testing.T) {
+	cfg := zap.Config{
+		OutputPaths:      []string{"stdout", "app.log"},
+		ErrorOutputPaths: []string{"stderr", "zap-errors.log"},
+	}
+	applyRotation(&cfg, rotationConfig{Daily: true, MaxSize: 100})
+
+	if cfg.OutputPaths[0] != "stdout" || cfg.OutputPaths[1] == "app.log" {
+		t.Fatalf("output paths were not rotated correctly: %v", cfg.OutputPaths)
+	}
+	if cfg.ErrorOutputPaths[0] != "stderr" || cfg.ErrorOutputPaths[1] == "zap-errors.log" {
+		t.Fatalf("error output paths were not rotated correctly: %v", cfg.ErrorOutputPaths)
+	}
+}
+
+func TestBuildLoggerDoesNotWriteColorCodesToFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "xbase.log")
+	encoderConfig := zap.NewProductionEncoderConfig()
+	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	cfg := zap.Config{
+		Level:         zap.NewAtomicLevelAt(zapcore.InfoLevel),
+		Encoding:      "console",
+		EncoderConfig: encoderConfig,
+		OutputPaths: rotatingOutputPaths([]string{path}, rotationConfig{
+			Daily:   true,
+			MaxSize: 100,
+		}),
+		ErrorOutputPaths: []string{"stderr"},
+	}
+
+	value, err := buildLogger(cfg)
+	if err != nil {
+		t.Fatalf("buildLogger() error = %v", err)
+	}
+	value.Info("plain file output")
+	if err = syncLogger(value); err != nil {
+		t.Fatalf("logger Sync() error = %v", err)
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read log file: %v", err)
+	}
+	if bytes.Contains(content, []byte("\x1b[")) {
+		t.Fatalf("file log contains ANSI color code: %q", content)
 	}
 }
 

@@ -92,6 +92,10 @@ func (r *GameRoute) roundRobinDispatch(status registry.ServiceStatus) (*serviceE
 }
 
 func (r *GameRoute) weightRoundRobinDispatch(status registry.ServiceStatus) (*serviceEndpoint, error) {
+	// currWeight 字段被多个 goroutine 并发读写，必须加锁保护
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	var (
 		selected    *serviceEndpoint
 		totalWeight int

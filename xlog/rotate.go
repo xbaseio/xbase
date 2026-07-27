@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -112,6 +113,9 @@ func newRotatingFileSink(path string, cfg rotationConfig) *rotatingSink {
 		now:       time.Now,
 	}
 	sink.day = sink.currentDay()
+	if info, err := os.Stat(path); err == nil {
+		sink.day = sink.dayOf(info.ModTime())
+	}
 	return sink
 }
 
@@ -143,7 +147,11 @@ func (s *rotatingSink) Close() error {
 }
 
 func (s *rotatingSink) currentDay() int {
-	now := s.now()
+	return s.dayOf(s.now())
+}
+
+func (s *rotatingSink) dayOf(value time.Time) int {
+	now := value
 	if !s.localTime {
 		now = now.UTC()
 	}
