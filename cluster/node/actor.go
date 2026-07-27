@@ -67,13 +67,13 @@ func (a *Actor) Invoke(fn func()) {
 		return
 	}
 
-	// 使用非阻塞发送，避免持有 RLock 时因 fnChan 满而阻塞，
-	// 导致 destroy() 等待 Lock 时形成死锁。
-	select {
-	case a.fnChan <- fn:
-	default:
-		log.Warnf("actor fnChan full, drop invoke: kind=%s id=%s", a.Kind(), a.ID())
-	}
+		// 使用非阻塞发送，避免持有 RLock 时因 fnChan 满而阻塞，
+		// 导致 destroy() 等待 Lock 时形成死锁。
+		select {
+		case a.fnChan <- fn:
+		default:
+			xlog.Sugar().Warnf("actor fnChan full, drop invoke: kind=%s id=%s", a.Kind(), a.ID())
+		}
 }
 
 // AfterFunc 延迟调用，与官方的time.AfterFunc用法一致
@@ -115,7 +115,7 @@ func (a *Actor) AfterInvoke(d time.Duration, f func()) *Timer {
 		select {
 		case a.fnChan <- f:
 		default:
-			log.Warnf("actor fnChan full, drop after-invoke: kind=%s id=%s", a.Kind(), a.ID())
+			xlog.Sugar().Warnf("actor fnChan full, drop after-invoke: kind=%s id=%s", a.Kind(), a.ID())
 		}
 	})
 

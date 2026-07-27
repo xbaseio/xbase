@@ -856,15 +856,6 @@ func (l *GateLinker) WatchClusterInstance() {
 		xlog.Sugar().Fatalf("the dispatcher instance watch failed: %v", err)
 	}
 
-// WatchClusterInstance 监听集群实例
-func (l *GateLinker) WatchClusterInstance() {
-	ctx, cancel := context.WithTimeout(l.ctx, 3*time.Second)
-	watcher, err := l.opts.Registry.Watch(ctx, cluster.Gate.String())
-	cancel()
-	if err != nil {
-		xlog.Sugar().Fatalf("the dispatcher instance watch failed: %v", err)
-	}
-
 	go func() {
 		var once sync.Once
 		stop := func() { _ = watcher.Stop() }

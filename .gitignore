@@ -33,3 +33,6 @@ go.work.sum
 *.exe
 
 .gocache
+crypto/ecc/pem/key.pub.pem
+crypto/ecc/pem/key.pem
+crypto/ecc/pem/key.pub.pem
