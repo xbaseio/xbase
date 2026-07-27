@@ -192,11 +192,12 @@ func (g *Gate) handleConnect(conn network.Conn) {
 
 	g.session.AddConn(conn)
 
-	cid, uid := conn.ID(), conn.UID()
-
-	ctx, cancel := context.WithTimeout(g.ctx, g.opts.timeout)
-	g.proxy.trigger(ctx, cluster.Connect, cid, uid)
-	cancel()
+	if g.opts.connectionEvents {
+		cid, uid := conn.ID(), conn.UID()
+		ctx, cancel := context.WithTimeout(g.ctx, g.opts.timeout)
+		g.proxy.trigger(ctx, cluster.Connect, cid, uid)
+		cancel()
+	}
 }
 
 // 处理断开连接
@@ -206,9 +207,11 @@ func (g *Gate) handleDisconnect(conn network.Conn) {
 	if cid, uid := conn.ID(), conn.UID(); uid != 0 {
 		ctx, cancel := context.WithTimeout(g.ctx, g.opts.timeout)
 		_ = g.proxy.unbindGate(ctx, cid, uid)
-		g.proxy.trigger(ctx, cluster.Disconnect, cid, uid)
+		if g.opts.connectionEvents {
+			g.proxy.trigger(ctx, cluster.Disconnect, cid, uid)
+		}
 		cancel()
-	} else {
+	} else if g.opts.connectionEvents {
 		ctx, cancel := context.WithTimeout(g.ctx, g.opts.timeout)
 		g.proxy.trigger(ctx, cluster.Disconnect, cid, uid)
 		cancel()

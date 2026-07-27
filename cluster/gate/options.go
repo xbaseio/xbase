@@ -69,6 +69,7 @@ type options struct {
 	retireDelay       time.Duration
 	receiveQueue      int
 	deliverWorkers    int
+	connectionEvents  bool
 	messageDispatcher MessageDispatcher
 	metadata          map[string]string
 	policyMu          sync.RWMutex
@@ -91,21 +92,22 @@ type serviceStatusDecision struct {
 
 func defaultOptions() *options {
 	opts := &options{
-		ctx:            context.Background(),
-		name:           defaultName,
-		addr:           defaultAddr,
-		timeout:        defaultTimeout,
-		dispatch:       defaultDispatch,
-		metadata:       make(map[string]string),
-		expose:         etc.Get(defaultExposeKey).Bool(),
-		nodeKind:       cluster.Node_Normal,
-		gameID:         -1,
-		version:        defaultVersion,
-		retireDelay:    defaultRetireDelay,
-		receiveQueue:   defaultReceiveQueue,
-		deliverWorkers: max(runtime.NumCPU(), 1),
-		grayWhitelist:  make(map[int64]struct{}),
-		testWhitelist:  make(map[int64]struct{}),
+		ctx:              context.Background(),
+		name:             defaultName,
+		addr:             defaultAddr,
+		timeout:          defaultTimeout,
+		dispatch:         defaultDispatch,
+		metadata:         make(map[string]string),
+		expose:           etc.Get(defaultExposeKey).Bool(),
+		nodeKind:         cluster.Node_Normal,
+		gameID:           -1,
+		version:          defaultVersion,
+		retireDelay:      defaultRetireDelay,
+		receiveQueue:     defaultReceiveQueue,
+		deliverWorkers:   max(runtime.NumCPU(), 1),
+		connectionEvents: true,
+		grayWhitelist:    make(map[int64]struct{}),
+		testWhitelist:    make(map[int64]struct{}),
 	}
 
 	if id := etc.Get(defaultIDKey).String(); id != "" {
@@ -179,6 +181,9 @@ func WithServer(server network.Server) Option   { return func(o *options) { o.se
 func WithTimeout(timeout time.Duration) Option  { return func(o *options) { o.timeout = timeout } }
 func WithLocator(locator locate.Locator) Option { return func(o *options) { o.locator = locator } }
 func WithRegistry(r registry.Registry) Option   { return func(o *options) { o.registry = r } }
+func WithConnectionEvents(enabled bool) Option {
+	return func(o *options) { o.connectionEvents = enabled }
+}
 func WithDispatch(dispatch cluster.Dispatch) Option {
 	return func(o *options) { o.dispatch = dispatch }
 }

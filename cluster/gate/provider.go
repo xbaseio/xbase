@@ -41,7 +41,9 @@ func (g *Gate) bind(ctx context.Context, cid, uid int64, bindLobby bool) error {
 		}
 	}
 
-	g.proxy.trigger(ctx, cluster.Reconnect, cid, uid)
+	if g.opts.connectionEvents {
+		g.proxy.trigger(ctx, cluster.Reconnect, cid, uid)
+	}
 
 	return nil
 }
