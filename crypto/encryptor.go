@@ -1,6 +1,9 @@
 package crypto
 
-import "github.com/xbaseio/xbase/xlog"
+import (
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
+)
 
 type Encryptor interface {
 	// Name 名称
@@ -26,7 +29,7 @@ func RegisterEncryptor(encryptor Encryptor) {
 	}
 
 	if _, ok := encryptors[name]; ok {
-		xlog.Sugar().Warnf("the old %s encryptor will be overwritten", name)
+		xlog.Logger().Warn("the old encryptor will be overwritten", zap.Any("name", name))
 	}
 
 	encryptors[name] = encryptor
@@ -36,7 +39,7 @@ func RegisterEncryptor(encryptor Encryptor) {
 func InvokeEncryptor(name string) Encryptor {
 	encryptor, ok := encryptors[name]
 	if !ok {
-		xlog.Sugar().Fatalf("%s encryptor is not registered", name)
+		xlog.Logger().Fatal("encryptor is not registered", zap.Any("name", name))
 	}
 
 	return encryptor

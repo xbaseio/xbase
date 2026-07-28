@@ -7,6 +7,7 @@ import (
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type routePolicy struct {
@@ -49,7 +50,7 @@ func (w *routeWatcher) watch() {
 	watcher, err := w.registry.Watch(tctx, cluster.Node.String())
 	cancel()
 	if err != nil {
-		xlog.Sugar().Warnf("gate route watch failed: %v", err)
+		xlog.Logger().Warn("gate route watch failed", zap.Error(err))
 		return
 	}
 

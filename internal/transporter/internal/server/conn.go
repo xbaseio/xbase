@@ -15,6 +15,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xtime"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 const writeTimeout = 3 * time.Second
@@ -233,7 +234,7 @@ func (c *Conn) read() {
 		}
 
 		if err := handler(c, data); err != nil && !xerrors.Is(err, xerrors.ErrNotFoundUserLocation) {
-			xlog.Sugar().Warnf("process route %d message failed: %v", routeID, err)
+			xlog.Logger().Warn("process route message failed", zap.Any("routeID", routeID), zap.Error(err))
 		}
 	}
 }
@@ -256,7 +257,7 @@ func (c *Conn) write() {
 		select {
 		case hb := <-c.chHeartbeat:
 			if err := writeAllWithDeadline(conn, hb, writeTimeout); err != nil {
-				xlog.Sugar().Warnf("write heartbeat message error: %v", err)
+				xlog.Logger().Warn("write heartbeat message error", zap.Error(err))
 				_ = c.close(true)
 				return
 			}
@@ -279,7 +280,7 @@ func (c *Conn) write() {
 
 		case hb := <-c.chHeartbeat:
 			if err := writeAllWithDeadline(conn, hb, writeTimeout); err != nil {
-				xlog.Sugar().Warnf("write heartbeat message error: %v", err)
+				xlog.Logger().Warn("write heartbeat message error", zap.Error(err))
 				_ = c.close(true)
 				return
 			}
@@ -300,7 +301,7 @@ func (c *Conn) write() {
 				}
 
 				if err := writeAllWithDeadline(conn, data, writeTimeout); err != nil {
-					xlog.Sugar().Warnf("write business message error: %v", err)
+					xlog.Logger().Warn("write business message error", zap.Error(err))
 					return false
 				}
 

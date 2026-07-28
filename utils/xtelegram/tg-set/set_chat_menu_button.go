@@ -4,6 +4,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xtelegram/telegram/telegram"
 	"github.com/xbaseio/xbase/utils/xtelegram/telegram/types"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 
 	"github.com/xbaseio/xbase/utils/xconv"
 )
@@ -16,7 +17,7 @@ func SetChatMenuButton(botToken, username string, chatID int64) error {
 
 	botApi, err := telegram.New(botToken)
 	if err != nil {
-		xlog.Sugar().Errorf("%v", err)
+		xlog.Logger().Error("log event", zap.Error(err))
 		return nil
 	}
 
@@ -29,10 +30,10 @@ func SetChatMenuButton(botToken, username string, chatID int64) error {
 
 	//6867997452:AAFYZXHAC_TDvcfBiYto2ShutRSiUcboa04
 	if err != nil {
-		xlog.Sugar().Errorf("%v", err)
+		xlog.Logger().Error("log event", zap.Error(err))
 		return err
 	}
-	xlog.Sugar().Warnf("botToken,botToken:%v %#v", botToken, rst)
+	xlog.Logger().Warn("botToken,botToken", zap.Any("botToken", botToken), zap.Any("rst", rst))
 
 	return nil
 

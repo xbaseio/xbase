@@ -1,6 +1,9 @@
 package crypto
 
-import "github.com/xbaseio/xbase/xlog"
+import (
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
+)
 
 type Signer interface {
 	// Name 名称
@@ -26,7 +29,7 @@ func RegisterSigner(signer Signer) {
 	}
 
 	if _, ok := signers[name]; ok {
-		xlog.Sugar().Warnf("the old %s signer will be overwritten", name)
+		xlog.Logger().Warn("the old signer will be overwritten", zap.Any("name", name))
 	}
 
 	signers[name] = signer
@@ -36,7 +39,7 @@ func RegisterSigner(signer Signer) {
 func InvokeSigner(name string) Signer {
 	signer, ok := signers[name]
 	if !ok {
-		xlog.Sugar().Fatalf("%s signer is not registered", name)
+		xlog.Logger().Fatal("signer is not registered", zap.Any("name", name))
 	}
 
 	return signer

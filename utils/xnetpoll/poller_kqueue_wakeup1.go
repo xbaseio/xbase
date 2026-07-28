@@ -4,6 +4,7 @@ package xnetpoll
 
 import (
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 )
 
@@ -11,7 +12,7 @@ func (p *Poller) addWakeupEvent() error {
 	// 创建 pipe（用于唤醒 poller）
 	p.pipe = make([]int, 2)
 	if err := unix.Pipe2(p.pipe[:], unix.O_NONBLOCK|unix.O_CLOEXEC); err != nil {
-		xlog.Sugar().Fatalf("failed to create pipe for wakeup event: %v", err)
+		xlog.Logger().Fatal("failed to create pipe for wakeup event", zap.Error(err))
 	}
 
 	// 将 pipe 的读端注册到 kqueue，监听读事件
@@ -35,7 +36,7 @@ retry:
 		// 被信号中断，重试
 		goto retry
 	}
-	xlog.Sugar().Warnf("failed to write to the wakeup pipe: %v", err)
+	xlog.Logger().Warn("failed to write to the wakeup pipe", zap.Error(err))
 	return err
 }
 

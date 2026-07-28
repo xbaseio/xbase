@@ -4,6 +4,7 @@ import (
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/xlog"
 	"github.com/xtaci/kcp-go/v5"
+	"go.uber.org/zap"
 )
 
 type server struct {
@@ -113,7 +114,7 @@ func (s *server) serve() {
 	for {
 		conn, err := s.listener.AcceptKCP()
 		if err != nil {
-			xlog.Sugar().Warnf("kcp accept error: %v", err)
+			xlog.Logger().Warn("kcp accept error", zap.Error(err))
 			return
 		}
 

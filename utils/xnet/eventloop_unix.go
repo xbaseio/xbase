@@ -20,6 +20,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xsocket"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 )
 
@@ -448,7 +449,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 				func(_ any) error { return xerrors.ErrEngineShutdown },
 				nil,
 			)
-			xlog.Sugar().Debugf("failed to enqueue shutdown signal of high-priority for event-loop(%d): %v", el.idx, err)
+			xlog.Logger().Debug("failed to enqueue shutdown signal of high-priority for event-loop()", zap.Any("idx", el.idx), zap.Error(err))
 		}
 
 		if timer == nil {
@@ -459,7 +460,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 
 		select {
 		case <-ctx.Done():
-			xlog.Sugar().Debugf("stopping ticker in event-loop(%d) from Engine, error:%v", el.idx, ctx.Err())
+			xlog.Logger().Debug("stopping ticker in event-loop() from Engine, error", zap.Any("idx", el.idx), zap.Error(ctx.Err()))
 			return
 		case <-timer.C:
 		}

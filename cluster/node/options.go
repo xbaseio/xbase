@@ -15,6 +15,7 @@ import (
 	"github.com/xbaseio/xbase/transport"
 	"github.com/xbaseio/xbase/utils/xuuid"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 const (
@@ -122,7 +123,7 @@ func defaultOptions() *options {
 	}
 
 	if err := etc.Get(defaultMetadataKey).Scan(&opts.metadata); err != nil {
-		xlog.Sugar().Warnf("scan node metadata failed: %v", err)
+		xlog.Logger().Warn("scan node metadata failed", zap.Error(err))
 	}
 
 	if etc.Has(defaultGameIDKey) {

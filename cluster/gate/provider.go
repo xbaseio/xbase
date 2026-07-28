@@ -8,6 +8,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type provider struct {
@@ -89,7 +90,7 @@ func (p *provider) Push(ctx context.Context, kind session.Kind, target int64, me
 	if kind == session.User && xerrors.Is(err, xerrors.ErrNotFoundSession) {
 		xcall.Go(func() {
 			if e := p.gate.opts.locator.UnbindGate(ctx, target, p.gate.opts.id); e != nil {
-				xlog.Sugar().Errorf("unbind gate failed, uid = %d gid = %s err = %v", target, p.gate.opts.id, e)
+				xlog.Logger().Error("unbind gate failed, uid = gid = err", zap.Any("target", target), zap.Any("id", p.gate.opts.id), zap.Any("e", e))
 			}
 		})
 	}

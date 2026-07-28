@@ -6,6 +6,7 @@ import (
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/transport"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 const (
@@ -150,15 +151,15 @@ func defaultOptions() *options {
 	}
 
 	if err := etc.Get(defaultTrustProxyConfigKey).Scan(&opts.trustProxyConfig); err != nil {
-		xlog.Sugar().Warnf("scan trust proxy options failed: %v", err)
+		xlog.Logger().Warn("scan trust proxy options failed", zap.Error(err))
 	}
 
 	if err := etc.Get(defaultCorsKey).Scan(&opts.corsOpts); err != nil {
-		xlog.Sugar().Warnf("scan cors options failed: %v", err)
+		xlog.Logger().Warn("scan cors options failed", zap.Error(err))
 	}
 
 	if err := etc.Get(defaultSwaggerKey).Scan(&opts.swagOpts); err != nil {
-		xlog.Sugar().Warnf("scan swag options failed: %v", err)
+		xlog.Logger().Warn("scan swag options failed", zap.Error(err))
 	}
 
 	return opts

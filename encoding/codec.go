@@ -8,6 +8,7 @@ import (
 	"github.com/xbaseio/xbase/encoding/xml"
 	"github.com/xbaseio/xbase/encoding/yaml"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 var codecs = make(map[string]Codec)
@@ -43,7 +44,7 @@ func Register(codec Codec) {
 	}
 
 	if _, ok := codecs[name]; ok {
-		xlog.Sugar().Warnf("the old %s codec will be overwritten", name)
+		xlog.Logger().Warn("the old codec will be overwritten", zap.Any("name", name))
 	}
 
 	codecs[name] = codec
@@ -53,7 +54,7 @@ func Register(codec Codec) {
 func Invoke(name string) Codec {
 	codec, ok := codecs[name]
 	if !ok {
-		xlog.Sugar().Fatalf("%s codec is not registered", name)
+		xlog.Logger().Fatal("codec is not registered", zap.Any("name", name))
 	}
 
 	return codec

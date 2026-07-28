@@ -9,6 +9,7 @@ import (
 	"github.com/xbaseio/xbase/internal/transporter/internal/server"
 	"github.com/xbaseio/xbase/internal/transporter/node"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 func TestServer(t *testing.T) {
@@ -36,7 +37,7 @@ func (p *provider) Trigger(ctx context.Context, gid string, cid, uid int64, even
 
 // Deliver 投递消息
 func (p *provider) Deliver(ctx context.Context, gid, nid string, cid, uid int64, message []byte) error {
-	xlog.Sugar().Infof("gid: %s, nid: %s, cid: %d, uid: %d message: %s", gid, nid, cid, uid, string(message))
+	xlog.Logger().Info("gid: , nid: , cid: , uid: message", zap.Any("gid", gid), zap.Any("nid", nid), zap.Any("cid", cid), zap.Any("uid", uid), zap.String("message", string(message)))
 	return nil
 }
 

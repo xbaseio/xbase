@@ -9,6 +9,7 @@ import (
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type watcher struct {
@@ -101,13 +102,13 @@ func (wm *watcherMgr) subscribe() error {
 		GroupName:   wm.registry.opts.groupName,
 		SubscribeCallback: func(instances []model.Instance, err error) {
 			if err != nil {
-				xlog.Sugar().Warnf("%s subscribe callback failed: %v", wm.serviceName, err)
+				xlog.Logger().Warn("subscribe callback failed", zap.Any("serviceName", wm.serviceName), zap.Error(err))
 				return
 			}
 
 			services, err := parseInstances(instances)
 			if err != nil {
-				xlog.Sugar().Warnf("%s instances parse failed: %v", wm.serviceName, err)
+				xlog.Logger().Warn("instances parse failed", zap.Any("serviceName", wm.serviceName), zap.Error(err))
 				return
 			}
 

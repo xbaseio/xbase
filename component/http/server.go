@@ -14,6 +14,7 @@ import (
 	xnet "github.com/xbaseio/xbase/core/net"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type Server struct {
@@ -132,7 +133,7 @@ func (s *Server) Proxy() *Proxy {
 func (s *Server) Start() {
 	listenAddr, exposeAddr, err := xnet.ParseAddr(s.opts.addr)
 	if err != nil {
-		xlog.Sugar().Fatalf("http addr parse failed: %v", err)
+		xlog.Logger().Fatal("http addr parse failed", zap.Error(err))
 	}
 
 	if s.opts.transporter != nil && s.opts.registry != nil {
@@ -147,7 +148,7 @@ func (s *Server) Start() {
 			CertKeyFile:           s.opts.keyFile,
 			DisableStartupMessage: true,
 		}); err != nil {
-			xlog.Sugar().Fatalf("http server startup failed: %v", xerrors.Unwrap(xerrors.Unwrap(err)))
+			xlog.Logger().Fatal("http server startup failed", zap.Any("unwrap", xerrors.Unwrap(xerrors.Unwrap(err))))
 		}
 	}()
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/xbaseio/xbase/component"
 	"github.com/xbaseio/xbase/eventbus"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 const DefaultServiceStatusPolicyTopic = "cluster.gate.service_status_policy"
@@ -49,7 +50,7 @@ func PublishServiceStatusPolicy(payload *ServiceStatusPolicyEvent) {
 	}
 
 	if err := eventbus.Publish(context.Background(), DefaultServiceStatusPolicyTopic, payload); err != nil {
-		xlog.Sugar().Errorf("publish service status policy failed, payload=%#v err=%v", payload, err)
+		xlog.Logger().Error("publish service status policy failed, payload= err", zap.Any("payload", payload), zap.Error(err))
 	}
 }
 
@@ -68,7 +69,7 @@ func SubscribeServiceStatusPolicy(handler func(uuid string, payload *ServiceStat
 	}
 
 	if err := eventbus.Subscribe(context.Background(), DefaultServiceStatusPolicyTopic, wrapper); err != nil {
-		xlog.Sugar().Errorf("subscribe service status policy failed: %v", err)
+		xlog.Logger().Error("subscribe service status policy failed", zap.Error(err))
 	}
 
 	return wrapper

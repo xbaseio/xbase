@@ -12,6 +12,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xnet"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type serverConn struct {
@@ -449,7 +450,7 @@ func (c *serverConn) read() {
 		if err != nil {
 			if !xerrors.Is(err, net.ErrClosed) {
 				if _, ok := err.(*websocket.CloseError); !ok {
-					xlog.Sugar().Warnf("read message failed: %d %v", c.id, err)
+					xlog.Logger().Warn("read message failed", zap.Any("id", c.id), zap.Error(err))
 				}
 			}
 
@@ -478,7 +479,7 @@ func (c *serverConn) read() {
 		}
 
 		if !network.TryEnqueueRecv(c.recvQ, msgData) {
-			xlog.Sugar().Warnf("ws receive queue full, close conn: %d", c.id)
+			xlog.Logger().Warn("ws receive queue full, close conn", zap.Any("id", c.id))
 			_ = c.forceCloseIfCurrent(connID, true)
 			return
 		}
@@ -591,7 +592,7 @@ func (c *serverConn) doWrite(connID int64, r chWrite) bool {
 	if err := conn.WriteMessage(websocket.BinaryMessage, r.msg); err != nil {
 		if !xerrors.Is(err, net.ErrClosed) {
 			if _, ok := err.(*websocket.CloseError); !ok {
-				xlog.Sugar().Errorf("write message error: %v", err)
+				xlog.Logger().Error("write message error", zap.Error(err))
 			}
 		}
 

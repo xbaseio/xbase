@@ -9,6 +9,7 @@ import (
 	"github.com/xbaseio/xbase/network/kcp"
 	"github.com/xbaseio/xbase/packet"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 func TestServer_Simple(t *testing.T) {
@@ -23,20 +24,20 @@ func TestServer_Simple(t *testing.T) {
 	})
 
 	server.OnConnect(func(conn network.Conn) {
-		xlog.Sugar().Infof("connection is opened, connection id: %d", conn.ID())
+		xlog.Logger().Info("connection is opened, connection id", zap.Any("iD", conn.ID()))
 	})
 
 	server.OnDisconnect(func(conn network.Conn) {
-		xlog.Sugar().Infof("connection is closed, connection id: %d", conn.ID())
+		xlog.Logger().Info("connection is closed, connection id", zap.Any("iD", conn.ID()))
 	})
 
 	server.OnReceive(func(conn network.Conn, data []byte) {
 		message, _, err := packet.UnpackMessage(data)
 		if err != nil {
-			xlog.Sugar().Errorf("unpack message failed: %v", err)
+			xlog.Logger().Error("unpack message failed", zap.Error(err))
 			return
 		}
-		xlog.Sugar().Infof("receive message from client, cid: %d, seq: %d, game id: %d, msg: %s", conn.ID(), message.Seq, message.GameID, string(message.Buffer))
+		xlog.Logger().Info("receive message from client, cid: , seq: , game id: , msg", zap.Any("iD", conn.ID()), zap.Any("seq", message.Seq), zap.Any("gameID", message.GameID), zap.String("buffer", string(message.Buffer)))
 
 		msg, err := packet.PackMessage(&packet.Message{
 			Seq:       1,
@@ -45,17 +46,17 @@ func TestServer_Simple(t *testing.T) {
 			Buffer:    []byte("I'm fine~~"),
 		})
 		if err != nil {
-			xlog.Sugar().Errorf("pack message failed: %v", err)
+			xlog.Logger().Error("pack message failed", zap.Error(err))
 			return
 		}
 
 		if err = conn.Push(msg); err != nil {
-			xlog.Sugar().Errorf("push message failed: %v", err)
+			xlog.Logger().Error("push message failed", zap.Error(err))
 		}
 	})
 
 	if err := server.Start(); err != nil {
-		xlog.Sugar().Fatalf("start server failed: %v", err)
+		xlog.Logger().Fatal("start server failed", zap.Error(err))
 	}
 
 	select {}
@@ -71,7 +72,7 @@ func TestServer_Benchmark(t *testing.T) {
 	server.OnReceive(func(conn network.Conn, data []byte) {
 		message, _, err := packet.UnpackMessage(data)
 		if err != nil {
-			xlog.Sugar().Errorf("unpack message failed: %v", err)
+			xlog.Logger().Error("unpack message failed", zap.Error(err))
 			return
 		}
 
@@ -82,24 +83,24 @@ func TestServer_Benchmark(t *testing.T) {
 			Buffer:    message.Buffer,
 		})
 		if err != nil {
-			xlog.Sugar().Errorf("pack message failed: %v", err)
+			xlog.Logger().Error("pack message failed", zap.Error(err))
 			return
 		}
 
 		if err = conn.Send(msg); err != nil {
-			xlog.Sugar().Errorf("push message failed: %v", err)
+			xlog.Logger().Error("push message failed", zap.Error(err))
 			return
 		}
 	})
 
 	if err := server.Start(); err != nil {
-		xlog.Sugar().Fatalf("start server failed: %v", err)
+		xlog.Logger().Fatal("start server failed", zap.Error(err))
 	}
 
 	go func() {
 		err := http.ListenAndServe(":8089", nil)
 		if err != nil {
-			xlog.Sugar().Errorf("pprof server start failed: %v", err)
+			xlog.Logger().Error("pprof server start failed", zap.Error(err))
 		}
 	}()
 

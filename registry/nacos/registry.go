@@ -16,6 +16,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xconv"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 const name = "nacos"
@@ -101,7 +102,7 @@ func NewRegistry(opts ...Option) *Registry {
 			}
 		} else {
 			if err != nil {
-				xlog.Sugar().Warnf("%s parse failed: %v", endpoint, err)
+				xlog.Logger().Warn("parse failed", zap.Any("endpoint", endpoint), zap.Error(err))
 			}
 
 			o.client, r.err = clients.NewNamingClient(param)

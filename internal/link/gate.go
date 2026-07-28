@@ -17,6 +17,7 @@ import (
 	"github.com/xbaseio/xbase/session"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -809,7 +810,7 @@ func (l *GateLinker) WatchUserLocate() {
 	watcher, err := l.opts.Locator.Watch(ctx, cluster.Gate.String())
 	cancel()
 	if err != nil {
-		xlog.Sugar().Fatalf("user locate event watch failed: %v", err)
+		xlog.Logger().Fatal("user locate event watch failed", zap.Error(err))
 	}
 
 	go func() {
@@ -853,7 +854,7 @@ func (l *GateLinker) WatchClusterInstance() {
 	watcher, err := l.opts.Registry.Watch(ctx, cluster.Gate.String())
 	cancel()
 	if err != nil {
-		xlog.Sugar().Fatalf("the dispatcher instance watch failed: %v", err)
+		xlog.Logger().Fatal("the dispatcher instance watch failed", zap.Error(err))
 	}
 
 	go func() {

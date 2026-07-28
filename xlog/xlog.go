@@ -174,12 +174,6 @@ func Logger() *zap.Logger {
 	return zap.L()
 }
 
-// Sugar returns the process-wide sugared logger installed during package initialization.
-// Prefer Logger in performance-sensitive code to avoid formatting overhead.
-func Sugar() *zap.SugaredLogger {
-	return zap.S()
-}
-
 // Sync flushes buffered zap output.
 func Sync() error {
 	configureMu.Lock()

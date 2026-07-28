@@ -6,6 +6,7 @@ import (
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type Scheduler struct {
@@ -221,7 +222,7 @@ func (s *Scheduler) dispatchRequest(ctx Context) error {
 
 	act, ok := s.loadActor(uid, kind.(string))
 	if !ok {
-		xlog.Sugar().Errorf("dispatch request failed, uid = %v message = %v kind = %v", uid, ctx.MessageID(), kind)
+		xlog.Logger().Error("dispatch request failed, uid = message = kind", zap.Any("uid", uid), zap.Any("messageID", ctx.MessageID()), zap.Any("kind", kind))
 		return xerrors.ErrNotBindActor
 	}
 
@@ -233,7 +234,7 @@ func (s *Scheduler) dispatchEvent(ctx Context) error {
 	s.actors.Range(func(_, actor any) bool {
 		if act := actor.(*Actor); act.opts.dispatch {
 			if err := act.Next(ctx); err != nil {
-				xlog.Sugar().Warnf("dispatch event to actor failed: %v", err)
+				xlog.Logger().Warn("dispatch event to actor failed", zap.Error(err))
 			}
 		}
 

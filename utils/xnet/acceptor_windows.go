@@ -8,6 +8,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xpool/xgoroutine"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 func (eng *engine) listenStream(ln net.Listener) (err error) {
@@ -24,7 +25,7 @@ func (eng *engine) listenStream(ln net.Listener) (err error) {
 		if e != nil {
 			err = e
 			if !eng.beingShutdown.Load() {
-				xlog.Sugar().Errorf("Accept() fails xbase to error: %v", err)
+				xlog.Logger().Error("Accept() fails xbase to error", zap.Error(err))
 			} else if errors.Is(err, net.ErrClosed) {
 				err = errors.Join(err, xerrors.ErrEngineShutdown)
 			}
@@ -62,7 +63,7 @@ func (eng *engine) ListenUDP(pc net.PacketConn) (err error) {
 		if e != nil {
 			err = e
 			if !eng.beingShutdown.Load() {
-				xlog.Sugar().Errorf("failed to receive data from UDP fd xbase to error:%v", err)
+				xlog.Logger().Error("failed to receive data from UDP fd xbase to error", zap.Error(err))
 			} else if errors.Is(err, net.ErrClosed) {
 				err = errors.Join(err, xerrors.ErrEngineShutdown)
 			}

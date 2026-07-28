@@ -9,6 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/xbaseio/xbase/locate"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type watcher struct {
@@ -106,7 +107,7 @@ func newWatcherMgr(ctx context.Context, l *Locator, key string, kinds ...string)
 			case *redis.Message:
 				event, err := unmarshal([]byte(v.Payload))
 				if err != nil {
-					xlog.Sugar().Errorf("invalid payload, %s", v.Payload)
+					xlog.Logger().Error("invalid payload", zap.Any("payload", v.Payload))
 					continue
 				}
 				wm.broadcast(event)

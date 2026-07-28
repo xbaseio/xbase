@@ -14,6 +14,7 @@ import (
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
 	"github.com/xtaci/kcp-go/v5"
+	"go.uber.org/zap"
 )
 
 type serverConn struct {
@@ -126,7 +127,7 @@ func (c *serverConn) enqueueWrite(msg []byte) error {
 		return xerrors.ErrConnectionClosed
 
 	case <-timer.C:
-		xlog.Sugar().Warnf("kcp write queue timeout, close conn: %d", c.id)
+		xlog.Logger().Warn("kcp write queue timeout, close conn", zap.Any("id", c.id))
 		_ = c.forceClose(true)
 		return xerrors.ErrWriteQueueTimeout
 	}
@@ -509,7 +510,7 @@ func (c *serverConn) read() {
 		}
 
 		if !network.TryEnqueueRecv(c.recvQ, data) {
-			xlog.Sugar().Warnf("kcp receive queue full, close conn: %d", c.id)
+			xlog.Logger().Warn("kcp receive queue full, close conn", zap.Any("id", c.id))
 			_ = c.forceCloseIfCurrent(gen, true)
 			return
 		}
@@ -578,7 +579,7 @@ func (c *serverConn) write() {
 			}
 
 			if err := c.writeFull(conn, r.msg); err != nil {
-				xlog.Sugar().Errorf("write data message error: %v", err)
+				xlog.Logger().Error("write data message error", zap.Error(err))
 				_ = c.forceCloseIfCurrent(gen, true)
 				return
 			}

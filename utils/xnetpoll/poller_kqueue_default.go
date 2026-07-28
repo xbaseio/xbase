@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sync/atomic"
 
+	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 
 	"github.com/xbaseio/xbase/utils/xqueue"
@@ -110,7 +111,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 			runtime.Gosched()
 			continue
 		} else if err != nil {
-			xlog.Sugar().Errorf("error occurs in kqueue: %v", os.NewSyscallError("kevent wait", err))
+			xlog.Logger().Error("error occurs in kqueue", zap.Error(os.NewSyscallError("kevent wait", err)))
 			return err
 		}
 

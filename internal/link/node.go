@@ -15,6 +15,7 @@ import (
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -496,7 +497,7 @@ func (l *NodeLinker) WatchUserLocate() {
 	watcher, err := l.opts.Locator.Watch(ctx, cluster.Node.String())
 	cancel()
 	if err != nil {
-		xlog.Sugar().Fatalf("user locate event watch failed: %v", err)
+		xlog.Logger().Fatal("user locate event watch failed", zap.Error(err))
 	}
 
 	go func() {
@@ -538,7 +539,7 @@ func (l *NodeLinker) WatchClusterInstance() {
 	watcher, err := l.opts.Registry.Watch(ctx, cluster.Node.String())
 	cancel()
 	if err != nil {
-		xlog.Sugar().Fatalf("the cluster instance watch failed: %v", err)
+		xlog.Logger().Fatal("the cluster instance watch failed", zap.Error(err))
 	}
 
 	go func() {

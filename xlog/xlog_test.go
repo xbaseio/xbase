@@ -16,8 +16,8 @@ func TestInitializedLogger(t *testing.T) {
 	if logger == nil {
 		t.Fatal("log package init did not configure a logger")
 	}
-	if Logger() != zap.L() || Sugar() != zap.S() {
-		t.Fatal("log accessors do not return the initialized global logger")
+	if Logger() != zap.L() {
+		t.Fatal("Logger does not return the initialized global logger")
 	}
 }
 
@@ -68,9 +68,6 @@ func TestConfigureInstallsGlobalLogger(t *testing.T) {
 	}
 	if Logger() != zap.L() {
 		t.Fatal("Logger() does not return zap's configured global logger")
-	}
-	if Sugar() != zap.S() {
-		t.Fatal("Sugar() does not return zap's configured global sugared logger")
 	}
 	if !Logger().Core().Enabled(zapcore.DebugLevel) {
 		t.Fatal("configured logger does not enable debug level")

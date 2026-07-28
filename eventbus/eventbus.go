@@ -6,6 +6,7 @@ import (
 	"github.com/xbaseio/xbase/eventbus/internal"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 var globalEventbus Eventbus
@@ -35,7 +36,7 @@ func SetEventbus(eb Eventbus) {
 
 	if globalEventbus != nil {
 		if err := globalEventbus.Close(); err != nil {
-			xlog.Sugar().Errorf("the old eventbus close failed: %v", err)
+			xlog.Logger().Error("the old eventbus close failed", zap.Error(err))
 		}
 	}
 

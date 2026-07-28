@@ -9,6 +9,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type RouteHandler func(ctx Context)
@@ -89,7 +90,7 @@ func newRouter(node *Node) *Router {
 // invoked for every request, including requests without a route declaration.
 func (r *Router) BindMessageDispatcher(dispatcher MessageDispatcher) {
 	if r.node.getState() != cluster.Shut {
-		xlog.Sugar().Warnf("the node server is working, can't bind message dispatcher")
+		xlog.Logger().Warn("the node server is working, can't bind message dispatcher")
 		return
 	}
 
@@ -106,7 +107,7 @@ func (r *Router) HasMessageDispatcher() bool {
 // delivered to the dispatcher.
 func (r *Router) SetRoutePolicy(messageID int32, policy RoutePolicy) {
 	if r.node.getState() != cluster.Shut {
-		xlog.Sugar().Warnf("the node server is working, can't set route policy")
+		xlog.Logger().Warn("the node server is working, can't set route policy")
 		return
 	}
 
@@ -126,7 +127,7 @@ func (r *Router) SetRoutePolicy(messageID int32, policy RoutePolicy) {
 // MessageDispatcher and use SetRoutePolicy for routing metadata instead.
 func (r *Router) AddRouteHandler(messageID int32, handler RouteHandler, opts ...RouteOptions) {
 	if r.node.getState() != cluster.Shut {
-		xlog.Sugar().Warnf("the node server is working, can't add route handler")
+		xlog.Logger().Warn("the node server is working, can't add route handler")
 		return
 	}
 
@@ -145,7 +146,7 @@ func (r *Router) AddRouteHandler(messageID int32, handler RouteHandler, opts ...
 // Deprecated: 使用 BindMessageDispatcher。
 func (r *Router) SetDefaultRouteHandler(handler RouteHandler) {
 	if r.node.getState() != cluster.Shut {
-		xlog.Sugar().Warnf("the node server is working, can't set default route handler")
+		xlog.Logger().Warn("the node server is working, can't set default route handler")
 		return
 	}
 
@@ -160,7 +161,7 @@ func (r *Router) HasDefaultRouteHandler() bool {
 // SetPreRouteHandler 设置前置路由处理器
 func (r *Router) SetPreRouteHandler(handler RouteHandler) {
 	if r.node.getState() != cluster.Shut {
-		xlog.Sugar().Warnf("the node server is working, can't set pre-route handler")
+		xlog.Logger().Warn("the node server is working, can't set pre-route handler")
 		return
 	}
 
@@ -170,7 +171,7 @@ func (r *Router) SetPreRouteHandler(handler RouteHandler) {
 // SetPostRouteHandler 设置后置路由处理器
 func (r *Router) SetPostRouteHandler(handler RouteHandler) {
 	if r.node.getState() != cluster.Shut {
-		xlog.Sugar().Warnf("the node server is working, can't set post-route handler")
+		xlog.Logger().Warn("the node server is working, can't set post-route handler")
 		return
 	}
 
@@ -260,7 +261,7 @@ func (r *Router) deliver(gid, nid, pid string, cid, uid int64, seq, gameID, mess
 	case <-timer.C:
 		req.reset()
 		r.node.reqPool.Put(req)
-		xlog.Sugar().Warnf("node request queue full, drop message: %d uid: %d", messageID, uid)
+		xlog.Logger().Warn("node request queue full, drop message: uid", zap.Any("messageID", messageID), zap.Any("uid", uid))
 		return xerrors.ErrDeliverQueueFull
 	}
 }
@@ -286,7 +287,7 @@ func (r *Router) handle(req *request) {
 	}
 	if handler == nil {
 		req.compareVersionRecycle(version)
-		xlog.Sugar().Warnf("message dispatcher is not bound, message: %v", req.message.MessageID)
+		xlog.Logger().Warn("message dispatcher is not bound, message", zap.Any("messageID", req.message.MessageID))
 		return
 	}
 

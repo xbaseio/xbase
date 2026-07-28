@@ -14,6 +14,7 @@ import (
 	"github.com/xbaseio/xbase/packet"
 	"github.com/xbaseio/xbase/utils/xrand"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 var pprofOnce sync.Once
@@ -32,16 +33,10 @@ func TestClient_Simple(t *testing.T) {
 	client.OnReceive(func(conn network.Conn, data []byte) {
 		message, _, err := packet.UnpackMessage(data)
 		if err != nil {
-			xlog.Sugar().Errorf("unpack message failed: %v", err)
+			xlog.Logger().Error("unpack message failed", zap.Error(err))
 			return
 		}
-		xlog.Sugar().Infof(
-			"receive msg from server, cid: %d, seq: %d, game id: %d, msg: %s",
-			conn.ID(),
-			message.Seq,
-			message.GameID,
-			string(message.Buffer),
-		)
+		xlog.Logger().Info("receive msg from server, cid: , seq: , game id: , msg", zap.Any("iD", conn.ID()), zap.Any("seq", message.Seq), zap.Any("gameID", message.GameID), zap.String("buffer", string(message.Buffer)))
 	})
 
 	conn, err := client.Dial()
@@ -67,7 +62,7 @@ func TestClient_Simple(t *testing.T) {
 		<-ticker.C
 
 		if err = conn.Push(msg); err != nil {
-			xlog.Sugar().Errorf("push message failed: %v", err)
+			xlog.Logger().Error("push message failed", zap.Error(err))
 			return
 		}
 	}
@@ -99,7 +94,7 @@ func startPprof() {
 	pprofOnce.Do(func() {
 		go func() {
 			if err := http.ListenAndServe(":8090", nil); err != nil {
-				xlog.Sugar().Errorf("pprof server start failed: %v", err)
+				xlog.Logger().Error("pprof server start failed", zap.Error(err))
 			}
 		}()
 	})
@@ -137,7 +132,7 @@ func doPressureTest(concurrency int, requests int, size int) {
 		Buffer:    payload,
 	})
 	if err != nil {
-		xlog.Sugar().Errorf("pack message failed: %v", err)
+		xlog.Logger().Error("pack message failed", zap.Error(err))
 		return
 	}
 
@@ -146,7 +141,7 @@ func doPressureTest(concurrency int, requests int, size int) {
 	}, concurrency)
 
 	if len(conns) == 0 {
-		xlog.Sugar().Errorf("no xtcp connection available")
+		xlog.Logger().Error("no xtcp connection available")
 		return
 	}
 
@@ -165,7 +160,7 @@ func doPressureTest(concurrency int, requests int, size int) {
 				if err := conn.Push(msg); err != nil {
 					fail := atomic.AddInt64(&totalFail, 1)
 					if fail <= 10 {
-						xlog.Sugar().Errorf("push message failed: %v", err)
+						xlog.Logger().Error("push message failed", zap.Error(err))
 					}
 					continue
 				}
@@ -188,12 +183,7 @@ func doPressureTest(concurrency int, requests int, size int) {
 	sent := atomic.LoadInt64(&totalSent)
 
 	if ok := waitRecv(&totalRecv, sent, 5*time.Minute); !ok {
-		xlog.Sugar().Warnf(
-			"wait receive timeout, sent: %d, recv: %d, fail: %d",
-			sent,
-			atomic.LoadInt64(&totalRecv),
-			atomic.LoadInt64(&totalFail),
-		)
+		xlog.Logger().Warn("wait receive timeout, sent: , recv: , fail", zap.Any("sent", sent), zap.Any("loadInt64", atomic.LoadInt64(&totalRecv)), zap.Any("loadInt642", atomic.LoadInt64(&totalFail)))
 	}
 
 	totalTime := time.Since(startTime).Seconds()
@@ -225,7 +215,7 @@ func dialClients(dial func() (network.Conn, error), concurrency int) []network.C
 	for attempts := 0; len(conns) < concurrency && attempts < maxAttempts; attempts++ {
 		conn, err := dial()
 		if err != nil {
-			xlog.Sugar().Errorf("client dial failed: %v", err)
+			xlog.Logger().Error("client dial failed", zap.Error(err))
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
@@ -238,7 +228,7 @@ func dialClients(dial func() (network.Conn, error), concurrency int) []network.C
 	}
 
 	if len(conns) < concurrency {
-		xlog.Sugar().Warnf("dial connections not enough, want: %d, got: %d", concurrency, len(conns))
+		xlog.Logger().Warn("dial connections not enough, want: , got", zap.Any("concurrency", concurrency), zap.Any("arg2", len(conns)))
 	}
 
 	return conns

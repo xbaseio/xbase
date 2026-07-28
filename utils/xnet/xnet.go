@@ -515,13 +515,13 @@ var MaxStreamBufferCap = 64 * 1024 // 64KB
 
 func createListeners(addrs []string, opts ...Option) ([]*listener, *Options, error) {
 	options := loadOptions(opts...)
-	xlog.Sugar().Debugf("default log level is %s", zap.L().Level().String())
+	xlog.Logger().Debug("default log level is", zap.String("level", zap.L().Level().String()))
 
 	// Go 程序可以使用的最大操作系统线程数最初设置为 10000，
 	// 这也应该是用户可以启动的锁定到 OS 线程的 I/O 事件循环的最大数量。
 	if options.LockOSThread && options.NumEventLoop > 10000 {
-		xlog.Sugar().Errorf("too many event-loops under LockOSThread mode, should be less than 10,000 "+
-			"while you are trying to set up %d\n", options.NumEventLoop)
+		xlog.Logger().Error("too many event-loops under LockOSThread mode, should be less than 10,000 "+
+			"while you are trying to set up %d\n", zap.Any("args", []any{options.NumEventLoop}))
 		return nil, nil, xerrors.ErrTooManyEventLoopThreads
 	}
 

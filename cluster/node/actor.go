@@ -9,6 +9,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type Creator func(actor *Actor, args ...any) Processor
@@ -67,13 +68,13 @@ func (a *Actor) Invoke(fn func()) {
 		return
 	}
 
-		// 使用非阻塞发送，避免持有 RLock 时因 fnChan 满而阻塞，
-		// 导致 destroy() 等待 Lock 时形成死锁。
-		select {
-		case a.fnChan <- fn:
-		default:
-			xlog.Sugar().Warnf("actor fnChan full, drop invoke: kind=%s id=%s", a.Kind(), a.ID())
-		}
+	// 使用非阻塞发送，避免持有 RLock 时因 fnChan 满而阻塞，
+	// 导致 destroy() 等待 Lock 时形成死锁。
+	select {
+	case a.fnChan <- fn:
+	default:
+		xlog.Logger().Warn("actor fnChan full, drop invoke: kind= id", zap.Any("kind", a.Kind()), zap.Any("iD", a.ID()))
+	}
 }
 
 // AfterFunc 延迟调用，与官方的time.AfterFunc用法一致
@@ -115,7 +116,7 @@ func (a *Actor) AfterInvoke(d time.Duration, f func()) *Timer {
 		select {
 		case a.fnChan <- f:
 		default:
-			xlog.Sugar().Warnf("actor fnChan full, drop after-invoke: kind=%s id=%s", a.Kind(), a.ID())
+			xlog.Logger().Warn("actor fnChan full, drop after-invoke: kind= id", zap.Any("kind", a.Kind()), zap.Any("iD", a.ID()))
 		}
 	})
 
@@ -205,8 +206,7 @@ func (a *Actor) Next(ctx Context) error {
 	case a.mailbox <- ctx:
 		return nil
 	case <-timer.C:
-		xlog.Sugar().Warnf("actor mailbox full, drop message: %d uid: %d kind: %s id: %s",
-			ctx.MessageID(), ctx.UID(), a.Kind(), a.ID())
+		xlog.Logger().Warn("actor mailbox full, drop message: uid: kind: id", zap.Any("messageID", ctx.MessageID()), zap.Any("uID", ctx.UID()), zap.Any("kind", a.Kind()), zap.Any("iD", a.ID()))
 		return xerrors.ErrMailboxFull
 	}
 }

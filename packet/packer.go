@@ -8,6 +8,7 @@ import (
 	"github.com/xbaseio/xbase/core/buffer"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 const (
@@ -52,7 +53,7 @@ func NewPacker(opts ...Option) *defaultPacker {
 	}
 
 	if o.bufferBytes < 0 {
-		xlog.Sugar().Fatalf("the number of buffer bytes must be greater than or equal to 0, and give %d", o.bufferBytes)
+		xlog.Logger().Fatal("the number of buffer bytes must be greater than or equal to 0, and give", zap.Any("bufferBytes", o.bufferBytes))
 	}
 
 	return &defaultPacker{

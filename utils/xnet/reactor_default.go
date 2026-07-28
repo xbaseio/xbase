@@ -20,10 +20,10 @@ func (el *eventloop) rotate() error {
 
 	err := el.poller.Polling(el.accept0)
 	if xerrors.Is(err, xerrors.ErrEngineShutdown) {
-		xlog.Sugar().Debugf("main reactor is exiting in terms of the demand from user, %v", err)
+		xlog.Logger().Debug("main reactor is exiting in terms of the demand from user", zap.Error(err))
 		err = nil
 	} else if err != nil {
-		xlog.Sugar().Errorf("main reactor is exiting xbase to error: %v", err)
+		xlog.Logger().Error("main reactor is exiting xbase to error", zap.Error(err))
 	}
 
 	el.engine.shutdown(err)
@@ -58,10 +58,10 @@ func (el *eventloop) orbit() error {
 	})
 
 	if xerrors.Is(err, xerrors.ErrEngineShutdown) {
-		xlog.Sugar().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+		xlog.Logger().Debug("event-loop() is exiting in terms of the demand from user", zap.Any("idx", el.idx), zap.Error(err))
 		err = nil
 	} else if err != nil {
-		xlog.Sugar().Errorf("event-loop(%d) is exiting xbase to error: %v", el.idx, err)
+		xlog.Logger().Error("event-loop() is exiting xbase to error", zap.Any("idx", el.idx), zap.Error(err))
 	}
 
 	el.closeConns()
@@ -84,10 +84,7 @@ func (el *eventloop) run() error {
 			if _, ok := el.listeners[fd]; ok {
 				return el.accept(fd, ev, flags)
 			}
-			xlog.Sugar().Warnf(
-				"received event[fd=%d|ev=%d|flags=%d] of a stale connection from event-loop(%d)",
-				fd, ev, flags, el.idx,
-			)
+			xlog.Logger().Warn("received event[fd=|ev=|flags=] of a stale connection from event-loop()", zap.Any("fd", fd), zap.Any("ev", ev), zap.Any("flags", flags), zap.Any("idx", el.idx))
 			return el.poller.Delete(fd)
 		}
 
@@ -95,10 +92,10 @@ func (el *eventloop) run() error {
 	})
 
 	if xerrors.Is(err, xerrors.ErrEngineShutdown) {
-		xlog.Sugar().Debugf("event-loop(%d) is exiting in terms of the demand from user, %v", el.idx, err)
+		xlog.Logger().Debug("event-loop() is exiting in terms of the demand from user", zap.Any("idx", el.idx), zap.Error(err))
 		err = nil
 	} else if err != nil {
-		xlog.Sugar().Errorf("event-loop(%d) is exiting xbase to error: %v", el.idx, err)
+		xlog.Logger().Error("event-loop() is exiting xbase to error", zap.Any("idx", el.idx), zap.Error(err))
 	}
 
 	el.closeConns()

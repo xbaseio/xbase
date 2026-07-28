@@ -13,6 +13,7 @@ import (
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/utils/xconv"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 const (
@@ -190,7 +191,7 @@ func (r *registrar) heartbeat(ctx context.Context, insID string) {
 
 	err := r.registry.opts.client.Agent().UpdateTTL(checkID, checkUpdateOutput, api.HealthPassing)
 	if err != nil {
-		xlog.Sugar().Warnf("update heartbeat ttl failed: %v", err)
+		xlog.Logger().Warn("update heartbeat ttl failed", zap.Error(err))
 	}
 
 	ticker := time.NewTicker(time.Duration(r.registry.opts.heartbeatCheckInterval) * time.Second / 2)
@@ -203,7 +204,7 @@ func (r *registrar) heartbeat(ctx context.Context, insID string) {
 			}
 
 			if err = r.registry.opts.client.Agent().UpdateTTL(checkID, checkUpdateOutput, api.HealthPassing); err != nil {
-				xlog.Sugar().Warnf("update heartbeat ttl failed: %v", err)
+				xlog.Logger().Warn("update heartbeat ttl failed", zap.Error(err))
 			}
 		case <-ctx.Done():
 			return

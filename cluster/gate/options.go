@@ -17,6 +17,7 @@ import (
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/utils/xuuid"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 const (
@@ -133,7 +134,7 @@ func defaultOptions() *options {
 	}
 
 	if err := etc.Get(defaultMetadataKey).Scan(&opts.metadata); err != nil {
-		xlog.Sugar().Warnf("scan gate metadata failed: %v", err)
+		xlog.Logger().Warn("scan gate metadata failed", zap.Error(err))
 	}
 
 	if version := etc.Get(defaultVersionKey).String(); version != "" {

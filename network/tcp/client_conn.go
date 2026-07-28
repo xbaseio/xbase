@@ -12,6 +12,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xnet"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type clientConnBox struct {
@@ -370,7 +371,7 @@ func (c *clientConn) write() {
 			}
 
 			if err := c.writeFull(conn, r.msg); err != nil {
-				xlog.Sugar().Errorf("write data message error: %v", err)
+				xlog.Logger().Error("write data message error", zap.Error(err))
 				_ = c.forceClose()
 				return
 			}

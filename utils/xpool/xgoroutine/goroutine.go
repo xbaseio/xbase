@@ -32,12 +32,12 @@ var DefaultWorkerPool = Default()
 type Pool = xants.Pool
 
 type antsLogger struct {
-	logger *zap.SugaredLogger
+	logger *zap.Logger
 }
 
 // Printf implements the xants.Logger interface.
 func (l antsLogger) Printf(format string, args ...any) {
-	l.logger.Infof(format, args...)
+	l.logger.Info("goroutine pool", zap.String("format", format), zap.Any("args", args))
 }
 
 // Default instantiates a non-blocking goroutine pool with the capacity of DefaultAntsPoolSize.
@@ -45,9 +45,9 @@ func Default() *Pool {
 	options := xants.Options{
 		ExpiryDuration: ExpiryDuration,
 		Nonblocking:    Nonblocking,
-		Logger:         &antsLogger{logger: xlog.Sugar()},
+		Logger:         &antsLogger{logger: xlog.Logger()},
 		PanicHandler: func(a any) {
-			xlog.Sugar().Errorf("goroutine pool panic: %v", a)
+			xlog.Logger().Error("goroutine pool panic", zap.Any("a", a))
 		},
 	}
 	defaultAntsPool, _ := xants.NewPool(DefaultAntsPoolSize, xants.WithOptions(options))

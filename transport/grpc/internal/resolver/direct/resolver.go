@@ -3,6 +3,7 @@ package direct
 import (
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/resolver"
 )
@@ -30,7 +31,7 @@ func (r *Resolver) updateState(state resolver.State) {
 		r.cc.ReportError(err)
 
 		if !(len(state.Addresses) == 0 && xerrors.Is(err, balancer.ErrBadResolverState)) {
-			xlog.Sugar().Warnf("update client conn state failed: %v", err)
+			xlog.Logger().Warn("update client conn state failed", zap.Error(err))
 		}
 	}
 }

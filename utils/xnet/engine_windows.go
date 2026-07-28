@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/xbaseio/xbase/xerrors"
@@ -35,7 +36,7 @@ func (eng *engine) isShutdown() bool {
 // shutdown 发出关闭信号。
 func (eng *engine) shutdown(err error) {
 	if err != nil && !xerrors.Is(err, xerrors.ErrEngineShutdown) {
-		xlog.Sugar().Errorf("engine is being shutdown with error: %v", err)
+		xlog.Logger().Error("engine is being shutdown with error", zap.Error(err))
 	}
 
 	eng.turnOff()
@@ -109,7 +110,7 @@ func (eng *engine) stop(ctx context.Context, engine Engine) {
 	eng.closeEventLoops()
 
 	if err := eng.concurrency.Wait(); err != nil && !xerrors.Is(err, xerrors.ErrEngineShutdown) {
-		xlog.Sugar().Errorf("engine shutdown error: %v", err)
+		xlog.Logger().Error("engine shutdown error", zap.Error(err))
 	}
 
 	eng.inShutdown.Store(true)
@@ -118,11 +119,7 @@ func (eng *engine) stop(ctx context.Context, engine Engine) {
 // run 启动整个 xnet 引擎。
 func run(eventHandler EventHandler, listeners []*listener, options *Options, addrs []string) error {
 	numEventLoop := determineEventLoops(options)
-	xlog.Sugar().Infof(
-		"Launching xnet with %d event-loops, listening on: %s",
-		numEventLoop,
-		strings.Join(addrs, " | "),
-	)
+	xlog.Logger().Info("Launching xnet with event-loops, listening on", zap.Any("numEventLoop", numEventLoop), zap.Any("join", strings.Join(addrs, " | ")))
 
 	rootCtx, shutdown := context.WithCancel(context.Background())
 	eg, ctx := errgroup.WithContext(rootCtx)
@@ -165,7 +162,7 @@ func run(eventHandler EventHandler, listeners []*listener, options *Options, add
 	}
 
 	if err := eng.start(ctx, numEventLoop); err != nil {
-		xlog.Sugar().Errorf("xnet engine is stopping with error: %v", err)
+		xlog.Logger().Error("xnet engine is stopping with error", zap.Error(err))
 		return err
 	}
 	defer eng.stop(rootCtx, engine)

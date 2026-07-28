@@ -13,6 +13,7 @@ import (
 	"github.com/xbaseio/xbase/internal/transporter/internal/protocol"
 	"github.com/xbaseio/xbase/internal/transporter/internal/route"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 const scheme = "drpc"
@@ -113,11 +114,11 @@ func (s *Server) Start() error {
 				if tempDelay > time.Second {
 					tempDelay = time.Second
 				}
-				xlog.Sugar().Warnf("tcp accept connect error: %v; retrying in %v", err, tempDelay)
+				xlog.Logger().Warn("tcp accept connect error: ; retrying in", zap.Error(err), zap.Any("tempDelay", tempDelay))
 				time.Sleep(tempDelay)
 				continue
 			}
-			xlog.Sugar().Warnf("tcp accept connect error: %v", err)
+			xlog.Logger().Warn("tcp accept connect error", zap.Error(err))
 			return err
 		}
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type server struct {
@@ -143,18 +144,18 @@ func (s *server) serve() {
 				if max := 1 * time.Second; tempDelay > max {
 					tempDelay = max
 				}
-				xlog.Sugar().Warnf("tcp accept error: %v; retrying in %v", err, tempDelay)
+				xlog.Logger().Warn("tcp accept error: ; retrying in", zap.Error(err), zap.Any("tempDelay", tempDelay))
 				time.Sleep(tempDelay)
 				continue
 			}
-			xlog.Sugar().Warnf("tcp accept error: %v", err)
+			xlog.Logger().Warn("tcp accept error", zap.Error(err))
 			return
 		}
 
 		tempDelay = 0
 
 		if err = s.connMgr.allocate(conn); err != nil {
-			xlog.Sugar().Errorf("connection allocate error: %v", err)
+			xlog.Logger().Error("connection allocate error", zap.Error(err))
 			_ = conn.Close()
 		}
 	}

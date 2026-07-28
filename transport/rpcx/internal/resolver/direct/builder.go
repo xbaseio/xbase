@@ -13,6 +13,7 @@ import (
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 const scheme = "direct"
@@ -35,7 +36,7 @@ func NewBuilder(dis registry.Discovery) *Builder {
 	b.ctx, b.cancel = context.WithCancel(context.Background())
 
 	if err := b.init(); err != nil {
-		xlog.Sugar().Fatalf("init client builder failed: %v", err)
+		xlog.Logger().Fatal("init client builder failed", zap.Error(err))
 	}
 
 	return b
@@ -121,7 +122,7 @@ func (b *Builder) updateInstances(instances []*registry.ServiceInstance) {
 
 		ep, err := endpoint.ParseEndpoint(instance.Endpoint)
 		if err != nil {
-			xlog.Sugar().Errorf("parse discovery endpoint failed: %v", err)
+			xlog.Logger().Error("parse discovery endpoint failed", zap.Error(err))
 			continue
 		}
 

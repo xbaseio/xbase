@@ -14,6 +14,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type HookHandler func(proxy *Proxy)
@@ -127,7 +128,7 @@ func (c *Client) handleReceive(conn network.Conn, data []byte) {
 
 	message, _, err := packet.UnpackMessage(data)
 	if err != nil {
-		xlog.Sugar().Errorf("unpack message failed: %v", err)
+		xlog.Logger().Error("unpack message failed", zap.Error(err))
 		return
 	}
 
@@ -149,7 +150,7 @@ func (c *Client) handleReceive(conn network.Conn, data []byte) {
 			message: message,
 		})
 	} else {
-		xlog.Sugar().Debugf("route handler is not registered, message: %v", message.MessageID)
+		xlog.Logger().Debug("route handler is not registered, message", zap.Any("messageID", message.MessageID))
 	}
 }
 
@@ -193,7 +194,7 @@ func (c *Client) addRouteHandler(messageID int32, handler RouteHandler) {
 	if c.getState() == cluster.Shut {
 		c.routes[messageID] = append(c.routes[messageID], handler)
 	} else {
-		xlog.Sugar().Warnf("client is working, can't add route handler")
+		xlog.Logger().Warn("client is working, can't add route handler")
 	}
 }
 
@@ -202,7 +203,7 @@ func (c *Client) setDefaultRouteHandler(handler RouteHandler) {
 	if c.getState() == cluster.Shut {
 		c.defaultRouteHandler = handler
 	} else {
-		xlog.Sugar().Warnf("client is working, can't set default route handler")
+		xlog.Logger().Warn("client is working, can't set default route handler")
 	}
 }
 
@@ -211,7 +212,7 @@ func (c *Client) addEventListener(event cluster.Event, handler EventHandler) {
 	if c.getState() == cluster.Shut {
 		c.events[event] = append(c.events[event], handler)
 	} else {
-		xlog.Sugar().Warnf("client is working, can't add event handler")
+		xlog.Logger().Warn("client is working, can't add event handler")
 	}
 }
 
@@ -226,7 +227,7 @@ func (c *Client) addHookListener(hook cluster.Hook, handler HookHandler) {
 		if c.getState() == cluster.Shut {
 			c.hooks[hook] = append(c.hooks[hook], handler)
 		} else {
-			xlog.Sugar().Warnf("server is working, can't add hook handler")
+			xlog.Logger().Warn("server is working, can't add hook handler")
 		}
 	}
 }

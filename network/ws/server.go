@@ -13,6 +13,7 @@ import (
 	"github.com/xbaseio/xbase/network"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type UpgradeHandler func(w http.ResponseWriter, r *http.Request) (allowed bool)
@@ -178,7 +179,7 @@ func (s *server) serve() {
 	}
 
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		xlog.Sugar().Errorf("websocket server shutdown, addr=%s, err=%v", s.opts.addr, err)
+		xlog.Logger().Error("websocket server shutdown, addr=, err", zap.Any("addr", s.opts.addr), zap.Error(err))
 	}
 }
 
@@ -196,12 +197,12 @@ func (s *server) handleUpgrade(w http.ResponseWriter, r *http.Request, upgrader 
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		xlog.Sugar().Errorf("websocket upgrade error, remote=%s, path=%s, err=%v", r.RemoteAddr, r.URL.Path, err)
+		xlog.Logger().Error("websocket upgrade error, remote=, path=, err", zap.Any("remoteAddr", r.RemoteAddr), zap.Any("path", r.URL.Path), zap.Error(err))
 		return
 	}
 
 	if err = s.connMgr.allocate(conn); err != nil {
-		xlog.Sugar().Errorf("connection allocate error, remote=%s, err=%v", r.RemoteAddr, err)
+		xlog.Logger().Error("connection allocate error, remote=, err", zap.Any("remoteAddr", r.RemoteAddr), zap.Error(err))
 		_ = conn.Close()
 		return
 	}

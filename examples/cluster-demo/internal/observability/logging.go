@@ -6,10 +6,11 @@ import (
 	"strings"
 
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 func Info(event string, kv ...any) {
-	xlog.Sugar().Infof("%s", render(event, kv...))
+	xlog.Logger().Info("log event", zap.Any("arg1", render(event, kv...)))
 }
 
 func Warn(event string, err error, kv ...any) {
@@ -17,7 +18,7 @@ func Warn(event string, err error, kv ...any) {
 	if err != nil {
 		items = append(items, "err", err)
 	}
-	xlog.Sugar().Warnf("%s", render(event, items...))
+	xlog.Logger().Warn("log event", zap.Any("arg1", render(event, items...)))
 }
 
 func Error(event string, err error, kv ...any) {
@@ -25,7 +26,7 @@ func Error(event string, err error, kv ...any) {
 	if err != nil {
 		items = append(items, "err", err)
 	}
-	xlog.Sugar().Errorf("%s", render(event, items...))
+	xlog.Logger().Error("log event", zap.Any("arg1", render(event, items...)))
 }
 
 func render(event string, kv ...any) string {

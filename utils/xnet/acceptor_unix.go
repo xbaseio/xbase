@@ -5,6 +5,7 @@ package xnet
 import (
 	"runtime"
 
+	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 
 	"github.com/xbaseio/xbase/utils/xnetpoll"
@@ -33,7 +34,7 @@ func (el *eventloop) accept0(fd int, _ xnetpoll.IOEvent, _ xnetpoll.IOFlags) err
 			// 这类错误通常可以直接继续重试。
 			continue
 		default:
-			xlog.Sugar().Errorf("Accept() failed xbase to error: %v", err)
+			xlog.Logger().Error("Accept() failed xbase to error", zap.Error(err))
 			return xerrors.ErrAcceptSocket
 		}
 
@@ -52,7 +53,7 @@ func (el *eventloop) accept0(fd int, _ xnetpoll.IOEvent, _ xnetpoll.IOFlags) err
 				opts.TCPKeepInterval,
 				opts.TCPKeepCount,
 			); err != nil {
-				xlog.Sugar().Errorf("failed to set TCP keepalive on fd=%d: %v", fd, err)
+				xlog.Logger().Error("failed to set TCP keepalive on fd", zap.Any("fd", fd), zap.Error(err))
 			}
 		}
 
@@ -60,7 +61,7 @@ func (el *eventloop) accept0(fd int, _ xnetpoll.IOEvent, _ xnetpoll.IOFlags) err
 		c := newStreamConn(network, nfd, targetEL, sa, listener.addr, remoteAddr)
 
 		if err = targetEL.poller.Trigger(xqueue.HighPriority, targetEL.register, c); err != nil {
-			xlog.Sugar().Errorf("failed to enqueue the accepted socket fd=%d to poller: %v", c.fd, err)
+			xlog.Logger().Error("failed to enqueue the accepted socket fd= to poller", zap.Any("fd", c.fd), zap.Error(err))
 			_ = unix.Close(nfd)
 			c.release()
 		}
@@ -87,7 +88,7 @@ func (el *eventloop) accept(fd int, ev xnetpoll.IOEvent, flags xnetpoll.IOFlags)
 		// 这类错误通常无需中断事件循环，直接返回等待下一次事件即可。
 		return nil
 	default:
-		xlog.Sugar().Errorf("Accept() failed xbase to error: %v", err)
+		xlog.Logger().Error("Accept() failed xbase to error", zap.Error(err))
 		return xerrors.ErrAcceptSocket
 	}
 
@@ -106,7 +107,7 @@ func (el *eventloop) accept(fd int, ev xnetpoll.IOEvent, flags xnetpoll.IOFlags)
 			opts.TCPKeepInterval,
 			opts.TCPKeepCount,
 		); err != nil {
-			xlog.Sugar().Errorf("failed to set TCP keepalive on fd=%d: %v", fd, err)
+			xlog.Logger().Error("failed to set TCP keepalive on fd", zap.Any("fd", fd), zap.Error(err))
 		}
 	}
 

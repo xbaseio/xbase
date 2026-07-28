@@ -4,6 +4,7 @@ import (
 	gatepolicy "github.com/xbaseio/xbase/component/eventbus"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 func (g *Gate) ServiceStatusPolicy() gatepolicy.ServiceStatusPolicy {
@@ -20,8 +21,7 @@ func (g *Gate) ApplyServiceStatusPolicy(policy gatepolicy.ServiceStatusPolicy, i
 	}
 
 	current := g.opts.updateServiceStatusPolicy(policy, isMathchGate)
-	xlog.Sugar().Infof("gate service status policy updated, gateID: %s gateName: %s grayTrafficPercent: %d grayWhitelist: %d testWhitelist: %d",
-		g.opts.id, g.opts.name, current.GrayTrafficPercent, len(current.GrayWhitelist), len(current.TestWhitelist))
+	xlog.Logger().Info("gate service status policy updated, gateID: gateName: grayTrafficPercent: grayWhitelist: testWhitelist", zap.Any("id", g.opts.id), zap.Any("name", g.opts.name), zap.Any("grayTrafficPercent", current.GrayTrafficPercent), zap.Any("arg4", len(current.GrayWhitelist)), zap.Any("arg5", len(current.TestWhitelist)))
 
 	return current
 }
@@ -38,8 +38,7 @@ func (g *Gate) subscribeServiceStatusPolicy() {
 		isMathchGate := payload.MatchGate(g.opts.id, g.opts.name)
 
 		current := g.ApplyServiceStatusPolicy(payload.Policy, isMathchGate)
-		xlog.Sugar().Infof("gate service status policy event applied, eventID: %s gateID: %s gateName: %s grayTrafficPercent: %d grayWhitelist: %d testWhitelist: %d",
-			uuid, g.opts.id, g.opts.name, current.GrayTrafficPercent, len(current.GrayWhitelist), len(current.TestWhitelist))
+		xlog.Logger().Info("gate service status policy event applied, eventID: gateID: gateName: grayTrafficPercent: grayWhitelist: testWhitelist", zap.Any("uuid", uuid), zap.Any("id", g.opts.id), zap.Any("name", g.opts.name), zap.Any("grayTrafficPercent", current.GrayTrafficPercent), zap.Any("arg5", len(current.GrayWhitelist)), zap.Any("arg6", len(current.TestWhitelist)))
 	})
 }
 

@@ -45,7 +45,7 @@ func NewClient(eh EventHandler, opts ...Option) (cli *Client, err error) {
 // Start 启动客户端事件循环。
 func (cli *Client) Start() error {
 	numEventLoop := determineEventLoops(cli.opts)
-	xlog.Sugar().Infof("Starting xnet client with %d event loops", numEventLoop)
+	xlog.Logger().Info("Starting xnet client with event loops", zap.Any("numEventLoop", numEventLoop))
 
 	cli.eng.eventHandler.OnBoot(Engine{cli.eng})
 
@@ -75,7 +75,7 @@ func (cli *Client) Start() error {
 			return nil
 		})
 	}
-	xlog.Sugar().Debugf("default log level is %s", zap.L().Level().String())
+	xlog.Logger().Debug("default log level is", zap.String("level", zap.L().Level().String()))
 	return nil
 }
 

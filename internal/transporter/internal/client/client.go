@@ -10,6 +10,7 @@ import (
 	"github.com/xbaseio/xbase/core/buffer"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -54,7 +55,7 @@ func (c *Client) Establish() error {
 			conn := newConn(c)
 
 			if err := conn.dial(); err != nil {
-				xlog.Sugar().Warnf("conn dial failed: %v", err)
+				xlog.Logger().Warn("conn dial failed", zap.Error(err))
 				return err
 			}
 

@@ -12,6 +12,7 @@ import (
 	xnet "github.com/xbaseio/xbase/utils/xnet"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type server struct {
@@ -193,7 +194,7 @@ func (eh *gnetEventHandler) OnShutdown(eng xnet.Engine) {
 func (eh *gnetEventHandler) OnOpen(c xnet.Conn) ([]byte, xnet.Action) {
 	conn, err := eh.s.connMgr.allocate(c)
 	if err != nil {
-		xlog.Sugar().Errorf("connection allocate error: %v", err)
+		xlog.Logger().Error("connection allocate error", zap.Error(err))
 		return nil, xnet.Close
 	}
 

@@ -21,7 +21,7 @@ func Call(fn func()) {
 			case runtime.Error:
 				xlog.Logger().Panic("runtime panic", zap.Any("panic", err))
 			default:
-				xlog.Sugar().Panicf("panic error: %v", err)
+				xlog.Logger().Panic("panic error", zap.Any("panic", err))
 			}
 		}
 	}()

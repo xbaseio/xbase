@@ -8,6 +8,7 @@ import (
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type Dispatcher struct {
@@ -122,8 +123,7 @@ func (d *Dispatcher) ReplaceServices(services ...*registry.ServiceInstance) {
 	for _, service := range services {
 		ep, err := endpoint.ParseEndpoint(service.Endpoint)
 		if err != nil {
-			xlog.Sugar().Errorf("service endpoint parse failed, insID: %s kind: %s name: %s alias: %s endpoint: %s err: %v",
-				service.ID, service.Kind, service.Name, service.Alias, service.Endpoint, err)
+			xlog.Logger().Error("service endpoint parse failed, insID: kind: name: alias: endpoint: err", zap.Any("iD", service.ID), zap.Any("kind", service.Kind), zap.Any("name", service.Name), zap.Any("alias", service.Alias), zap.Any("endpoint", service.Endpoint), zap.Error(err))
 			continue
 		}
 

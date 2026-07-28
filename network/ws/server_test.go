@@ -9,6 +9,7 @@ import (
 	"github.com/xbaseio/xbase/packet"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 func TestServer(t *testing.T) {
@@ -56,7 +57,7 @@ func TestServer(t *testing.T) {
 	xcall.Go(func() {
 		err := http.ListenAndServe(":8089", nil)
 		if err != nil {
-			xlog.Sugar().Errorf("pprof server start failed: %v", err)
+			xlog.Logger().Error("pprof server start failed", zap.Error(err))
 		}
 	})
 
@@ -99,7 +100,7 @@ func TestServer_Benchmark(t *testing.T) {
 	xcall.Go(func() {
 		err := http.ListenAndServe(":8089", nil)
 		if err != nil {
-			xlog.Sugar().Errorf("pprof server start failed: %v", err)
+			xlog.Logger().Error("pprof server start failed", zap.Error(err))
 		}
 	})
 

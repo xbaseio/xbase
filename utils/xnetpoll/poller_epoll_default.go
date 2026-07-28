@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 
 	"github.com/xbaseio/xbase/utils/xqueue"
@@ -130,7 +131,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 			runtime.Gosched()
 			continue
 		} else if err != nil {
-			xlog.Sugar().Errorf("error occurs in epoll: %v", os.NewSyscallError("epoll_wait", err))
+			xlog.Logger().Error("error occurs in epoll", zap.Error(os.NewSyscallError("epoll_wait", err)))
 			return err
 		}
 
@@ -189,8 +190,7 @@ func (p *Poller) Polling(callback PollEventHandler) error {
 						continue
 					}
 					if err != nil {
-						xlog.Sugar().Errorf("failed to notify next round of event-loop for leftover tasks, %v",
-							os.NewSyscallError("write", err))
+						xlog.Logger().Error("failed to notify next round of event-loop for leftover tasks", zap.Error(os.NewSyscallError("write", err)))
 					}
 					break
 				}

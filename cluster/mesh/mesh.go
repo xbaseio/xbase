@@ -13,6 +13,7 @@ import (
 	"github.com/xbaseio/xbase/transport"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type HookHandler func(proxy *Proxy)
@@ -136,32 +137,32 @@ func (m *Mesh) startTransportServer() {
 
 	transporter, err := m.opts.transporter.NewServer()
 	if err != nil {
-		xlog.Sugar().Fatalf("transport server create failed: %v", err)
+		xlog.Logger().Fatal("transport server create failed", zap.Error(err))
 	}
 
 	m.transporter = transporter
 
 	for _, entity := range m.services {
 		if err = m.transporter.RegisterService(entity.desc, entity.provider); err != nil {
-			xlog.Sugar().Fatalf("register service failed: %v", err)
+			xlog.Logger().Fatal("register service failed", zap.Error(err))
 		}
 	}
 
 	go func() {
 		if err = m.transporter.Start(); err != nil {
-			xlog.Sugar().Fatalf("transport server start failed: %v", err)
+			xlog.Logger().Fatal("transport server start failed", zap.Error(err))
 		}
 	}()
 
 	if err = cluster.WaitForTCPListen(m.transporter.Addr(), defaultTimeout); err != nil {
-		xlog.Sugar().Fatalf("transport server listen timeout: %v", err)
+		xlog.Logger().Fatal("transport server listen timeout", zap.Error(err))
 	}
 }
 
 // 停止传输服务器
 func (m *Mesh) stopTransportServer() {
 	if err := m.transporter.Stop(); err != nil {
-		xlog.Sugar().Errorf("transport server stop failed: %v", err)
+		xlog.Logger().Error("transport server stop failed", zap.Error(err))
 	}
 }
 
@@ -187,7 +188,7 @@ func (m *Mesh) registerServiceInstance() {
 	defer cancel()
 
 	if err := m.opts.registry.Register(ctx, m.instance); err != nil {
-		xlog.Sugar().Fatalf("register cluster instance failed: %v", err)
+		xlog.Logger().Fatal("register cluster instance failed", zap.Error(err))
 	}
 }
 
@@ -203,7 +204,7 @@ func (m *Mesh) refreshServiceInstance() {
 	defer cancel()
 
 	if err := m.opts.registry.Register(ctx, m.instance); err != nil {
-		xlog.Sugar().Fatalf("refresh cluster instance failed: %v", err)
+		xlog.Logger().Fatal("refresh cluster instance failed", zap.Error(err))
 	}
 }
 
@@ -213,7 +214,7 @@ func (m *Mesh) deregisterServiceInstance() {
 	defer cancel()
 
 	if err := m.opts.registry.Deregister(ctx, m.instance); err != nil {
-		xlog.Sugar().Errorf("deregister cluster instance failed: %v", err)
+		xlog.Logger().Error("deregister cluster instance failed", zap.Error(err))
 	}
 }
 
@@ -257,7 +258,7 @@ func (m *Mesh) addHookListener(hook cluster.Hook, handler HookHandler) {
 		if m.getState() == cluster.Shut {
 			m.hooks[hook] = append(m.hooks[hook], handler)
 		} else {
-			xlog.Sugar().Warnf("server is working, can't add hook handler")
+			xlog.Logger().Warn("server is working, can't add hook handler")
 		}
 	}
 }
@@ -271,7 +272,7 @@ func (m *Mesh) addServiceProvider(name string, desc, provider any) {
 			provider: provider,
 		})
 	} else {
-		xlog.Sugar().Warnf("mesh server is working, can't add service provider")
+		xlog.Logger().Warn("mesh server is working, can't add service provider")
 	}
 }
 

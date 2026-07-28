@@ -9,6 +9,7 @@ import (
 	"github.com/xbaseio/xbase/core/info"
 	xnet "github.com/xbaseio/xbase/core/net"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 var _ component.Component = &PProf{}
@@ -34,12 +35,12 @@ func (*PProf) Name() string {
 func (p *PProf) Start() {
 	listenAddr, exposeAddr, err := xnet.ParseAddr(p.opts.addr)
 	if err != nil {
-		xlog.Sugar().Fatalf("pprof addr parse failed: %v", err)
+		xlog.Logger().Fatal("pprof addr parse failed", zap.Error(err))
 	}
 
 	go func() {
 		if err := http.ListenAndServe(listenAddr, nil); err != nil {
-			xlog.Sugar().Fatalf("pprof server start failed: %v", err)
+			xlog.Logger().Fatal("pprof server start failed", zap.Error(err))
 		}
 	}()
 

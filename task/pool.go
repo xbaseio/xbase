@@ -4,6 +4,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xants"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type Pool interface {
@@ -71,7 +72,7 @@ func AddTask(task func()) {
 
 	if err := globalPool.AddTask(task); err != nil {
 		xcall.Go(task)
-		xlog.Sugar().Warnf("add task to the task pool failed: %v", err)
+		xlog.Logger().Warn("add task to the task pool failed", zap.Error(err))
 		return
 	}
 }
@@ -87,5 +88,5 @@ type logger struct {
 }
 
 func (l *logger) Printf(format string, args ...any) {
-	xlog.Sugar().Infof(format, args...)
+	xlog.Logger().Info(format, zap.Any("args", []any{args}))
 }

@@ -4,6 +4,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xtelegram/telegram/telegram"
 	"github.com/xbaseio/xbase/utils/xtelegram/telegram/types"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 func SetStickerEmojiList(botToken string) error {
@@ -14,7 +15,7 @@ func SetStickerEmojiList(botToken string) error {
 
 	botApi, err := telegram.New(botToken)
 	if err != nil {
-		xlog.Sugar().Errorf("%v", err)
+		xlog.Logger().Error("log event", zap.Error(err))
 		return nil
 	}
 
@@ -29,10 +30,10 @@ func SetStickerEmojiList(botToken string) error {
 	})
 
 	if err != nil {
-		xlog.Sugar().Errorf("%v", err)
+		xlog.Logger().Error("log event", zap.Error(err))
 		return err
 	}
-	xlog.Sugar().Warnf("botToken,botToken:%v %#v", botToken, rst)
+	xlog.Logger().Warn("botToken,botToken", zap.Any("botToken", botToken), zap.Any("rst", rst))
 
 	return nil
 

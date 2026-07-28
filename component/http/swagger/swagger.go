@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -30,14 +31,14 @@ const (
 func New(cfg Config) fiber.Handler {
 	// Verify Swagger file exists
 	if _, err := os.Stat(cfg.FilePath); os.IsNotExist(err) {
-		xlog.Sugar().Warnf("%s file does not exist", cfg.FilePath)
+		xlog.Logger().Warn("file does not exist", zap.Any("filePath", cfg.FilePath))
 		return nil
 	}
 
 	// Read Swagger Spec into memory
 	rawSpec, err := os.ReadFile(cfg.FilePath)
 	if err != nil {
-		xlog.Sugar().Warnf("Failed to read provided Swagger file (%s): %v", cfg.FilePath, err)
+		xlog.Logger().Warn("Failed to read provided Swagger file ()", zap.Any("filePath", cfg.FilePath), zap.Error(err))
 		return nil
 	}
 

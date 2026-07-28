@@ -9,6 +9,7 @@ import (
 
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type Options struct {
@@ -43,7 +44,7 @@ func Start(opts Options) {
 		watcher, err := opts.Registry.Watch(ctx, opts.ServiceName)
 		cancel()
 		if err != nil {
-			xlog.Sugar().Fatalf("%s version watch failed: %v", opts.Kind, err)
+			xlog.Logger().Fatal("version watch failed", zap.Any("kind", opts.Kind), zap.Error(err))
 		}
 
 		defer watcher.Stop()
@@ -84,8 +85,7 @@ func (w *watcher) check(services []*registry.ServiceInstance) {
 		w.cancelSchedule()
 		return
 	}
-	xlog.Sugar().Warnf("%s %s version %s is lower than cluster max %s, will retire in %v",
-		w.opts.Kind, w.opts.ID, w.opts.Version, maxVersion, w.opts.RetireDelay)
+	xlog.Logger().Warn("version is lower than cluster max , will retire in", zap.Any("kind", w.opts.Kind), zap.Any("iD", w.opts.ID), zap.Any("version", w.opts.Version), zap.Any("maxVersion", maxVersion), zap.Any("retireDelay", w.opts.RetireDelay))
 	w.schedule()
 }
 
@@ -119,19 +119,19 @@ func (w *watcher) schedule() {
 	}
 
 	w.timer = time.AfterFunc(w.opts.RetireDelay, func() {
-		xlog.Sugar().Warnf("%s %s version %s retiring after %v", w.opts.Kind, w.opts.ID, w.opts.Version, w.opts.RetireDelay)
+		xlog.Logger().Warn("version retiring after", zap.Any("kind", w.opts.Kind), zap.Any("iD", w.opts.ID), zap.Any("version", w.opts.Version), zap.Any("retireDelay", w.opts.RetireDelay))
 
 		w.opts.Shutdown()
 
 		proc, err := os.FindProcess(os.Getpid())
 		if err != nil {
-			xlog.Sugar().Errorf("find process failed: %v", err)
+			xlog.Logger().Error("find process failed", zap.Error(err))
 			os.Exit(0)
 			return
 		}
 
 		if err = proc.Signal(syscall.SIGTERM); err != nil {
-			xlog.Sugar().Errorf("send retire signal failed: %v", err)
+			xlog.Logger().Error("send retire signal failed", zap.Error(err))
 			os.Exit(0)
 		}
 	})

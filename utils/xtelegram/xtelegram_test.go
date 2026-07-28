@@ -7,6 +7,7 @@ import (
 	"github.com/xbaseio/xbase/config"
 	"github.com/xbaseio/xbase/config/file"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 
 	//optionChannelDao "github.com/xbaseio/xbase/utils/dao/option-channel"
 	//optionListenerAddressDao "github.com/xbaseio/xbase/utils/dao/option-listener-address"
@@ -49,7 +50,7 @@ func TestClient_SendMessage(t *testing.T) {
 		xtelegram.WithMsgType(tgtypes.RobotMsgTypePhoto),
 		xtelegram.WithParseMode(tgtypes.ModeMarkdown))
 	if err == nil {
-		xlog.Sugar().Errorf("%v", err)
+		xlog.Logger().Error("log event", zap.Error(err))
 		return
 	}
 	xMsg.SendMessage(33, replaces)

@@ -15,6 +15,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xtime"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 const (
@@ -344,7 +345,7 @@ func (c *conn) write(ctx context.Context, conn net.Conn) {
 			}
 
 			if err := writeAllWithDeadline(conn, protocol.Heartbeat(), writeTimeout); err != nil {
-				xlog.Sugar().Warnf("write heartbeat message error: %v", err)
+				xlog.Logger().Warn("write heartbeat message error", zap.Error(err))
 				c.retry(conn)
 				return
 			}
@@ -384,7 +385,7 @@ func (c *conn) doWrite(conn net.Conn, msg *message) bool {
 		}
 
 		if err := writeAllWithDeadline(conn, data, writeTimeout); err != nil {
-			xlog.Sugar().Warnf("write transporter message error: %v", err)
+			xlog.Logger().Warn("write transporter message error", zap.Error(err))
 			return false
 		}
 
@@ -425,7 +426,7 @@ func (c *conn) retry(conn net.Conn) {
 	}
 
 	if err := c.dial(); err != nil {
-		xlog.Sugar().Warnf("retry dial failed: %v", err)
+		xlog.Logger().Warn("retry dial failed", zap.Error(err))
 	}
 }
 

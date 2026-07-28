@@ -11,6 +11,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xpool/xgoroutine"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 //
@@ -225,12 +226,12 @@ func (el *eventloop) run() (err error) {
 		}
 
 		if xerrors.Is(err, xerrors.ErrEngineShutdown) {
-			xlog.Sugar().Debugf("event-loop(%d) exiting: %v", el.idx, err)
+			xlog.Logger().Debug("event-loop() exiting", zap.Any("idx", el.idx), zap.Error(err))
 			break
 		}
 
 		if err != nil {
-			xlog.Sugar().Debugf("event-loop(%d) error: %v", el.idx, err)
+			xlog.Logger().Debug("event-loop() error", zap.Any("idx", el.idx), zap.Error(err))
 		}
 	}
 
@@ -362,7 +363,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 			if !shutdown {
 				shutdown = true
 				el.ch <- xerrors.ErrEngineShutdown
-				xlog.Sugar().Debugf("ticker stop loop(%d)", el.idx)
+				xlog.Logger().Debug("ticker stop loop()", zap.Any("idx", el.idx))
 			}
 		}
 
@@ -374,7 +375,7 @@ func (el *eventloop) ticker(ctx context.Context) {
 
 		select {
 		case <-ctx.Done():
-			xlog.Sugar().Debugf("ticker stop by ctx loop(%d)", el.idx)
+			xlog.Logger().Debug("ticker stop by ctx loop()", zap.Any("idx", el.idx))
 			return
 		case <-timer.C:
 		}

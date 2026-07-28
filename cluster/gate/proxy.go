@@ -11,6 +11,7 @@ import (
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xerrors"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 )
 
 type proxy struct {
@@ -48,7 +49,7 @@ func (p *proxy) bindLobby(ctx context.Context, uid int64) error {
 func (p *proxy) unbindGate(ctx context.Context, cid, uid int64) error {
 	err := p.gate.opts.locator.UnbindGate(ctx, uid, p.gate.opts.id)
 	if err != nil {
-		xlog.Sugar().Errorf("user unbind failed, gid: %s, cid: %d, uid: %d, err: %v", p.gate.opts.id, cid, uid, err)
+		xlog.Logger().Error("user unbind failed, gid: , cid: , uid: , err", zap.Any("id", p.gate.opts.id), zap.Any("cid", cid), zap.Any("uid", uid), zap.Error(err))
 	}
 
 	return err
@@ -57,7 +58,7 @@ func (p *proxy) unbindGate(ctx context.Context, cid, uid int64) error {
 // 触发事件
 func (p *proxy) trigger(ctx context.Context, event cluster.Event, cid, uid int64) {
 	if mode.IsDebugMode() {
-		xlog.Sugar().Debugf("trigger event, event: %v cid: %d uid: %d", event.String(), cid, uid)
+		xlog.Logger().Debug("trigger event, event: cid: uid", zap.String("event", event.String()), zap.Any("cid", cid), zap.Any("uid", uid))
 	}
 
 	if err := p.nodeLinker.Trigger(ctx, &link.TriggerArgs{
@@ -67,9 +68,9 @@ func (p *proxy) trigger(ctx context.Context, event cluster.Event, cid, uid int64
 	}); err != nil {
 		switch {
 		case xerrors.Is(err, xerrors.ErrNotFoundEvent), xerrors.Is(err, xerrors.ErrNotFoundUserLocation):
-			xlog.Sugar().Warnf("trigger event failed, cid: %d, uid: %d, event: %v, err: %v", cid, uid, event.String(), err)
+			xlog.Logger().Warn("trigger event failed, cid: , uid: , event: , err", zap.Any("cid", cid), zap.Any("uid", uid), zap.String("event", event.String()), zap.Error(err))
 		default:
-			xlog.Sugar().Errorf("trigger event failed, cid: %d, uid: %d, event: %v, err: %v", cid, uid, event.String(), err)
+			xlog.Logger().Error("trigger event failed, cid: , uid: , event: , err", zap.Any("cid", cid), zap.Any("uid", uid), zap.String("event", event.String()), zap.Error(err))
 		}
 	}
 }
@@ -78,11 +79,11 @@ func (p *proxy) trigger(ctx context.Context, event cluster.Event, cid, uid int64
 func (p *proxy) deliver(ctx context.Context, conn network.Conn, cid, uid int64, data []byte) {
 	message, _, err := packet.UnpackMessage(data)
 	if err != nil {
-		xlog.Sugar().Errorf("unpack message failed: %v", err)
+		xlog.Logger().Error("unpack message failed", zap.Error(err))
 		return
 	}
 	if message == nil {
-		xlog.Sugar().Warnf("unpack message failed: half packet")
+		xlog.Logger().Warn("unpack message failed: half packet")
 
 		return
 	}
@@ -93,7 +94,7 @@ func (p *proxy) deliver(ctx context.Context, conn network.Conn, cid, uid int64, 
 	}
 
 	if uid == 0 {
-		xlog.Sugar().Warnf("unbound connection message rejected, cid: %d message: %d game: %d", cid, message.MessageID, message.GameID)
+		xlog.Logger().Warn("unbound connection message rejected, cid: message: game", zap.Any("cid", cid), zap.Any("messageID", message.MessageID), zap.Any("gameID", message.GameID))
 		return
 	}
 
@@ -106,13 +107,13 @@ func (p *proxy) deliver(ctx context.Context, conn network.Conn, cid, uid int64, 
 	}); err != nil {
 		switch {
 		case xerrors.Is(err, xerrors.ErrNotFoundRoute), xerrors.Is(err, xerrors.ErrNotFoundEndpoint):
-			xlog.Sugar().Warnf("deliver message failed, cid: %d uid: %d seq: %d game: %d message: %d err: %v", cid, uid, message.Seq, message.GameID, message.MessageID, err)
+			xlog.Logger().Warn("deliver message failed, cid: uid: seq: game: message: err", zap.Any("cid", cid), zap.Any("uid", uid), zap.Any("seq", message.Seq), zap.Any("gameID", message.GameID), zap.Any("messageID", message.MessageID), zap.Error(err))
 		default:
-			xlog.Sugar().Errorf("deliver message failed, cid: %d uid: %d seq: %d game: %d message: %d err: %v", cid, uid, message.Seq, message.GameID, message.MessageID, err)
+			xlog.Logger().Error("deliver message failed, cid: uid: seq: game: message: err", zap.Any("cid", cid), zap.Any("uid", uid), zap.Any("seq", message.Seq), zap.Any("gameID", message.GameID), zap.Any("messageID", message.MessageID), zap.Error(err))
 		}
 	} else {
 		if mode.IsDebugMode() {
-			xlog.Sugar().Debugf("deliver message success, cid: %d uid: %d seq: %d game: %d message: %d", cid, uid, message.Seq, message.GameID, message.MessageID)
+			xlog.Logger().Debug("deliver message success, cid: uid: seq: game: message", zap.Any("cid", cid), zap.Any("uid", uid), zap.Any("seq", message.Seq), zap.Any("gameID", message.GameID), zap.Any("messageID", message.MessageID))
 		}
 	}
 }
@@ -121,7 +122,7 @@ func (p *proxy) deliver(ctx context.Context, conn network.Conn, cid, uid int64, 
 func (p *proxy) dispatchGateMessage(ctx context.Context, conn network.Conn, message *packet.Message) {
 	dispatcher := p.gate.opts.messageDispatcher
 	if dispatcher == nil {
-		xlog.Sugar().Warnf("gate message dispatcher is not bound, message: %d", message.MessageID)
+		xlog.Logger().Warn("gate message dispatcher is not bound, message", zap.Any("messageID", message.MessageID))
 		return
 	}
 

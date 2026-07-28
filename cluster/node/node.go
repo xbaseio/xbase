@@ -15,6 +15,7 @@ import (
 	"github.com/xbaseio/xbase/transport"
 	"github.com/xbaseio/xbase/utils/xcall"
 	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -120,8 +121,7 @@ func (n *Node) Init() {
 	n.runHookFunc(cluster.Init)
 
 	if n.router.StatefulRouteCount() > 0 {
-		xlog.Sugar().Warnf("node %s has %d stateful routes; ensure BindNode is called before stateful traffic",
-			n.opts.name, n.router.StatefulRouteCount())
+		xlog.Logger().Warn("node has stateful routes; ensure BindNode is called before stateful traffic", zap.Any("name", n.opts.name), zap.Any("statefulRouteCount", n.router.StatefulRouteCount()))
 	}
 }
 
@@ -234,26 +234,26 @@ func (n *Node) startLinkServer() {
 		Expose: n.opts.expose,
 	})
 	if err != nil {
-		xlog.Sugar().Fatalf("link server create failed: %v", err)
+		xlog.Logger().Fatal("link server create failed", zap.Error(err))
 	}
 
 	n.linker = linker
 
 	go func() {
 		if err = n.linker.Start(); err != nil {
-			xlog.Sugar().Fatalf("link server start failed: %v", err)
+			xlog.Logger().Fatal("link server start failed", zap.Error(err))
 		}
 	}()
 
 	if err = cluster.WaitForTCPListen(n.linker.ListenAddr(), defaultTimeout); err != nil {
-		xlog.Sugar().Fatalf("link server listen timeout: %v", err)
+		xlog.Logger().Fatal("link server listen timeout", zap.Error(err))
 	}
 }
 
 // 停止连接服务器
 func (n *Node) stopLinkServer() {
 	if err := n.linker.Stop(); err != nil {
-		xlog.Sugar().Errorf("link server stop failed: %v", err)
+		xlog.Logger().Error("link server stop failed", zap.Error(err))
 	}
 }
 
@@ -271,25 +271,25 @@ func (n *Node) startTransportServer() {
 
 	transporter, err := n.opts.transporter.NewServer()
 	if err != nil {
-		xlog.Sugar().Fatalf("transport server create failed: %v", err)
+		xlog.Logger().Fatal("transport server create failed", zap.Error(err))
 	}
 
 	n.transporter = transporter
 
 	for _, entity := range n.services {
 		if err = n.transporter.RegisterService(entity.desc, entity.provider); err != nil {
-			xlog.Sugar().Fatalf("register service failed: %v", err)
+			xlog.Logger().Fatal("register service failed", zap.Error(err))
 		}
 	}
 
 	go func() {
 		if err = n.transporter.Start(); err != nil {
-			xlog.Sugar().Fatalf("transport server start failed: %v", err)
+			xlog.Logger().Fatal("transport server start failed", zap.Error(err))
 		}
 	}()
 
 	if err = cluster.WaitForTCPListen(n.transporter.Addr(), defaultTimeout); err != nil {
-		xlog.Sugar().Fatalf("transport server listen timeout: %v", err)
+		xlog.Logger().Fatal("transport server listen timeout", zap.Error(err))
 	}
 }
 
@@ -300,7 +300,7 @@ func (n *Node) stopTransportServer() {
 	}
 
 	if err := n.transporter.Stop(); err != nil {
-		xlog.Sugar().Errorf("transport server stop failed: %v", err)
+		xlog.Logger().Error("transport server stop failed", zap.Error(err))
 	}
 }
 
@@ -349,14 +349,14 @@ func (n *Node) registerServiceInstances() {
 	}
 
 	if err := n.doRegisterServiceInstances(); err != nil {
-		xlog.Sugar().Fatalf("register cluster instances failed: %v", err)
+		xlog.Logger().Fatal("register cluster instances failed", zap.Error(err))
 	}
 }
 
 // 刷新服务实例状态
 func (n *Node) refreshServiceInstances() {
 	if err := n.doRefreshServiceInstances(); err != nil {
-		xlog.Sugar().Errorf("refresh cluster instances failed: %v", err)
+		xlog.Logger().Error("refresh cluster instances failed", zap.Error(err))
 	}
 }
 
@@ -373,7 +373,7 @@ func (n *Node) deregisterServiceInstances() {
 	}
 
 	if err := eg.Wait(); err != nil {
-		xlog.Sugar().Errorf("deregister cluster instances failed: %v", err)
+		xlog.Logger().Error("deregister cluster instances failed", zap.Error(err))
 	}
 }
 
@@ -449,7 +449,7 @@ func (n *Node) addHookListener(hook cluster.Hook, handler HookHandler) {
 		if n.getState() == cluster.Shut {
 			n.hooks[hook] = append(n.hooks[hook], handler)
 		} else {
-			xlog.Sugar().Warnf("server is working, can't add hook handler")
+			xlog.Logger().Warn("server is working, can't add hook handler")
 		}
 	}
 }
@@ -463,7 +463,7 @@ func (n *Node) addServiceProvider(name string, desc, provider any) {
 			provider: provider,
 		})
 	} else {
-		xlog.Sugar().Warnf("server is working, can't add service provider")
+		xlog.Logger().Warn("server is working, can't add service provider")
 	}
 }
 

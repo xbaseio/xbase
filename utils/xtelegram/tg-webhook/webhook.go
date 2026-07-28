@@ -1,6 +1,9 @@
 package tgwebhook
 
-import "github.com/xbaseio/xbase/xlog"
+import (
+	"github.com/xbaseio/xbase/xlog"
+	"go.uber.org/zap"
+)
 
 func SetWebHook(botToken, channelCode, webHookUrl string) error {
 
@@ -19,7 +22,7 @@ func SetWebHook(botToken, channelCode, webHookUrl string) error {
 
 	var res any
 	err := client.Get("/setWebhook", data, res)
-	xlog.Sugar().Warnf("channelCode:%v CallBack:%v, %#v:%v", channelCode, webHookUrl, res, err)
+	xlog.Logger().Warn("channelCode: CallBack", zap.Any("channelCode", channelCode), zap.Any("webHookUrl", webHookUrl), zap.Any("res", res), zap.Error(err))
 	if err != nil {
 		return err
 	}
