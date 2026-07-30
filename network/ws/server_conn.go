@@ -275,6 +275,10 @@ func (c *serverConn) checkAuthorize() {
 			return
 		}
 
+		xlog.Logger().Warn("ws authorize timeout, close conn",
+			zap.Int64("cid", connID),
+			zap.Duration("timeout", c.connMgr.server.opts.authorizeTimeout),
+		)
 		_ = c.forceCloseIfCurrent(connID, true)
 	}))
 
