@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/xbaseio/xbase/cluster"
+	"github.com/xbaseio/xbase/locate"
 	"github.com/xbaseio/xbase/locate/redis"
 	"github.com/xbaseio/xbase/utils/xuuid"
 )
@@ -31,7 +32,7 @@ func TestLocator_BindNode(t *testing.T) {
 	nid := xuuid.UUID()
 	name := "node1"
 
-	if err := locator.BindNode(ctx, uid, name, nid); err != nil {
+	if err := locator.BindNode(ctx, uid, name, locate.NodeBinding{NID: nid, Metadata: map[string]string{"agentCode": "agent001"}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -58,11 +59,11 @@ func TestLocator_UnbindNode(t *testing.T) {
 	name1 := "node1"
 	name2 := "node2"
 
-	if err := locator.BindNode(ctx, uid, name1, nid1); err != nil {
+	if err := locator.BindNode(ctx, uid, name1, locate.NodeBinding{NID: nid1}); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := locator.BindNode(ctx, uid, name2, nid2); err != nil {
+	if err := locator.BindNode(ctx, uid, name2, locate.NodeBinding{NID: nid2}); err != nil {
 		t.Fatal(err)
 	}
 

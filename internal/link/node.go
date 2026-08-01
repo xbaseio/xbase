@@ -2,6 +2,7 @@ package link
 
 import (
 	"context"
+	"maps"
 	"sync"
 	"time"
 
@@ -20,12 +21,12 @@ import (
 )
 
 type NodeLinker struct {
-	ctx        context.Context             // 上下文
-	opts       *Options                    // 参数项
-	builder    *node.Builder               // 构建器
-	dispatcher *dispatcher.Dispatcher      // 分发器
-	rw         sync.RWMutex                // 锁
-	sources    map[int64]map[string]string // 用户来源节点
+	ctx        context.Context                         // 上下文
+	opts       *Options                                // 参数项
+	builder    *node.Builder                           // 构建器
+	dispatcher *dispatcher.Dispatcher                  // 分发器
+	rw         sync.RWMutex                            // 锁
+	sources    map[int64]map[string]locate.NodeBinding // 用户节点绑定
 }
 
 func NewNodeLinker(ctx context.Context, opts *Options) *NodeLinker {
@@ -34,7 +35,7 @@ func NewNodeLinker(ctx context.Context, opts *Options) *NodeLinker {
 		opts:       opts,
 		builder:    node.NewBuilder(&node.Options{InsID: opts.InsID, InsKind: opts.InsKind, NodeKind: opts.NodeKind, GameID: opts.GameID}),
 		dispatcher: dispatcher.NewDispatcher(opts.Dispatch),
-		sources:    make(map[int64]map[string]string),
+		sources:    make(map[int64]map[string]locate.NodeBinding),
 	}
 }
 
@@ -50,47 +51,54 @@ func (l *NodeLinker) AskNode(ctx context.Context, uid int64, name, nid string) (
 		return "", false, xerrors.ErrNotFoundLocator
 	}
 
-	if insID, ok := l.doLoadSource(uid, name); ok {
-		return insID, insID == nid, nil
+	if binding, ok := l.doLoadSource(uid, name); ok {
+		return binding.NID, binding.NID == nid, nil
 	}
 
-	insID, err := l.opts.Locator.LocateNode(ctx, uid, name)
+	binding, err := l.opts.Locator.LocateNodeBinding(ctx, uid, name)
 	if err != nil {
 		return "", false, err
 	}
+	insID := binding.NID
 
 	if insID == "" {
 		return "", false, xerrors.ErrNotFoundUserLocation
 	}
 
-	l.doStoreSource(uid, name, insID)
+	l.doStoreSource(uid, name, binding)
 
 	return insID, insID == nid, nil
 }
 
 // LocateNode 定位用户所在节点
 func (l *NodeLinker) LocateNode(ctx context.Context, uid int64, name string) (string, error) {
+	binding, err := l.LocateNodeBinding(ctx, uid, name)
+	return binding.NID, err
+}
+
+// LocateNodeBinding 定位用户所在节点及其绑定元数据。
+func (l *NodeLinker) LocateNodeBinding(ctx context.Context, uid int64, name string) (locate.NodeBinding, error) {
 	if l.opts.Locator == nil {
-		return "", xerrors.ErrNotFoundLocator
+		return locate.NodeBinding{}, xerrors.ErrNotFoundLocator
 	}
 
-	nid, ok := l.doLoadSource(uid, name)
+	binding, ok := l.doLoadSource(uid, name)
 	if ok {
-		return nid, nil
+		return binding, nil
 	}
 
-	nid, err := l.opts.Locator.LocateNode(ctx, uid, name)
+	binding, err := l.opts.Locator.LocateNodeBinding(ctx, uid, name)
 	if err != nil {
-		return "", err
+		return locate.NodeBinding{}, err
 	}
 
-	if nid == "" {
-		return "", xerrors.ErrNotFoundUserLocation
+	if binding.NID == "" {
+		return locate.NodeBinding{}, xerrors.ErrNotFoundUserLocation
 	}
 
-	l.doStoreSource(uid, name, nid)
+	l.doStoreSource(uid, name, binding)
 
-	return nid, nil
+	return cloneNodeBinding(binding), nil
 }
 
 // LocateNodes 定位用户所在节点列表
@@ -105,16 +113,16 @@ func (l *NodeLinker) LocateNodes(ctx context.Context, uid int64) (map[string]str
 // BindNode 绑定节点
 // 单个用户可以绑定到多个节点服务器上，相同名称的节点服务器只能绑定一个，多次绑定会到相同名称的节点服务器会覆盖之前的绑定。
 // 绑定操作会通过发布订阅方式同步到网关服务器和其他相关节点服务器上。
-func (l *NodeLinker) BindNode(ctx context.Context, uid int64, name, nid string) error {
+func (l *NodeLinker) BindNode(ctx context.Context, uid int64, name string, binding locate.NodeBinding) error {
 	if l.opts.Locator == nil {
 		return xerrors.ErrNotFoundLocator
 	}
 
-	if err := l.opts.Locator.BindNode(ctx, uid, name, nid); err != nil {
+	if err := l.opts.Locator.BindNode(ctx, uid, name, binding); err != nil {
 		return err
 	}
 
-	l.doStoreSource(uid, name, nid)
+	l.doStoreSource(uid, name, binding)
 
 	return nil
 }
@@ -139,7 +147,7 @@ func (l *NodeLinker) BindGameNode(ctx context.Context, uid int64, gameID int32) 
 		return err
 	}
 
-	return l.BindNode(ctx, uid, name, nid)
+	return l.BindNode(ctx, uid, name, locate.NodeBinding{NID: nid})
 }
 
 // UnbindNode 解绑节点
@@ -213,13 +221,13 @@ func (l *NodeLinker) Deliver(ctx context.Context, args *DeliverArgs) error {
 			buf.Release()
 			return err
 		} else {
-			return client.Deliver(ctx, args.CID, args.UID, buf)
+			return client.Deliver(ctx, args.CID, args.UID, args.Metadata, buf)
 		}
 	} else {
-		if _, err = l.doRPC(ctx, args.GameID, args.UID, func(ctx context.Context, client *node.Client) (bool, any, error) {
+		if _, err = l.doRPC(ctx, args.GameID, args.UID, func(ctx context.Context, client *node.Client, metadata map[string]string) (bool, any, error) {
 			isDeliver = true
 
-			return false, nil, client.Deliver(ctx, args.CID, args.UID, buf)
+			return false, nil, client.Deliver(ctx, args.CID, args.UID, metadata, buf)
 		}); err != nil {
 			if !isDeliver {
 				buf.Release()
@@ -280,7 +288,7 @@ func (l *NodeLinker) SetState(ctx context.Context, nid string, state cluster.Sta
 }
 
 // 执行节点RPC调用；按 GameID 定位目标节点组，已绑定用户走定位，否则按分发策略选择节点
-func (l *NodeLinker) doRPC(ctx context.Context, gameID int32, uid int64, fn func(ctx context.Context, client *node.Client) (bool, any, error)) (any, error) {
+func (l *NodeLinker) doRPC(ctx context.Context, gameID int32, uid int64, fn func(ctx context.Context, client *node.Client, metadata map[string]string) (bool, any, error)) (any, error) {
 	route, err := l.dispatcher.FindGameRoute(gameID)
 	if err != nil {
 		return nil, err
@@ -291,12 +299,17 @@ func (l *NodeLinker) doRPC(ctx context.Context, gameID int32, uid int64, fn func
 		prev      string
 		reply     any
 		continued bool
+		metadata  map[string]string
 	)
 
 	for range 2 {
 		nid = ""
+		metadata = nil
 		if uid != 0 {
-			nid, err = l.LocateNode(ctx, uid, route.Group())
+			var binding locate.NodeBinding
+			binding, err = l.LocateNodeBinding(ctx, uid, route.Group())
+			nid = binding.NID
+			metadata = binding.Metadata
 			if err != nil {
 				if !xerrors.Is(err, xerrors.ErrNotFoundUserLocation) {
 					return nil, err
@@ -321,7 +334,7 @@ func (l *NodeLinker) doRPC(ctx context.Context, gameID int32, uid int64, fn func
 			return nil, err
 		}
 
-		continued, reply, err = fn(ctx, client)
+		continued, reply, err = fn(ctx, client, metadata)
 		if continued {
 			if uid != 0 && prev != "" {
 				l.doDeleteSource(uid, route.Group(), prev)
@@ -396,36 +409,38 @@ func (l *NodeLinker) PackBuffer(message any, encrypt bool) ([]byte, error) {
 }
 
 // 存储用户节点来源
-func (l *NodeLinker) doStoreSource(uid int64, name, nid string) {
+func (l *NodeLinker) doStoreSource(uid int64, name string, binding locate.NodeBinding) {
+	binding = cloneNodeBinding(binding)
 	wait, done := func() (bool, bool) {
 		l.rw.Lock()
 		defer l.rw.Unlock()
 
 		if sources, ok := l.sources[uid]; ok {
-			if oldNID, ok := sources[name]; ok {
-				if oldNID == nid {
+			if oldBinding, ok := sources[name]; ok {
+				if oldBinding.NID == binding.NID {
+					sources[name] = binding
 					return false, false
 				} else {
-					sources[name] = nid
+					sources[name] = binding
 
 					switch l.opts.InsID {
-					case oldNID:
+					case oldBinding.NID:
 						return false, true
-					case nid:
+					case binding.NID:
 						return true, false
 					default:
 						return false, false
 					}
 				}
 			} else {
-				sources[name] = nid
+				sources[name] = binding
 
-				return l.opts.InsID == nid, false
+				return l.opts.InsID == binding.NID, false
 			}
 		} else {
-			l.sources[uid] = map[string]string{name: nid}
+			l.sources[uid] = map[string]locate.NodeBinding{name: binding}
 
-			return l.opts.InsID == nid, false
+			return l.opts.InsID == binding.NID, false
 		}
 	}()
 
@@ -449,13 +464,13 @@ func (l *NodeLinker) doDeleteSource(uid int64, name, nid string) {
 			return false
 		}
 
-		oldNID, ok := sources[name]
+		oldBinding, ok := sources[name]
 		if !ok {
 			return false
 		}
 
 		// ignore mismatched NID
-		if oldNID != nid {
+		if oldBinding.NID != nid {
 			return false
 		}
 
@@ -465,7 +480,7 @@ func (l *NodeLinker) doDeleteSource(uid int64, name, nid string) {
 			delete(sources, name)
 		}
 
-		return oldNID == l.opts.InsID
+		return oldBinding.NID == l.opts.InsID
 	}()
 
 	if done && l.opts.DoneHandler != nil {
@@ -474,17 +489,17 @@ func (l *NodeLinker) doDeleteSource(uid int64, name, nid string) {
 }
 
 // 加载用户节点来源
-func (l *NodeLinker) doLoadSource(uid int64, name string) (string, bool) {
+func (l *NodeLinker) doLoadSource(uid int64, name string) (locate.NodeBinding, bool) {
 	l.rw.RLock()
 	defer l.rw.RUnlock()
 
 	if sources, ok := l.sources[uid]; ok {
-		if nid, ok := sources[name]; ok {
-			return nid, ok
+		if binding, ok := sources[name]; ok {
+			return cloneNodeBinding(binding), ok
 		}
 	}
 
-	return "", false
+	return locate.NodeBinding{}, false
 }
 
 // WatchUserLocate 监听用户定位
@@ -522,7 +537,7 @@ func (l *NodeLinker) WatchUserLocate() {
 			for _, event := range events {
 				switch event.Type {
 				case locate.BindNode:
-					l.doStoreSource(event.UID, event.InsName, event.InsID)
+					l.doStoreSource(event.UID, event.InsName, locate.NodeBinding{NID: event.InsID, Metadata: event.Metadata})
 				case locate.UnbindNode:
 					l.doDeleteSource(event.UID, event.InsName, event.InsID)
 				default:
@@ -531,6 +546,11 @@ func (l *NodeLinker) WatchUserLocate() {
 			}
 		}
 	}()
+}
+
+func cloneNodeBinding(binding locate.NodeBinding) locate.NodeBinding {
+	binding.Metadata = maps.Clone(binding.Metadata)
+	return binding
 }
 
 // WatchClusterInstance 监听集群实例

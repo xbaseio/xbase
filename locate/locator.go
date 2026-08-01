@@ -12,7 +12,7 @@ type Locator interface {
 	// BindGate 绑定网关
 	BindGate(ctx context.Context, uid int64, gid string) error
 	// BindNode 绑定节点
-	BindNode(ctx context.Context, uid int64, name, nid string) error
+	BindNode(ctx context.Context, uid int64, name string, binding NodeBinding) error
 	// UnbindGate 解绑网关
 	UnbindGate(ctx context.Context, uid int64, gid string) error
 	// UnbindNode 解绑节点
@@ -21,8 +21,17 @@ type Locator interface {
 	LocateGate(ctx context.Context, uid int64) (string, error)
 	// LocateNode 定位用户所在节点
 	LocateNode(ctx context.Context, uid int64, name string) (string, error)
+	// LocateNodeBinding locates the node and its per-user binding metadata.
+	LocateNodeBinding(ctx context.Context, uid int64, name string) (NodeBinding, error)
 	// LocateNodes 定位用户所在节点列表
 	LocateNodes(ctx context.Context, uid int64) (map[string]string, error)
+}
+
+// NodeBinding describes the node selected for a user and the metadata that
+// should accompany messages routed through this binding.
+type NodeBinding struct {
+	NID      string            `json:"nid"`
+	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
 type Watcher interface {
@@ -43,6 +52,8 @@ type Event struct {
 	InsKind string `json:"insKind"`
 	// 实例名称
 	InsName string `json:"insName"`
+	// Metadata contains the per-user node binding metadata.
+	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
 type EventType int

@@ -5,6 +5,7 @@ import (
 
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/internal/link"
+	"github.com/xbaseio/xbase/locate"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/session"
 	"github.com/xbaseio/xbase/transport"
@@ -15,6 +16,8 @@ type Proxy struct {
 	gateLinker *link.GateLinker // 网关链接器
 	nodeLinker *link.NodeLinker // 节点链接器
 }
+
+type NodeBinding = locate.NodeBinding
 
 func newProxy(mesh *Mesh) *Proxy {
 	opts := &link.Options{
@@ -117,8 +120,8 @@ func (p *Proxy) LocateNodes(ctx context.Context, uid int64) (map[string]string, 
 // BindNode 绑定节点
 // 单个用户可以绑定到多个节点服务器上，相同名称的节点服务器只能绑定一个，多次绑定会到相同名称的节点服务器会覆盖之前的绑定。
 // 绑定操作会通过发布订阅方式同步到网关服务器和其他相关节点服务器上。
-func (p *Proxy) BindNode(ctx context.Context, uid int64, name, nid string) error {
-	return p.nodeLinker.BindNode(ctx, uid, name, nid)
+func (p *Proxy) BindNode(ctx context.Context, uid int64, name string, binding NodeBinding) error {
+	return p.nodeLinker.BindNode(ctx, uid, name, binding)
 }
 
 // UnbindNode 解绑节点
@@ -207,6 +210,7 @@ func (p *Proxy) Deliver(ctx context.Context, args *cluster.DeliverArgs) error {
 	return p.nodeLinker.Deliver(ctx, &link.DeliverArgs{
 		NID:       args.NID,
 		UID:       args.UID,
+		Metadata:  args.Metadata,
 		GameID:    args.Message.GameID,
 		MessageID: args.Message.MessageID,
 		Buffer:    args.Message,

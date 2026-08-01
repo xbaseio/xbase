@@ -1,11 +1,27 @@
 package node
 
 import (
+	"maps"
 	"sync/atomic"
 	"testing"
 
 	"github.com/xbaseio/xbase/cluster"
 )
+
+func TestRequestMetadata(t *testing.T) {
+	n := NewNode()
+	req := n.reqPool.Get().(*request)
+	req.metadata = map[string]string{"agentCode": "agent001", "roomID": "10001"}
+
+	metadata := req.Metadata()
+	if !maps.Equal(metadata, req.metadata) {
+		t.Fatalf("metadata = %#v, want %#v", metadata, req.metadata)
+	}
+	metadata["agentCode"] = "changed"
+	if req.Metadata()["agentCode"] != "agent001" {
+		t.Fatal("request metadata was mutated by the caller")
+	}
+}
 
 func TestRouterMessageDispatcherReceivesUndeclaredMessages(t *testing.T) {
 	n := NewNode()

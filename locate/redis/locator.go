@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -108,8 +109,14 @@ func (l *Locator) LocateGate(ctx context.Context, uid int64) (string, error) {
 
 // LocateNode 定位用户所在节点
 func (l *Locator) LocateNode(ctx context.Context, uid int64, name string) (string, error) {
+	binding, err := l.LocateNodeBinding(ctx, uid, name)
+	return binding.NID, err
+}
+
+// LocateNodeBinding locates the node and its per-user binding metadata.
+func (l *Locator) LocateNodeBinding(ctx context.Context, uid int64, name string) (locate.NodeBinding, error) {
 	if l.err != nil {
-		return "", l.err
+		return locate.NodeBinding{}, l.err
 	}
 
 	key := fmt.Sprintf(userNodeKey, l.opts.prefix, uid)
@@ -117,16 +124,16 @@ func (l *Locator) LocateNode(ctx context.Context, uid int64, name string) (strin
 	val, err, _ := l.sfg.Do(key+name, func() (any, error) {
 		val, err := l.opts.client.HGet(ctx, key, name).Result()
 		if err != nil && !xerrors.Is(err, redis.Nil) {
-			return "", err
+			return locate.NodeBinding{}, err
 		}
 
-		return val, nil
+		return unmarshalNodeBinding(val)
 	})
 	if err != nil {
-		return "", err
+		return locate.NodeBinding{}, err
 	}
 
-	return val.(string), nil
+	return cloneNodeBinding(val.(locate.NodeBinding)), nil
 }
 
 // LocateNodes 定位用户所在节点列表
@@ -143,7 +150,16 @@ func (l *Locator) LocateNodes(ctx context.Context, uid int64) (map[string]string
 			return nil, err
 		}
 
-		return val, nil
+		bindings := make(map[string]string, len(val))
+		for name, encoded := range val {
+			binding, err := unmarshalNodeBinding(encoded)
+			if err != nil {
+				return nil, err
+			}
+			bindings[name] = binding.NID
+		}
+
+		return bindings, nil
 	})
 	if err != nil {
 		return nil, err
@@ -164,7 +180,7 @@ func (l *Locator) BindGate(ctx context.Context, uid int64, gid string) error {
 		return err
 	}
 
-	if err := l.broadcast(ctx, locate.BindGate, uid, gid); err != nil {
+	if err := l.broadcast(ctx, locate.BindGate, uid, gid, nil); err != nil {
 		xlog.Logger().Error("location event broadcast failed", zap.Error(err))
 	}
 
@@ -172,18 +188,26 @@ func (l *Locator) BindGate(ctx context.Context, uid int64, gid string) error {
 }
 
 // BindNode 绑定节点
-func (l *Locator) BindNode(ctx context.Context, uid int64, name, nid string) error {
+func (l *Locator) BindNode(ctx context.Context, uid int64, name string, binding locate.NodeBinding) error {
 	if l.err != nil {
 		return l.err
 	}
+	if binding.NID == "" {
+		return xerrors.ErrInvalidNID
+	}
 
 	key := fmt.Sprintf(userNodeKey, l.opts.prefix, uid)
-
-	if err := l.opts.client.HSet(ctx, key, name, nid).Err(); err != nil {
+	binding = cloneNodeBinding(binding)
+	encoded, err := marshalNodeBinding(binding)
+	if err != nil {
 		return err
 	}
 
-	if err := l.broadcast(ctx, locate.BindNode, uid, nid, name); err != nil {
+	if err := l.opts.client.HSet(ctx, key, name, encoded).Err(); err != nil {
+		return err
+	}
+
+	if err := l.broadcast(ctx, locate.BindNode, uid, binding.NID, binding.Metadata, name); err != nil {
 		xlog.Logger().Error("location event broadcast failed", zap.Error(err))
 	}
 
@@ -204,7 +228,7 @@ func (l *Locator) UnbindGate(ctx context.Context, uid int64, gid string) error {
 	}
 
 	if rst[0] == "OK" {
-		if err = l.broadcast(ctx, locate.UnbindGate, uid, gid); err != nil {
+		if err = l.broadcast(ctx, locate.UnbindGate, uid, gid, nil); err != nil {
 			xlog.Logger().Error("location event broadcast failed", zap.Error(err))
 		}
 	}
@@ -226,7 +250,7 @@ func (l *Locator) UnbindNode(ctx context.Context, uid int64, name, nid string) e
 	}
 
 	if rst[0] == "OK" {
-		if err = l.broadcast(ctx, locate.UnbindNode, uid, nid, name); err != nil {
+		if err = l.broadcast(ctx, locate.UnbindNode, uid, nid, nil, name); err != nil {
 			xlog.Logger().Error("location event broadcast failed", zap.Error(err))
 		}
 	}
@@ -235,8 +259,8 @@ func (l *Locator) UnbindNode(ctx context.Context, uid int64, name, nid string) e
 }
 
 // 广播事件
-func (l *Locator) broadcast(ctx context.Context, typ locate.EventType, uid int64, insID string, insName ...string) error {
-	evt := &locate.Event{UID: uid, Type: typ, InsID: insID}
+func (l *Locator) broadcast(ctx context.Context, typ locate.EventType, uid int64, insID string, metadata map[string]string, insName ...string) error {
+	evt := &locate.Event{UID: uid, Type: typ, InsID: insID, Metadata: maps.Clone(metadata)}
 
 	switch typ {
 	case locate.BindGate, locate.UnbindGate:
@@ -303,4 +327,34 @@ func unmarshal(data []byte) (*locate.Event, error) {
 	}
 
 	return evt, nil
+}
+
+func marshalNodeBinding(binding locate.NodeBinding) (string, error) {
+	buf, err := json.Marshal(binding)
+	if err != nil {
+		return "", err
+	}
+	return string(buf), nil
+}
+
+func unmarshalNodeBinding(data string) (locate.NodeBinding, error) {
+	if data == "" {
+		return locate.NodeBinding{}, nil
+	}
+
+	// Bindings written before metadata support contain the raw node ID.
+	if !strings.HasPrefix(data, "{") {
+		return locate.NodeBinding{NID: data}, nil
+	}
+
+	binding := locate.NodeBinding{}
+	if err := json.Unmarshal([]byte(data), &binding); err != nil {
+		return locate.NodeBinding{}, err
+	}
+	return binding, nil
+}
+
+func cloneNodeBinding(binding locate.NodeBinding) locate.NodeBinding {
+	binding.Metadata = maps.Clone(binding.Metadata)
+	return binding
 }

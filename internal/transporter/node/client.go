@@ -28,8 +28,8 @@ func (c *Client) Trigger(ctx context.Context, event cluster.Event, cid, uid int6
 }
 
 // Deliver 投递消息
-func (c *Client) Deliver(ctx context.Context, cid, uid int64, buf buffer.Buffer) error {
-	return c.cli.Send(ctx, protocol.EncodeDeliverReq(0, cid, uid, buf), cid)
+func (c *Client) Deliver(ctx context.Context, cid, uid int64, metadata map[string]string, buf buffer.Buffer) error {
+	return c.cli.Send(ctx, protocol.EncodeDeliverReq(0, cid, uid, metadata, buf), cid)
 }
 
 // GetState 获取状态

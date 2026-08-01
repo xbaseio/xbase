@@ -18,7 +18,7 @@ func (p *provider) Trigger(ctx context.Context, gid string, cid, uid int64, even
 }
 
 // Deliver 投递消息
-func (p *provider) Deliver(ctx context.Context, gid, nid string, cid, uid int64, message []byte) error {
+func (p *provider) Deliver(ctx context.Context, gid, nid string, cid, uid int64, metadata map[string]string, message []byte) error {
 	msg, _, err := packet.UnpackMessage(message)
 	if err != nil {
 		return err
@@ -50,7 +50,7 @@ func (p *provider) Deliver(ctx context.Context, gid, nid string, cid, uid int64,
 		}
 	}
 
-	return p.node.router.deliver(gid, nid, "", cid, uid, msg.Seq, msg.GameID, msg.MessageID, msg.Buffer)
+	return p.node.router.deliver(gid, nid, "", cid, uid, msg.Seq, msg.GameID, msg.MessageID, metadata, msg.Buffer)
 }
 
 // GetState 获取状态

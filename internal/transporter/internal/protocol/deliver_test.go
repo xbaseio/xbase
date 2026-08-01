@@ -9,15 +9,15 @@ import (
 )
 
 func TestEncodeDeliverReq(t *testing.T) {
-	buffer := protocol.EncodeDeliverReq(1, 2, 3, buffer.NewNocopyBuffer([]byte("hello world")))
+	buffer := protocol.EncodeDeliverReq(1, 2, 3, map[string]string{"agentCode": "agent001"}, buffer.NewNocopyBuffer([]byte("hello world")))
 
 	t.Log(buffer.Bytes())
 }
 
 func TestDecodeDeliverReq(t *testing.T) {
-	buffer := protocol.EncodeDeliverReq(1, 2, 3, buffer.NewNocopyBuffer([]byte("hello world")))
+	buffer := protocol.EncodeDeliverReq(1, 2, 3, map[string]string{"agentCode": "agent001", "roomID": "10001"}, buffer.NewNocopyBuffer([]byte("hello world")))
 
-	seq, cid, uid, message, err := protocol.DecodeDeliverReq(buffer.Bytes())
+	seq, cid, uid, metadata, message, err := protocol.DecodeDeliverReq(buffer.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,6 +25,9 @@ func TestDecodeDeliverReq(t *testing.T) {
 	t.Logf("seq: %v", seq)
 	t.Logf("cid: %v", cid)
 	t.Logf("uid: %v", uid)
+	if metadata["agentCode"] != "agent001" || metadata["roomID"] != "10001" {
+		t.Fatalf("metadata: %#v", metadata)
+	}
 	t.Logf("message: %v", string(message))
 }
 

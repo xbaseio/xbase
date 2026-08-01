@@ -17,6 +17,8 @@ type Context interface {
 	CID() int64
 	// UID 获取用户ID
 	UID() int64
+	// Metadata 获取用户节点绑定元数据。
+	Metadata() map[string]string
 	// Seq 获取消息序列号
 	Seq() int32
 	// GameID 获取消息游戏ID

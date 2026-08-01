@@ -45,6 +45,11 @@ func (e *event) UID() int64 {
 	return e.uid
 }
 
+// Metadata returns no binding metadata for lifecycle events.
+func (e *event) Metadata() map[string]string {
+	return nil
+}
+
 // Seq 获取消息序列号
 func (e *event) Seq() int32 {
 	return 0
@@ -204,9 +209,9 @@ func (e *event) UnbindGate(uid ...int64) error {
 func (e *event) BindNode(uid ...int64) error {
 	switch {
 	case len(uid) > 0:
-		return e.node.proxy.BindNode(e.ctx, uid[0])
+		return e.node.proxy.bindCurrentNode(e.ctx, uid[0], nil)
 	case e.uid != 0:
-		return e.node.proxy.BindNode(e.ctx, e.uid)
+		return e.node.proxy.bindCurrentNode(e.ctx, e.uid, nil)
 	default:
 		return xerrors.ErrIllegalOperation
 	}

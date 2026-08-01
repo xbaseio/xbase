@@ -36,7 +36,7 @@ func (p *provider) Trigger(ctx context.Context, gid string, cid, uid int64, even
 }
 
 // Deliver 投递消息
-func (p *provider) Deliver(ctx context.Context, gid, nid string, cid, uid int64, message []byte) error {
+func (p *provider) Deliver(ctx context.Context, gid, nid string, cid, uid int64, metadata map[string]string, message []byte) error {
 	xlog.Logger().Info("gid: , nid: , cid: , uid: message", zap.Any("gid", gid), zap.Any("nid", nid), zap.Any("cid", cid), zap.Any("uid", uid), zap.String("message", string(message)))
 	return nil
 }

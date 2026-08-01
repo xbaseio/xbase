@@ -61,7 +61,7 @@ func (s *Server) trigger(conn *server.Conn, data []byte) error {
 
 // 投递消息
 func (s *Server) deliver(conn *server.Conn, data []byte) error {
-	seq, cid, uid, message, err := protocol.DecodeDeliverReq(data)
+	seq, cid, uid, metadata, message, err := protocol.DecodeDeliverReq(data)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func (s *Server) deliver(conn *server.Conn, data []byte) error {
 		return xerrors.ErrIllegalRequest
 	}
 
-	if err = s.provider.Deliver(context.Background(), gid, nid, cid, uid, message); seq == 0 {
+	if err = s.provider.Deliver(context.Background(), gid, nid, cid, uid, metadata, message); seq == 0 {
 		return err
 	} else {
 		return conn.Send(protocol.EncodeDeliverRes(seq, codes.ErrorToCode(err)))

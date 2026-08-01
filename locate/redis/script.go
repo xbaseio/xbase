@@ -17,7 +17,19 @@ const unbindGateScript = `
 const unbindNodeScript = `
 	local val = redis.call('HGET', KEYS[1], ARGV[1])
 
-	if val == '' or val ~= ARGV[2] then
+	if not val then
+		return {'NO'}
+	end
+
+	local nid = val
+	if string.sub(val, 1, 1) == '{' then
+		local ok, binding = pcall(cjson.decode, val)
+		if ok and binding['nid'] then
+			nid = binding['nid']
+		end
+	end
+
+	if nid ~= ARGV[2] then
 		return {'NO'}
 	end
 

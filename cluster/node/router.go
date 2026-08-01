@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"maps"
 	"time"
 
 	"github.com/xbaseio/xbase/cluster"
@@ -233,7 +234,7 @@ func (r *Router) Group(groups ...func(group *RouterGroup)) *RouterGroup {
 	return group
 }
 
-func (r *Router) deliver(gid, nid, pid string, cid, uid int64, seq, gameID, messageID int32, data any) error {
+func (r *Router) deliver(gid, nid, pid string, cid, uid int64, seq, gameID, messageID int32, metadata map[string]string, data any) error {
 	req := r.node.reqPool.Get().(*request)
 	req.ctx = context.Background()
 	req.gid = gid
@@ -241,6 +242,7 @@ func (r *Router) deliver(gid, nid, pid string, cid, uid int64, seq, gameID, mess
 	req.pid = pid
 	req.cid = cid
 	req.uid = uid
+	req.metadata = maps.Clone(metadata)
 	req.message.Seq = seq
 	req.message.GameID = gameID
 	req.message.MessageID = messageID

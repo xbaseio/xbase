@@ -21,7 +21,7 @@ func TestBuilder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = client.Deliver(context.Background(), 1, 2, buffer.NewNocopyBuffer([]byte("hello world")))
+	err = client.Deliver(context.Background(), 1, 2, nil, buffer.NewNocopyBuffer([]byte("hello world")))
 	if err != nil {
 		t.Fatal(err)
 	}

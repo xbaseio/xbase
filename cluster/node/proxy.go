@@ -6,6 +6,7 @@ import (
 
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/internal/link"
+	"github.com/xbaseio/xbase/locate"
 	"github.com/xbaseio/xbase/registry"
 	"github.com/xbaseio/xbase/session"
 	"github.com/xbaseio/xbase/transport"
@@ -18,6 +19,9 @@ type Proxy struct {
 	gateLinker *link.GateLinker // 网关链接器
 	nodeLinker *link.NodeLinker // 节点链接器
 }
+
+// NodeBinding is the selected node and metadata attached to routed messages.
+type NodeBinding = locate.NodeBinding
 
 func newProxy(node *Node) *Proxy {
 	return &Proxy{
@@ -178,6 +182,11 @@ func (p *Proxy) LocateNode(ctx context.Context, uid int64, name string) (string,
 	return p.nodeLinker.LocateNode(ctx, uid, name)
 }
 
+// LocateNodeBinding 定位用户所在节点及其绑定元数据。
+func (p *Proxy) LocateNodeBinding(ctx context.Context, uid int64, name string) (NodeBinding, error) {
+	return p.nodeLinker.LocateNodeBinding(ctx, uid, name)
+}
+
 // LocateNodes 定位用户所在节点列表
 func (p *Proxy) LocateNodes(ctx context.Context, uid int64) (map[string]string, error) {
 	return p.nodeLinker.LocateNodes(ctx, uid)
@@ -186,14 +195,12 @@ func (p *Proxy) LocateNodes(ctx context.Context, uid int64) (map[string]string, 
 // BindNode 绑定节点
 // 单个用户可以绑定到多个节点服务器上，相同名称的节点服务器只能绑定一个，多次绑定会到相同名称的节点服务器会覆盖之前的绑定。
 // 绑定操作会通过发布订阅方式同步到网关服务器和其他相关节点服务器上。
-func (p *Proxy) BindNode(ctx context.Context, uid int64, nameAndNID ...string) error {
-	name, nid := p.node.opts.name, p.node.opts.id
+func (p *Proxy) BindNode(ctx context.Context, uid int64, name string, binding NodeBinding) error {
+	return p.nodeLinker.BindNode(ctx, uid, name, binding)
+}
 
-	if len(nameAndNID) >= 2 && nameAndNID[0] != "" && nameAndNID[1] != "" {
-		name, nid = nameAndNID[0], nameAndNID[1]
-	}
-
-	return p.nodeLinker.BindNode(ctx, uid, name, nid)
+func (p *Proxy) bindCurrentNode(ctx context.Context, uid int64, metadata map[string]string) error {
+	return p.BindNode(ctx, uid, p.node.opts.name, NodeBinding{NID: p.node.opts.id, Metadata: metadata})
 }
 
 // UnbindNode 解绑节点
@@ -302,6 +309,7 @@ func (p *Proxy) Deliver(ctx context.Context, args *cluster.DeliverArgs) error {
 	return p.nodeLinker.Deliver(ctx, &link.DeliverArgs{
 		NID:       args.NID,
 		UID:       args.UID,
+		Metadata:  args.Metadata,
 		GameID:    args.Message.GameID,
 		MessageID: args.Message.MessageID,
 		Buffer:    args.Message,
