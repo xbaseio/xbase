@@ -23,7 +23,7 @@ type Cache interface {
 	// GetSet 获取设置缓存值
 	GetSet(ctx context.Context, key string, fn SetValueFunc, expiration ...time.Duration) Result
 	// GetExpiration 获取过期时间
-	GetExpiration(expiration time.Duration) time.Duration
+	GetExpiration(expiration ...time.Duration) time.Duration
 	// Delete 删除缓存
 	Delete(ctx context.Context, keys ...string) (int64, error)
 	// IncrInt 整数自增
