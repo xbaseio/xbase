@@ -6,7 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/casbin/casbin/v2"
+	"github.com/casbin/casbin/v3"
+	casbinlog "github.com/casbin/casbin/v3/log"
 	"gorm.io/gorm/logger"
 )
 
@@ -52,7 +53,9 @@ func NewEnforcer(opts *Options) (*Enforcer, error) {
 	}
 
 	// 是否开启 casbin 日志
-	enforcer.EnableLog(cfg.Debug)
+	if cfg.Debug {
+		enforcer.SetLogger(casbinlog.NewDefaultLogger())
+	}
 
 	// 是否开启权限校验
 	// 注意：Enable=false 时，Enforce 会直接放行

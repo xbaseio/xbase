@@ -8,7 +8,7 @@ require (
 	github.com/IBM/sarama v1.47.0
 	github.com/bradfitz/gomemcache v0.0.0-20250403215159-8d39553ac7cf
 	github.com/bytedance/sonic v1.15.0
-	github.com/casbin/casbin/v2 v2.1.2
+	github.com/casbin/casbin/v3 v3.8.1
 	github.com/dobyte/jwt v0.1.6
 	github.com/ethereum/go-ethereum v1.17.1
 	github.com/fsnotify/fsnotify v1.9.0
@@ -31,8 +31,8 @@ require (
 	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.42.0
 	google.golang.org/grpc v1.79.3
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	google.golang.org/protobuf v1.36.11
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.31.1
@@ -40,7 +40,6 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible // indirect
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
 	github.com/akutz/memconn v0.1.0 // indirect
 	github.com/alibabacloud-go/alibabacloud-gateway-pop v0.0.6 // indirect
@@ -69,9 +68,11 @@ require (
 	github.com/apache/thrift v0.21.0 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/bmatcuk/doublestar/v4 v4.6.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
+	github.com/casbin/govaluate v1.3.0 // indirect
 	github.com/cenk/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
