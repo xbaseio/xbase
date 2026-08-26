@@ -185,7 +185,9 @@ func (s *Session) Bind(cid, uid int64) error {
 	// 锁外关闭旧连接，避免死锁
 	if kickConn != nil {
 		go func(c network.Conn) {
-			_ = c.Close(true)
+			// Graceful close flushes the replacement notification already queued
+			// on the high-priority write channel before sending the close signal.
+			_ = c.Close()
 		}(kickConn)
 	}
 
