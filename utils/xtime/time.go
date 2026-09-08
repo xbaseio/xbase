@@ -207,6 +207,11 @@ func DayHead(offset ...int) Time {
 	return StartOfDay(Day(offset...))
 }
 
+// HourHead 获取小时开始时间
+func HourHead() Time {
+	return StartOfHour(Now())
+}
+
 // DayTail 获取一天结束时间
 func DayTail(offset ...int) Time {
 	return DayHead(offset...).AddDate(0, 0, 1).Add(-time.Nanosecond)
@@ -250,6 +255,12 @@ func MonthHead(offset ...int) Time {
 // MonthTail 获取一月结束时间
 func MonthTail(offset ...int) Time {
 	return MonthHead(offset...).AddDate(0, 1, 0).Add(-time.Nanosecond)
+}
+
+// StartOfHour 获取指定时间所在小时的开始时间
+func StartOfHour(t Time) Time {
+	t = t.In(Location())
+	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location())
 }
 
 // StartOfDay 获取指定时间所在天的开始时间
