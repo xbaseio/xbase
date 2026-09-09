@@ -2,6 +2,7 @@ package limiter
 
 import (
 	"sync"
+	"time"
 
 	"github.com/xbaseio/xbase/utils/xtime"
 )
@@ -12,7 +13,7 @@ type Limiter struct {
 	cap          float64
 	num          float64
 	rate         float64
-	lastFillTime xtime.Time
+	lastFillTime time.Time
 }
 
 func NewLimiter(cap, rate float64) *Limiter {

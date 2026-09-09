@@ -66,8 +66,6 @@ type TransformRule struct {
 	Tpl string
 }
 
-type Time = time.Time
-
 func init() {
 	locationValue.Store(time.Local)
 
@@ -111,33 +109,33 @@ func SetTimezone(name string) error {
 }
 
 // Parse 解析日期时间
-func Parse(layout string, value string) (Time, error) {
+func Parse(layout string, value string) (time.Time, error) {
 	return time.ParseInLocation(layout, value, Location())
 }
 
 // Now 当前时间
-func Now() Time {
+func Now() time.Time {
 	return time.Now().In(Location())
 }
 
 // Today 今天当前时刻
-func Today() Time {
+func Today() time.Time {
 	return Now()
 }
 
 // Yesterday 昨天当前时刻
-func Yesterday() Time {
+func Yesterday() time.Time {
 	return Day(-1)
 }
 
 // Tomorrow 明天当前时刻
-func Tomorrow() Time {
+func Tomorrow() time.Time {
 	return Day(1)
 }
 
 // Transform 时间转换成“刚刚/几分钟前/几小时前”
 // rule 可自定义，但 Max 必须从小到大，最后一项 Max 可以为 0 表示兜底。
-func Transform(t Time, rule ...[]TransformRule) string {
+func Transform(t time.Time, rule ...[]TransformRule) string {
 	rules := defaultTransformRule
 	if len(rule) > 0 && len(rule[0]) > 0 {
 		rules = rule[0]
@@ -173,7 +171,7 @@ func formatTransformTpl(tpl string, v uint64) string {
 }
 
 // Unix 秒时间戳转标准时间
-func Unix(sec int64, nsec ...int64) Time {
+func Unix(sec int64, nsec ...int64) time.Time {
 	ns := int64(0)
 	if len(nsec) > 0 {
 		ns = nsec[0]
@@ -182,49 +180,49 @@ func Unix(sec int64, nsec ...int64) Time {
 }
 
 // UnixMilli 毫秒时间戳转标准时间
-func UnixMilli(msec int64) Time {
+func UnixMilli(msec int64) time.Time {
 	return time.UnixMilli(msec).In(Location())
 }
 
 // UnixMicro 微秒时间戳转标准时间
-func UnixMicro(usec int64) Time {
+func UnixMicro(usec int64) time.Time {
 	return time.UnixMicro(usec).In(Location())
 }
 
 // UnixNano 纳秒时间戳转标准时间
-func UnixNano(nsec int64) Time {
+func UnixNano(nsec int64) time.Time {
 	return time.Unix(0, nsec).In(Location())
 }
 
 // Day 获取某一天的当前时刻
 // offsetDays 偏移天数，例如：-1 前一天，0 当前，1 明天
-func Day(offset ...int) Time {
+func Day(offset ...int) time.Time {
 	return Now().AddDate(0, 0, firstOffset(offset))
 }
 
 // DayHead 获取一天开始时间
-func DayHead(offset ...int) Time {
+func DayHead(offset ...int) time.Time {
 	return StartOfDay(Day(offset...))
 }
 
 // HourHead 获取小时开始时间
-func HourHead() Time {
+func HourHead() time.Time {
 	return StartOfHour(Now())
 }
 
 // DayTail 获取一天结束时间
-func DayTail(offset ...int) Time {
+func DayTail(offset ...int) time.Time {
 	return DayHead(offset...).AddDate(0, 0, 1).Add(-time.Nanosecond)
 }
 
 // Week 获取某一周的当前时刻
 // offsetWeeks 偏移周数，例如：-1 上周，0 本周，1 下周
-func Week(offset ...int) Time {
+func Week(offset ...int) time.Time {
 	return Now().AddDate(0, 0, firstOffset(offset)*7)
 }
 
 // WeekHead 获取一周开始时间，默认周一为第一天
-func WeekHead(offset ...int) Time {
+func WeekHead(offset ...int) time.Time {
 	base := DayHead()
 
 	weekday := int(base.Weekday())
@@ -237,51 +235,51 @@ func WeekHead(offset ...int) Time {
 }
 
 // WeekTail 获取一周结束时间，默认周日为最后一天
-func WeekTail(offset ...int) Time {
+func WeekTail(offset ...int) time.Time {
 	return WeekHead(offset...).AddDate(0, 0, 7).Add(-time.Nanosecond)
 }
 
 // Month 获取某一月的当前时刻
 // offsetMonths 偏移月数，例如：-1 前一月，0 当前月，1 下一月
-func Month(offset ...int) Time {
+func Month(offset ...int) time.Time {
 	return addMonthsClamped(Now(), firstOffset(offset))
 }
 
 // MonthHead 获取一月开始时间
-func MonthHead(offset ...int) Time {
+func MonthHead(offset ...int) time.Time {
 	return StartOfMonth(Month(offset...))
 }
 
 // MonthTail 获取一月结束时间
-func MonthTail(offset ...int) Time {
+func MonthTail(offset ...int) time.Time {
 	return MonthHead(offset...).AddDate(0, 1, 0).Add(-time.Nanosecond)
 }
 
 // StartOfHour 获取指定时间所在小时的开始时间
-func StartOfHour(t Time) Time {
+func StartOfHour(t time.Time) time.Time {
 	t = t.In(Location())
 	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location())
 }
 
 // StartOfDay 获取指定时间所在天的开始时间
-func StartOfDay(t Time) Time {
+func StartOfDay(t time.Time) time.Time {
 	t = t.In(Location())
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 }
 
 // EndOfDay 获取指定时间所在天的结束时间
-func EndOfDay(t Time) Time {
+func EndOfDay(t time.Time) time.Time {
 	return StartOfDay(t).AddDate(0, 0, 1).Add(-time.Nanosecond)
 }
 
 // StartOfMonth 获取指定时间所在月的开始时间
-func StartOfMonth(t Time) Time {
+func StartOfMonth(t time.Time) time.Time {
 	t = t.In(Location())
 	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location())
 }
 
 // EndOfMonth 获取指定时间所在月的结束时间
-func EndOfMonth(t Time) Time {
+func EndOfMonth(t time.Time) time.Time {
 	return StartOfMonth(t).AddDate(0, 1, 0).Add(-time.Nanosecond)
 }
 
@@ -304,7 +302,7 @@ func firstOffset(offset []int) int {
 
 // addMonthsClamped 按自然月偏移，并把日期夹到目标月最后一天。
 // 例如：2026-03-31 偏移 -1 个月 => 2026-02-28
-func addMonthsClamped(t Time, months int) Time {
+func addMonthsClamped(t time.Time, months int) time.Time {
 	t = t.In(Location())
 
 	year, month, day := t.Date()
@@ -344,7 +342,7 @@ func divMod(x, y int) (int, int) {
 
 // Format 格式化时间
 // 不传时间时，默认格式化当前时间
-func Format(layout string, t ...Time) string {
+func Format(layout string, t ...time.Time) string {
 	if layout == "" {
 		layout = DateTime
 	}
@@ -358,34 +356,34 @@ func Format(layout string, t ...Time) string {
 }
 
 // Date 当前日期，格式：2006-01-02
-func Date(t ...Time) string {
+func Date(t ...time.Time) string {
 	return Format(DateOnly, t...)
 }
 
 // Datetime 当前日期时间，格式：2006-01-02 15:04:05
 // 注意：不能叫 DateTime，因为上面已经有 const DateTime = time.DateTime
-func Datetime(t ...Time) string {
+func Datetime(t ...time.Time) string {
 	return Format(DateTime, t...)
 }
 
 // TimeString 当前时间，格式：15:04:05
-func TimeString(t ...Time) string {
+func TimeString(t ...time.Time) string {
 	return Format(TimeOnly, t...)
 }
 
 // MonthString 当前年月，格式：2006-01
-func MonthString(t ...Time) string {
+func MonthString(t ...time.Time) string {
 	return Format(MonthOnly, t...)
 }
 
 // YearString 当前年份，格式：2006
-func YearString(t ...Time) string {
+func YearString(t ...time.Time) string {
 	return Format(YearOnly, t...)
 }
 
 // Timestamp 当前秒级时间戳
 // 不传时间时，默认当前时间
-func Timestamp(t ...Time) int64 {
+func Timestamp(t ...time.Time) int64 {
 	target := Now()
 	if len(t) > 0 {
 		target = t[0].In(Location())
@@ -394,7 +392,7 @@ func Timestamp(t ...Time) int64 {
 }
 
 // TimestampMilli 当前毫秒时间戳
-func TimestampMilli(t ...Time) int64 {
+func TimestampMilli(t ...time.Time) int64 {
 	target := Now()
 	if len(t) > 0 {
 		target = t[0].In(Location())
@@ -403,7 +401,7 @@ func TimestampMilli(t ...Time) int64 {
 }
 
 // TimestampMicro 当前微秒时间戳
-func TimestampMicro(t ...Time) int64 {
+func TimestampMicro(t ...time.Time) int64 {
 	target := Now()
 	if len(t) > 0 {
 		target = t[0].In(Location())
@@ -412,7 +410,7 @@ func TimestampMicro(t ...Time) int64 {
 }
 
 // TimestampNano 当前纳秒时间戳
-func TimestampNano(t ...Time) int64 {
+func TimestampNano(t ...time.Time) int64 {
 	target := Now()
 	if len(t) > 0 {
 		target = t[0].In(Location())
@@ -462,22 +460,22 @@ func MonthTailUnix(offset ...int) int64 {
 }
 
 // ParseDate 解析日期：2006-01-02
-func ParseDate(value string) (Time, error) {
+func ParseDate(value string) (time.Time, error) {
 	return Parse(DateOnly, value)
 }
 
 // ParseDatetime 解析日期时间：2006-01-02 15:04:05
-func ParseDatetime(value string) (Time, error) {
+func ParseDatetime(value string) (time.Time, error) {
 	return Parse(DateTime, value)
 }
 
 // ParseMonth 解析月份：2006-01
-func ParseMonth(value string) (Time, error) {
+func ParseMonth(value string) (time.Time, error) {
 	return Parse(MonthOnly, value)
 }
 
 // MustParse 解析时间，失败返回当前时间
-func MustParse(layout string, value string) Time {
+func MustParse(layout string, value string) time.Time {
 	t, err := Parse(layout, value)
 	if err != nil {
 		return Now()
@@ -486,11 +484,11 @@ func MustParse(layout string, value string) Time {
 }
 
 // MustParseDate 解析日期，失败返回当前时间
-func MustParseDate(value string) Time {
+func MustParseDate(value string) time.Time {
 	return MustParse(DateOnly, value)
 }
 
 // MustParseDatetime 解析日期时间，失败返回当前时间
-func MustParseDatetime(value string) Time {
+func MustParseDatetime(value string) time.Time {
 	return MustParse(DateTime, value)
 }
