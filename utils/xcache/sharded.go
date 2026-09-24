@@ -10,12 +10,12 @@ import (
 	"time"
 )
 
-// This is an experimental and unexported (for now) attempt at making a cache
+// This is an experimental and unexported (for now) attempt at making a xcache
 // with better algorithmic complexity than the standard one, namely by
-// preventing write locks of the entire cache when an item is added. As of the
-// time of writing, the overhead of selecting buckets results in cache
-// operations being about twice as slow as for the standard cache with small
-// total cache sizes, and faster for larger ones.
+// preventing write locks of the entire xcache when an item is added. As of the
+// time of writing, the overhead of selecting buckets results in xcache
+// operations being about twice as slow as for the standard xcache with small
+// total xcache sizes, and faster for larger ones.
 //
 // See cache_test.go for a few benchmarks.
 
@@ -26,7 +26,7 @@ type unexportedShardedCache struct {
 type shardedCache struct {
 	seed    uint32
 	m       uint32
-	cs      []*cache
+	cs      []*xcache
 	janitor *shardedJanitor
 }
 
@@ -62,7 +62,7 @@ func djb33(seed uint32, k string) uint32 {
 	return d ^ (d >> 16)
 }
 
-func (sc *shardedCache) bucket(k string) *cache {
+func (sc *shardedCache) bucket(k string) *xcache {
 	return sc.cs[djb33(sc.seed, k)%sc.m]
 }
 
@@ -104,10 +104,10 @@ func (sc *shardedCache) DeleteExpired() {
 	}
 }
 
-// Returns the items in the cache. This may include items that have expired,
+// Returns the items in the xcache. This may include items that have expired,
 // but have not yet been cleaned up. If this is significant, the Expiration
 // fields of the items should be checked. Note that explicit synchronization
-// is needed to use a cache and its corresponding Items() return values at
+// is needed to use a xcache and its corresponding Items() return values at
 // the same time, as the maps are shared.
 func (sc *shardedCache) Items() []map[string]Item {
 	res := make([]map[string]Item, len(sc.cs))
@@ -158,7 +158,7 @@ func newShardedCache(n int, de time.Duration) *shardedCache {
 	rnd, err := rand.Int(rand.Reader, max)
 	var seed uint32
 	if err != nil {
-		os.Stderr.Write([]byte("WARNING: go-cache's newShardedCache failed to read from the system CSPRNG (/dev/urandom or equivalent.) Your system's security may be compromised. Continuing with an insecure seed.\n"))
+		os.Stderr.Write([]byte("WARNING: go-xcache's newShardedCache failed to read from the system CSPRNG (/dev/urandom or equivalent.) Your system's security may be compromised. Continuing with an insecure seed.\n"))
 		seed = insecurerand.Uint32()
 	} else {
 		seed = uint32(rnd.Uint64())
@@ -166,10 +166,10 @@ func newShardedCache(n int, de time.Duration) *shardedCache {
 	sc := &shardedCache{
 		seed: seed,
 		m:    uint32(n),
-		cs:   make([]*cache, n),
+		cs:   make([]*xcache, n),
 	}
 	for i := 0; i < n; i++ {
-		c := &cache{
+		c := &xcache{
 			defaultExpiration: de,
 			items:             map[string]Item{},
 		}

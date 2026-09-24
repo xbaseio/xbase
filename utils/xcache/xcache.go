@@ -28,16 +28,16 @@ const (
 	NoExpiration time.Duration = -1
 	// For use with functions that take an expiration time. Equivalent to
 	// passing in the same expiration duration as was given to New() or
-	// NewFrom() when the cache was created (e.g. 5 minutes.)
+	// NewFrom() when the xcache was created (e.g. 5 minutes.)
 	DefaultExpiration time.Duration = 0
 )
 
-type Cache struct {
-	*cache
+type XCache struct {
+	*xcache
 	// If this is confusing, see the comment at the bottom of New()
 }
 
-type cache struct {
+type xcache struct {
 	defaultExpiration time.Duration
 	items             map[string]Item
 	mu                sync.RWMutex
@@ -45,10 +45,10 @@ type cache struct {
 	janitor           *janitor
 }
 
-// Add an item to the cache, replacing any existing item. If the duration is 0
-// (DefaultExpiration), the cache's default expiration time is used. If it is -1
+// Add an item to the xcache, replacing any existing item. If the duration is 0
+// (DefaultExpiration), the xcache's default expiration time is used. If it is -1
 // (NoExpiration), the item never expires.
-func (c *cache) Set(k string, x interface{}, d time.Duration) {
+func (c *xcache) Set(k string, x interface{}, d time.Duration) {
 	// "Inlining" of set
 	var e int64
 	if d == DefaultExpiration {
@@ -67,7 +67,7 @@ func (c *cache) Set(k string, x interface{}, d time.Duration) {
 	c.mu.Unlock()
 }
 
-func (c *cache) set(k string, x interface{}, d time.Duration) {
+func (c *xcache) set(k string, x interface{}, d time.Duration) {
 	var e int64
 	if d == DefaultExpiration {
 		d = c.defaultExpiration
@@ -81,15 +81,15 @@ func (c *cache) set(k string, x interface{}, d time.Duration) {
 	}
 }
 
-// Add an item to the cache, replacing any existing item, using the default
+// Add an item to the xcache, replacing any existing item, using the default
 // expiration.
-func (c *cache) SetDefault(k string, x interface{}) {
+func (c *xcache) SetDefault(k string, x interface{}) {
 	c.Set(k, x, DefaultExpiration)
 }
 
-// Add an item to the cache only if an item doesn't already exist for the given
+// Add an item to the xcache only if an item doesn't already exist for the given
 // key, or if the existing item has expired. Returns an error otherwise.
-func (c *cache) Add(k string, x interface{}, d time.Duration) error {
+func (c *xcache) Add(k string, x interface{}, d time.Duration) error {
 	c.mu.Lock()
 	_, found := c.get(k)
 	if found {
@@ -101,9 +101,9 @@ func (c *cache) Add(k string, x interface{}, d time.Duration) error {
 	return nil
 }
 
-// Set a new value for the cache key only if it already exists, and the existing
+// Set a new value for the xcache key only if it already exists, and the existing
 // item hasn't expired. Returns an error otherwise.
-func (c *cache) Replace(k string, x interface{}, d time.Duration) error {
+func (c *xcache) Replace(k string, x interface{}, d time.Duration) error {
 	c.mu.Lock()
 	_, found := c.get(k)
 	if !found {
@@ -115,9 +115,9 @@ func (c *cache) Replace(k string, x interface{}, d time.Duration) error {
 	return nil
 }
 
-// Get an item from the cache. Returns the item or nil, and a bool indicating
+// Get an item from the xcache. Returns the item or nil, and a bool indicating
 // whether the key was found.
-func (c *cache) Get(k string) (interface{}, bool) {
+func (c *xcache) Get(k string) (interface{}, bool) {
 	c.mu.RLock()
 	// "Inlining" of get and Expired
 	item, found := c.items[k]
@@ -135,11 +135,11 @@ func (c *cache) Get(k string) (interface{}, bool) {
 	return item.Object, true
 }
 
-// GetWithExpiration returns an item and its expiration time from the cache.
+// GetWithExpiration returns an item and its expiration time from the xcache.
 // It returns the item or nil, the expiration time if one is set (if the item
 // never expires a zero value for time.Time is returned), and a bool indicating
 // whether the key was found.
-func (c *cache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
+func (c *xcache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
 	c.mu.RLock()
 	// "Inlining" of get and Expired
 	item, found := c.items[k]
@@ -165,7 +165,7 @@ func (c *cache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
 	return item.Object, time.Time{}, true
 }
 
-func (c *cache) get(k string) (interface{}, bool) {
+func (c *xcache) get(k string) (interface{}, bool) {
 	item, found := c.items[k]
 	if !found {
 		return nil, false
@@ -184,7 +184,7 @@ func (c *cache) get(k string) (interface{}, bool) {
 // item's value is not an integer, if it was not found, or if it is not
 // possible to increment it by n. To retrieve the incremented value, use one
 // of the specialized methods, e.g. IncrementInt64.
-func (c *cache) Increment(k string, n int64) error {
+func (c *xcache) Increment(k string, n int64) error {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -232,7 +232,7 @@ func (c *cache) Increment(k string, n int64) error {
 // possible to increment it by n. Pass a negative number to decrement the
 // value. To retrieve the incremented value, use one of the specialized methods,
 // e.g. IncrementFloat64.
-func (c *cache) IncrementFloat(k string, n float64) error {
+func (c *xcache) IncrementFloat(k string, n float64) error {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -256,7 +256,7 @@ func (c *cache) IncrementFloat(k string, n float64) error {
 // Increment an item of type int by n. Returns an error if the item's value is
 // not an int, or if it was not found. If there is no error, the incremented
 // value is returned.
-func (c *cache) IncrementInt(k string, n int) (int, error) {
+func (c *xcache) IncrementInt(k string, n int) (int, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -278,7 +278,7 @@ func (c *cache) IncrementInt(k string, n int) (int, error) {
 // Increment an item of type int8 by n. Returns an error if the item's value is
 // not an int8, or if it was not found. If there is no error, the incremented
 // value is returned.
-func (c *cache) IncrementInt8(k string, n int8) (int8, error) {
+func (c *xcache) IncrementInt8(k string, n int8) (int8, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -300,7 +300,7 @@ func (c *cache) IncrementInt8(k string, n int8) (int8, error) {
 // Increment an item of type int16 by n. Returns an error if the item's value is
 // not an int16, or if it was not found. If there is no error, the incremented
 // value is returned.
-func (c *cache) IncrementInt16(k string, n int16) (int16, error) {
+func (c *xcache) IncrementInt16(k string, n int16) (int16, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -322,7 +322,7 @@ func (c *cache) IncrementInt16(k string, n int16) (int16, error) {
 // Increment an item of type int32 by n. Returns an error if the item's value is
 // not an int32, or if it was not found. If there is no error, the incremented
 // value is returned.
-func (c *cache) IncrementInt32(k string, n int32) (int32, error) {
+func (c *xcache) IncrementInt32(k string, n int32) (int32, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -344,7 +344,7 @@ func (c *cache) IncrementInt32(k string, n int32) (int32, error) {
 // Increment an item of type int64 by n. Returns an error if the item's value is
 // not an int64, or if it was not found. If there is no error, the incremented
 // value is returned.
-func (c *cache) IncrementInt64(k string, n int64) (int64, error) {
+func (c *xcache) IncrementInt64(k string, n int64) (int64, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -366,7 +366,7 @@ func (c *cache) IncrementInt64(k string, n int64) (int64, error) {
 // Increment an item of type uint by n. Returns an error if the item's value is
 // not an uint, or if it was not found. If there is no error, the incremented
 // value is returned.
-func (c *cache) IncrementUint(k string, n uint) (uint, error) {
+func (c *xcache) IncrementUint(k string, n uint) (uint, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -388,7 +388,7 @@ func (c *cache) IncrementUint(k string, n uint) (uint, error) {
 // Increment an item of type uintptr by n. Returns an error if the item's value
 // is not an uintptr, or if it was not found. If there is no error, the
 // incremented value is returned.
-func (c *cache) IncrementUintptr(k string, n uintptr) (uintptr, error) {
+func (c *xcache) IncrementUintptr(k string, n uintptr) (uintptr, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -410,7 +410,7 @@ func (c *cache) IncrementUintptr(k string, n uintptr) (uintptr, error) {
 // Increment an item of type uint8 by n. Returns an error if the item's value
 // is not an uint8, or if it was not found. If there is no error, the
 // incremented value is returned.
-func (c *cache) IncrementUint8(k string, n uint8) (uint8, error) {
+func (c *xcache) IncrementUint8(k string, n uint8) (uint8, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -432,7 +432,7 @@ func (c *cache) IncrementUint8(k string, n uint8) (uint8, error) {
 // Increment an item of type uint16 by n. Returns an error if the item's value
 // is not an uint16, or if it was not found. If there is no error, the
 // incremented value is returned.
-func (c *cache) IncrementUint16(k string, n uint16) (uint16, error) {
+func (c *xcache) IncrementUint16(k string, n uint16) (uint16, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -454,7 +454,7 @@ func (c *cache) IncrementUint16(k string, n uint16) (uint16, error) {
 // Increment an item of type uint32 by n. Returns an error if the item's value
 // is not an uint32, or if it was not found. If there is no error, the
 // incremented value is returned.
-func (c *cache) IncrementUint32(k string, n uint32) (uint32, error) {
+func (c *xcache) IncrementUint32(k string, n uint32) (uint32, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -476,7 +476,7 @@ func (c *cache) IncrementUint32(k string, n uint32) (uint32, error) {
 // Increment an item of type uint64 by n. Returns an error if the item's value
 // is not an uint64, or if it was not found. If there is no error, the
 // incremented value is returned.
-func (c *cache) IncrementUint64(k string, n uint64) (uint64, error) {
+func (c *xcache) IncrementUint64(k string, n uint64) (uint64, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -498,7 +498,7 @@ func (c *cache) IncrementUint64(k string, n uint64) (uint64, error) {
 // Increment an item of type float32 by n. Returns an error if the item's value
 // is not an float32, or if it was not found. If there is no error, the
 // incremented value is returned.
-func (c *cache) IncrementFloat32(k string, n float32) (float32, error) {
+func (c *xcache) IncrementFloat32(k string, n float32) (float32, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -520,7 +520,7 @@ func (c *cache) IncrementFloat32(k string, n float32) (float32, error) {
 // Increment an item of type float64 by n. Returns an error if the item's value
 // is not an float64, or if it was not found. If there is no error, the
 // incremented value is returned.
-func (c *cache) IncrementFloat64(k string, n float64) (float64, error) {
+func (c *xcache) IncrementFloat64(k string, n float64) (float64, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -544,7 +544,7 @@ func (c *cache) IncrementFloat64(k string, n float64) (float64, error) {
 // item's value is not an integer, if it was not found, or if it is not
 // possible to decrement it by n. To retrieve the decremented value, use one
 // of the specialized methods, e.g. DecrementInt64.
-func (c *cache) Decrement(k string, n int64) error {
+func (c *xcache) Decrement(k string, n int64) error {
 	// TODO: Implement Increment and Decrement more cleanly.
 	// (Cannot do Increment(k, n*-1) for uints.)
 	c.mu.Lock()
@@ -594,7 +594,7 @@ func (c *cache) Decrement(k string, n int64) error {
 // possible to decrement it by n. Pass a negative number to decrement the
 // value. To retrieve the decremented value, use one of the specialized methods,
 // e.g. DecrementFloat64.
-func (c *cache) DecrementFloat(k string, n float64) error {
+func (c *xcache) DecrementFloat(k string, n float64) error {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -618,7 +618,7 @@ func (c *cache) DecrementFloat(k string, n float64) error {
 // Decrement an item of type int by n. Returns an error if the item's value is
 // not an int, or if it was not found. If there is no error, the decremented
 // value is returned.
-func (c *cache) DecrementInt(k string, n int) (int, error) {
+func (c *xcache) DecrementInt(k string, n int) (int, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -640,7 +640,7 @@ func (c *cache) DecrementInt(k string, n int) (int, error) {
 // Decrement an item of type int8 by n. Returns an error if the item's value is
 // not an int8, or if it was not found. If there is no error, the decremented
 // value is returned.
-func (c *cache) DecrementInt8(k string, n int8) (int8, error) {
+func (c *xcache) DecrementInt8(k string, n int8) (int8, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -662,7 +662,7 @@ func (c *cache) DecrementInt8(k string, n int8) (int8, error) {
 // Decrement an item of type int16 by n. Returns an error if the item's value is
 // not an int16, or if it was not found. If there is no error, the decremented
 // value is returned.
-func (c *cache) DecrementInt16(k string, n int16) (int16, error) {
+func (c *xcache) DecrementInt16(k string, n int16) (int16, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -684,7 +684,7 @@ func (c *cache) DecrementInt16(k string, n int16) (int16, error) {
 // Decrement an item of type int32 by n. Returns an error if the item's value is
 // not an int32, or if it was not found. If there is no error, the decremented
 // value is returned.
-func (c *cache) DecrementInt32(k string, n int32) (int32, error) {
+func (c *xcache) DecrementInt32(k string, n int32) (int32, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -706,7 +706,7 @@ func (c *cache) DecrementInt32(k string, n int32) (int32, error) {
 // Decrement an item of type int64 by n. Returns an error if the item's value is
 // not an int64, or if it was not found. If there is no error, the decremented
 // value is returned.
-func (c *cache) DecrementInt64(k string, n int64) (int64, error) {
+func (c *xcache) DecrementInt64(k string, n int64) (int64, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -728,7 +728,7 @@ func (c *cache) DecrementInt64(k string, n int64) (int64, error) {
 // Decrement an item of type uint by n. Returns an error if the item's value is
 // not an uint, or if it was not found. If there is no error, the decremented
 // value is returned.
-func (c *cache) DecrementUint(k string, n uint) (uint, error) {
+func (c *xcache) DecrementUint(k string, n uint) (uint, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -750,7 +750,7 @@ func (c *cache) DecrementUint(k string, n uint) (uint, error) {
 // Decrement an item of type uintptr by n. Returns an error if the item's value
 // is not an uintptr, or if it was not found. If there is no error, the
 // decremented value is returned.
-func (c *cache) DecrementUintptr(k string, n uintptr) (uintptr, error) {
+func (c *xcache) DecrementUintptr(k string, n uintptr) (uintptr, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -772,7 +772,7 @@ func (c *cache) DecrementUintptr(k string, n uintptr) (uintptr, error) {
 // Decrement an item of type uint8 by n. Returns an error if the item's value is
 // not an uint8, or if it was not found. If there is no error, the decremented
 // value is returned.
-func (c *cache) DecrementUint8(k string, n uint8) (uint8, error) {
+func (c *xcache) DecrementUint8(k string, n uint8) (uint8, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -794,7 +794,7 @@ func (c *cache) DecrementUint8(k string, n uint8) (uint8, error) {
 // Decrement an item of type uint16 by n. Returns an error if the item's value
 // is not an uint16, or if it was not found. If there is no error, the
 // decremented value is returned.
-func (c *cache) DecrementUint16(k string, n uint16) (uint16, error) {
+func (c *xcache) DecrementUint16(k string, n uint16) (uint16, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -816,7 +816,7 @@ func (c *cache) DecrementUint16(k string, n uint16) (uint16, error) {
 // Decrement an item of type uint32 by n. Returns an error if the item's value
 // is not an uint32, or if it was not found. If there is no error, the
 // decremented value is returned.
-func (c *cache) DecrementUint32(k string, n uint32) (uint32, error) {
+func (c *xcache) DecrementUint32(k string, n uint32) (uint32, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -838,7 +838,7 @@ func (c *cache) DecrementUint32(k string, n uint32) (uint32, error) {
 // Decrement an item of type uint64 by n. Returns an error if the item's value
 // is not an uint64, or if it was not found. If there is no error, the
 // decremented value is returned.
-func (c *cache) DecrementUint64(k string, n uint64) (uint64, error) {
+func (c *xcache) DecrementUint64(k string, n uint64) (uint64, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -860,7 +860,7 @@ func (c *cache) DecrementUint64(k string, n uint64) (uint64, error) {
 // Decrement an item of type float32 by n. Returns an error if the item's value
 // is not an float32, or if it was not found. If there is no error, the
 // decremented value is returned.
-func (c *cache) DecrementFloat32(k string, n float32) (float32, error) {
+func (c *xcache) DecrementFloat32(k string, n float32) (float32, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -882,7 +882,7 @@ func (c *cache) DecrementFloat32(k string, n float32) (float32, error) {
 // Decrement an item of type float64 by n. Returns an error if the item's value
 // is not an float64, or if it was not found. If there is no error, the
 // decremented value is returned.
-func (c *cache) DecrementFloat64(k string, n float64) (float64, error) {
+func (c *xcache) DecrementFloat64(k string, n float64) (float64, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -901,8 +901,8 @@ func (c *cache) DecrementFloat64(k string, n float64) (float64, error) {
 	return nv, nil
 }
 
-// Delete an item from the cache. Does nothing if the key is not in the cache.
-func (c *cache) Delete(k string) {
+// Delete an item from the xcache. Does nothing if the key is not in the xcache.
+func (c *xcache) Delete(k string) {
 	c.mu.Lock()
 	v, evicted := c.delete(k)
 	c.mu.Unlock()
@@ -911,7 +911,7 @@ func (c *cache) Delete(k string) {
 	}
 }
 
-func (c *cache) delete(k string) (interface{}, bool) {
+func (c *xcache) delete(k string) (interface{}, bool) {
 	if c.onEvicted != nil {
 		if v, found := c.items[k]; found {
 			delete(c.items, k)
@@ -927,8 +927,8 @@ type keyAndValue struct {
 	value interface{}
 }
 
-// Delete all expired items from the cache.
-func (c *cache) DeleteExpired() {
+// Delete all expired items from the xcache.
+func (c *xcache) DeleteExpired() {
 	var evictedItems []keyAndValue
 	now := time.Now().UnixNano()
 	c.mu.Lock()
@@ -948,19 +948,19 @@ func (c *cache) DeleteExpired() {
 }
 
 // Sets an (optional) function that is called with the key and value when an
-// item is evicted from the cache. (Including when it is deleted manually, but
+// item is evicted from the xcache. (Including when it is deleted manually, but
 // not when it is overwritten.) Set to nil to disable.
-func (c *cache) OnEvicted(f func(string, interface{})) {
+func (c *xcache) OnEvicted(f func(string, interface{})) {
 	c.mu.Lock()
 	c.onEvicted = f
 	c.mu.Unlock()
 }
 
-// Write the cache's items (using Gob) to an io.Writer.
+// Write the xcache's items (using Gob) to an io.Writer.
 //
 // NOTE: This method is deprecated in favor of c.Items() and NewFrom() (see the
 // documentation for NewFrom().)
-func (c *cache) Save(w io.Writer) (err error) {
+func (c *xcache) Save(w io.Writer) (err error) {
 	enc := gob.NewEncoder(w)
 	defer func() {
 		if x := recover(); x != nil {
@@ -976,12 +976,12 @@ func (c *cache) Save(w io.Writer) (err error) {
 	return
 }
 
-// Save the cache's items to the given filename, creating the file if it
+// Save the xcache's items to the given filename, creating the file if it
 // doesn't exist, and overwriting it if it does.
 //
 // NOTE: This method is deprecated in favor of c.Items() and NewFrom() (see the
 // documentation for NewFrom().)
-func (c *cache) SaveFile(fname string) error {
+func (c *xcache) SaveFile(fname string) error {
 	fp, err := os.Create(fname)
 	if err != nil {
 		return err
@@ -994,12 +994,12 @@ func (c *cache) SaveFile(fname string) error {
 	return fp.Close()
 }
 
-// Add (Gob-serialized) cache items from an io.Reader, excluding any items with
-// keys that already exist (and haven't expired) in the current cache.
+// Add (Gob-serialized) xcache items from an io.Reader, excluding any items with
+// keys that already exist (and haven't expired) in the current xcache.
 //
 // NOTE: This method is deprecated in favor of c.Items() and NewFrom() (see the
 // documentation for NewFrom().)
-func (c *cache) Load(r io.Reader) error {
+func (c *xcache) Load(r io.Reader) error {
 	dec := gob.NewDecoder(r)
 	items := map[string]Item{}
 	err := dec.Decode(&items)
@@ -1016,12 +1016,12 @@ func (c *cache) Load(r io.Reader) error {
 	return err
 }
 
-// Load and add cache items from the given filename, excluding any items with
-// keys that already exist in the current cache.
+// Load and add xcache items from the given filename, excluding any items with
+// keys that already exist in the current xcache.
 //
 // NOTE: This method is deprecated in favor of c.Items() and NewFrom() (see the
 // documentation for NewFrom().)
-func (c *cache) LoadFile(fname string) error {
+func (c *xcache) LoadFile(fname string) error {
 	fp, err := os.Open(fname)
 	if err != nil {
 		return err
@@ -1034,8 +1034,8 @@ func (c *cache) LoadFile(fname string) error {
 	return fp.Close()
 }
 
-// Copies all unexpired items in the cache into a new map and returns it.
-func (c *cache) Items() map[string]Item {
+// Copies all unexpired items in the xcache into a new map and returns it.
+func (c *xcache) Items() map[string]Item {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	m := make(map[string]Item, len(c.items))
@@ -1052,17 +1052,17 @@ func (c *cache) Items() map[string]Item {
 	return m
 }
 
-// Returns the number of items in the cache. This may include items that have
+// Returns the number of items in the xcache. This may include items that have
 // expired, but have not yet been cleaned up.
-func (c *cache) ItemCount() int {
+func (c *xcache) ItemCount() int {
 	c.mu.RLock()
 	n := len(c.items)
 	c.mu.RUnlock()
 	return n
 }
 
-// Delete all items from the cache.
-func (c *cache) Flush() {
+// Delete all items from the xcache.
+func (c *xcache) Flush() {
 	c.mu.Lock()
 	c.items = map[string]Item{}
 	c.mu.Unlock()
@@ -1073,7 +1073,7 @@ type janitor struct {
 	stop     chan bool
 }
 
-func (j *janitor) Run(c *cache) {
+func (j *janitor) Run(c *xcache) {
 	ticker := time.NewTicker(j.Interval)
 	for {
 		select {
@@ -1086,11 +1086,11 @@ func (j *janitor) Run(c *cache) {
 	}
 }
 
-func stopJanitor(c *Cache) {
+func stopJanitor(c *XCache) {
 	c.janitor.stop <- true
 }
 
-func runJanitor(c *cache, ci time.Duration) {
+func runJanitor(c *xcache, ci time.Duration) {
 	j := &janitor{
 		Interval: ci,
 		stop:     make(chan bool),
@@ -1099,25 +1099,25 @@ func runJanitor(c *cache, ci time.Duration) {
 	go j.Run(c)
 }
 
-func newCache(de time.Duration, m map[string]Item) *cache {
+func newCache(de time.Duration, m map[string]Item) *xcache {
 	if de == 0 {
 		de = -1
 	}
-	c := &cache{
+	c := &xcache{
 		defaultExpiration: de,
 		items:             m,
 	}
 	return c
 }
 
-func newCacheWithJanitor(de time.Duration, ci time.Duration, m map[string]Item) *Cache {
+func newCacheWithJanitor(de time.Duration, ci time.Duration, m map[string]Item) *XCache {
 	c := newCache(de, m)
 	// This trick ensures that the janitor goroutine (which--granted it
 	// was enabled--is running DeleteExpired on c forever) does not keep
 	// the returned C object from being garbage collected. When it is
 	// garbage collected, the finalizer stops the janitor goroutine, after
 	// which c can be collected.
-	C := &Cache{c}
+	C := &XCache{c}
 	if ci > 0 {
 		runJanitor(c, ci)
 		runtime.SetFinalizer(C, stopJanitor)
@@ -1125,37 +1125,37 @@ func newCacheWithJanitor(de time.Duration, ci time.Duration, m map[string]Item) 
 	return C
 }
 
-// Return a new cache with a given default expiration duration and cleanup
+// Return a new xcache with a given default expiration duration and cleanup
 // interval. If the expiration duration is less than one (or NoExpiration),
-// the items in the cache never expire (by default), and must be deleted
+// the items in the xcache never expire (by default), and must be deleted
 // manually. If the cleanup interval is less than one, expired items are not
-// deleted from the cache before calling c.DeleteExpired().
-func New(defaultExpiration, cleanupInterval time.Duration) *Cache {
+// deleted from the xcache before calling c.DeleteExpired().
+func New(defaultExpiration, cleanupInterval time.Duration) *XCache {
 	items := make(map[string]Item)
 	return newCacheWithJanitor(defaultExpiration, cleanupInterval, items)
 }
 
-// Return a new cache with a given default expiration duration and cleanup
+// Return a new xcache with a given default expiration duration and cleanup
 // interval. If the expiration duration is less than one (or NoExpiration),
-// the items in the cache never expire (by default), and must be deleted
+// the items in the xcache never expire (by default), and must be deleted
 // manually. If the cleanup interval is less than one, expired items are not
-// deleted from the cache before calling c.DeleteExpired().
+// deleted from the xcache before calling c.DeleteExpired().
 //
 // NewFrom() also accepts an items map which will serve as the underlying map
-// for the cache. This is useful for starting from a deserialized cache
+// for the xcache. This is useful for starting from a deserialized xcache
 // (serialized using e.g. gob.Encode() on c.Items()), or passing in e.g.
-// make(map[string]Item, 500) to improve startup performance when the cache
+// make(map[string]Item, 500) to improve startup performance when the xcache
 // is expected to reach a certain minimum size.
 //
-// Only the cache's methods synchronize access to this map, so it is not
-// recommended to keep any references to the map around after creating a cache.
+// Only the xcache's methods synchronize access to this map, so it is not
+// recommended to keep any references to the map around after creating a xcache.
 // If need be, the map can be accessed at a later point using c.Items() (subject
 // to the same caveat.)
 //
 // Note regarding serialization: When using e.g. gob, make sure to
-// gob.Register() the individual types stored in the cache before encoding a
+// gob.Register() the individual types stored in the xcache before encoding a
 // map retrieved with c.Items(), and to register those same types before
 // decoding a blob containing an items map.
-func NewFrom(defaultExpiration, cleanupInterval time.Duration, items map[string]Item) *Cache {
+func NewFrom(defaultExpiration, cleanupInterval time.Duration, items map[string]Item) *XCache {
 	return newCacheWithJanitor(defaultExpiration, cleanupInterval, items)
 }

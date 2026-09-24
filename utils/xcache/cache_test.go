@@ -1256,7 +1256,7 @@ func TestCacheSerialization(t *testing.T) {
 	testFillAndSerialize(t, tc)
 }
 
-func testFillAndSerialize(t *testing.T, tc *Cache) {
+func testFillAndSerialize(t *testing.T, tc *XCache) {
 	tc.Set("a", "a", DefaultExpiration)
 	tc.Set("b", "b", DefaultExpiration)
 	tc.Set("c", "c", DefaultExpiration)
