@@ -15,7 +15,7 @@ type Item struct {
 	Expiration int64
 }
 
-// Returns true if the item has expired.
+// Expired 判断条目是否已经过期。
 func (item Item) Expired() bool {
 	if item.Expiration == 0 {
 		return false
@@ -24,17 +24,15 @@ func (item Item) Expired() bool {
 }
 
 const (
-	// For use with functions that take an expiration time.
+	// NoExpiration 表示条目永不过期，用于接受过期时间参数的方法。
 	NoExpiration time.Duration = -1
-	// For use with functions that take an expiration time. Equivalent to
-	// passing in the same expiration duration as was given to New() or
-	// NewFrom() when the xcache was created (e.g. 5 minutes.)
+	// DefaultExpiration 表示使用 New 或 NewFrom 创建缓存时指定的默认过期时间。
 	DefaultExpiration time.Duration = 0
 )
 
 type XCache struct {
 	*xcache
-	// If this is confusing, see the comment at the bottom of New()
+	// 通过外层对象管理清理协程的生命周期，详见 newCacheWithJanitor。
 }
 
 type xcache struct {
@@ -45,11 +43,9 @@ type xcache struct {
 	janitor           *janitor
 }
 
-// Add an item to the xcache, replacing any existing item. If the duration is 0
-// (DefaultExpiration), the xcache's default expiration time is used. If it is -1
-// (NoExpiration), the item never expires.
+// Set 写入条目并覆盖已有值；DefaultExpiration 使用默认过期时间，NoExpiration 表示永不过期。
 func (c *xcache) Set(k string, x interface{}, d time.Duration) {
-	// "Inlining" of set
+	// 直接展开 set 的逻辑，计算过期时间后加锁写入。
 	var e int64
 	if d == DefaultExpiration {
 		d = c.defaultExpiration
@@ -62,8 +58,7 @@ func (c *xcache) Set(k string, x interface{}, d time.Duration) {
 		Object:     x,
 		Expiration: e,
 	}
-	// TODO: Calls to mu.Unlock are currently not deferred because defer
-	// adds ~200 ns (as of go1.)
+	// 此处沿用显式解锁，不使用延迟调用。
 	c.mu.Unlock()
 }
 
@@ -81,14 +76,12 @@ func (c *xcache) set(k string, x interface{}, d time.Duration) {
 	}
 }
 
-// Add an item to the xcache, replacing any existing item, using the default
-// expiration.
+// SetDefault 使用默认过期时间写入条目，并覆盖已有值。
 func (c *xcache) SetDefault(k string, x interface{}) {
 	c.Set(k, x, DefaultExpiration)
 }
 
-// Add an item to the xcache only if an item doesn't already exist for the given
-// key, or if the existing item has expired. Returns an error otherwise.
+// Add 仅在键不存在或已有条目过期时写入，否则返回错误。
 func (c *xcache) Add(k string, x interface{}, d time.Duration) error {
 	c.mu.Lock()
 	_, found := c.get(k)
@@ -101,8 +94,7 @@ func (c *xcache) Add(k string, x interface{}, d time.Duration) error {
 	return nil
 }
 
-// Set a new value for the xcache key only if it already exists, and the existing
-// item hasn't expired. Returns an error otherwise.
+// Replace 仅在键存在且条目未过期时替换其值，否则返回错误。
 func (c *xcache) Replace(k string, x interface{}, d time.Duration) error {
 	c.mu.Lock()
 	_, found := c.get(k)
@@ -115,11 +107,10 @@ func (c *xcache) Replace(k string, x interface{}, d time.Duration) error {
 	return nil
 }
 
-// Get an item from the xcache. Returns the item or nil, and a bool indicating
-// whether the key was found.
+// Get 获取条目，返回缓存值和是否命中；不存在或已过期时返回 nil、false。
 func (c *xcache) Get(k string) (interface{}, bool) {
 	c.mu.RLock()
-	// "Inlining" of get and Expired
+	// 直接展开查询和过期判断逻辑。
 	item, found := c.items[k]
 	if !found {
 		c.mu.RUnlock()
@@ -135,13 +126,11 @@ func (c *xcache) Get(k string) (interface{}, bool) {
 	return item.Object, true
 }
 
-// GetWithExpiration returns an item and its expiration time from the xcache.
-// It returns the item or nil, the expiration time if one is set (if the item
-// never expires a zero value for time.Time is returned), and a bool indicating
-// whether the key was found.
+// GetWithExpiration 返回缓存值、过期时间和是否命中。
+// 永不过期的条目返回零值时间；不存在或已过期时返回 nil、零值时间和 false。
 func (c *xcache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
 	c.mu.RLock()
-	// "Inlining" of get and Expired
+	// 直接展开查询和过期判断逻辑。
 	item, found := c.items[k]
 	if !found {
 		c.mu.RUnlock()
@@ -154,13 +143,12 @@ func (c *xcache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
 			return nil, time.Time{}, false
 		}
 
-		// Return the item and the expiration time
+		// 返回缓存值和对应的过期时间。
 		c.mu.RUnlock()
 		return item.Object, time.Unix(0, item.Expiration), true
 	}
 
-	// If expiration <= 0 (i.e. no expiration time set) then return the item
-	// and a zeroed time.Time
+	// 过期时间不大于零表示永不过期，返回缓存值和零值时间。
 	c.mu.RUnlock()
 	return item.Object, time.Time{}, true
 }
@@ -170,7 +158,7 @@ func (c *xcache) get(k string) (interface{}, bool) {
 	if !found {
 		return nil, false
 	}
-	// "Inlining" of Expired
+	// 直接判断条目是否过期。
 	if item.Expiration > 0 {
 		if time.Now().UnixNano() > item.Expiration {
 			return nil, false
@@ -179,11 +167,8 @@ func (c *xcache) get(k string) (interface{}, bool) {
 	return item.Object, true
 }
 
-// Increment an item of type int, int8, int16, int32, int64, uintptr, uint,
-// uint8, uint32, or uint64, float32 or float64 by n. Returns an error if the
-// item's value is not an integer, if it was not found, or if it is not
-// possible to increment it by n. To retrieve the incremented value, use one
-// of the specialized methods, e.g. IncrementInt64.
+// Increment 将整数或浮点数条目的值增加 n；条目不存在、已过期或类型不支持时返回错误。
+// 如需取得更新后的值，请使用 IncrementInt64 等类型专用方法。
 func (c *xcache) Increment(k string, n int64) error {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -227,11 +212,8 @@ func (c *xcache) Increment(k string, n int64) error {
 	return nil
 }
 
-// Increment an item of type float32 or float64 by n. Returns an error if the
-// item's value is not floating point, if it was not found, or if it is not
-// possible to increment it by n. Pass a negative number to decrement the
-// value. To retrieve the incremented value, use one of the specialized methods,
-// e.g. IncrementFloat64.
+// IncrementFloat 将 float32 或 float64 条目的值增加 n，传入负数表示减少。
+// 条目不存在、已过期或类型不匹配时返回错误；如需取得新值，请使用 IncrementFloat64 等方法。
 func (c *xcache) IncrementFloat(k string, n float64) error {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -253,9 +235,8 @@ func (c *xcache) IncrementFloat(k string, n float64) error {
 	return nil
 }
 
-// Increment an item of type int by n. Returns an error if the item's value is
-// not an int, or if it was not found. If there is no error, the incremented
-// value is returned.
+// IncrementInt 将 int 类型条目的值增加 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) IncrementInt(k string, n int) (int, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -275,9 +256,8 @@ func (c *xcache) IncrementInt(k string, n int) (int, error) {
 	return nv, nil
 }
 
-// Increment an item of type int8 by n. Returns an error if the item's value is
-// not an int8, or if it was not found. If there is no error, the incremented
-// value is returned.
+// IncrementInt8 将 int8 类型条目的值增加 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) IncrementInt8(k string, n int8) (int8, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -297,9 +277,8 @@ func (c *xcache) IncrementInt8(k string, n int8) (int8, error) {
 	return nv, nil
 }
 
-// Increment an item of type int16 by n. Returns an error if the item's value is
-// not an int16, or if it was not found. If there is no error, the incremented
-// value is returned.
+// IncrementInt16 将 int16 类型条目的值增加 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) IncrementInt16(k string, n int16) (int16, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -319,9 +298,8 @@ func (c *xcache) IncrementInt16(k string, n int16) (int16, error) {
 	return nv, nil
 }
 
-// Increment an item of type int32 by n. Returns an error if the item's value is
-// not an int32, or if it was not found. If there is no error, the incremented
-// value is returned.
+// IncrementInt32 将 int32 类型条目的值增加 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) IncrementInt32(k string, n int32) (int32, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -341,9 +319,8 @@ func (c *xcache) IncrementInt32(k string, n int32) (int32, error) {
 	return nv, nil
 }
 
-// Increment an item of type int64 by n. Returns an error if the item's value is
-// not an int64, or if it was not found. If there is no error, the incremented
-// value is returned.
+// IncrementInt64 将 int64 类型条目的值增加 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) IncrementInt64(k string, n int64) (int64, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -363,9 +340,8 @@ func (c *xcache) IncrementInt64(k string, n int64) (int64, error) {
 	return nv, nil
 }
 
-// Increment an item of type uint by n. Returns an error if the item's value is
-// not an uint, or if it was not found. If there is no error, the incremented
-// value is returned.
+// IncrementUint 将 uint 类型条目的值增加 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) IncrementUint(k string, n uint) (uint, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -385,9 +361,8 @@ func (c *xcache) IncrementUint(k string, n uint) (uint, error) {
 	return nv, nil
 }
 
-// Increment an item of type uintptr by n. Returns an error if the item's value
-// is not an uintptr, or if it was not found. If there is no error, the
-// incremented value is returned.
+// IncrementUintptr 将 uintptr 类型条目的值增加 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) IncrementUintptr(k string, n uintptr) (uintptr, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -407,9 +382,8 @@ func (c *xcache) IncrementUintptr(k string, n uintptr) (uintptr, error) {
 	return nv, nil
 }
 
-// Increment an item of type uint8 by n. Returns an error if the item's value
-// is not an uint8, or if it was not found. If there is no error, the
-// incremented value is returned.
+// IncrementUint8 将 uint8 类型条目的值增加 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) IncrementUint8(k string, n uint8) (uint8, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -429,9 +403,8 @@ func (c *xcache) IncrementUint8(k string, n uint8) (uint8, error) {
 	return nv, nil
 }
 
-// Increment an item of type uint16 by n. Returns an error if the item's value
-// is not an uint16, or if it was not found. If there is no error, the
-// incremented value is returned.
+// IncrementUint16 将 uint16 类型条目的值增加 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) IncrementUint16(k string, n uint16) (uint16, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -451,9 +424,8 @@ func (c *xcache) IncrementUint16(k string, n uint16) (uint16, error) {
 	return nv, nil
 }
 
-// Increment an item of type uint32 by n. Returns an error if the item's value
-// is not an uint32, or if it was not found. If there is no error, the
-// incremented value is returned.
+// IncrementUint32 将 uint32 类型条目的值增加 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) IncrementUint32(k string, n uint32) (uint32, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -473,9 +445,8 @@ func (c *xcache) IncrementUint32(k string, n uint32) (uint32, error) {
 	return nv, nil
 }
 
-// Increment an item of type uint64 by n. Returns an error if the item's value
-// is not an uint64, or if it was not found. If there is no error, the
-// incremented value is returned.
+// IncrementUint64 将 uint64 类型条目的值增加 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) IncrementUint64(k string, n uint64) (uint64, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -495,9 +466,8 @@ func (c *xcache) IncrementUint64(k string, n uint64) (uint64, error) {
 	return nv, nil
 }
 
-// Increment an item of type float32 by n. Returns an error if the item's value
-// is not an float32, or if it was not found. If there is no error, the
-// incremented value is returned.
+// IncrementFloat32 将 float32 类型条目的值增加 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) IncrementFloat32(k string, n float32) (float32, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -517,9 +487,8 @@ func (c *xcache) IncrementFloat32(k string, n float32) (float32, error) {
 	return nv, nil
 }
 
-// Increment an item of type float64 by n. Returns an error if the item's value
-// is not an float64, or if it was not found. If there is no error, the
-// incremented value is returned.
+// IncrementFloat64 将 float64 类型条目的值增加 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) IncrementFloat64(k string, n float64) (float64, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -539,14 +508,10 @@ func (c *xcache) IncrementFloat64(k string, n float64) (float64, error) {
 	return nv, nil
 }
 
-// Decrement an item of type int, int8, int16, int32, int64, uintptr, uint,
-// uint8, uint32, or uint64, float32 or float64 by n. Returns an error if the
-// item's value is not an integer, if it was not found, or if it is not
-// possible to decrement it by n. To retrieve the decremented value, use one
-// of the specialized methods, e.g. DecrementInt64.
+// Decrement 将整数或浮点数条目的值减少 n；条目不存在、已过期或类型不支持时返回错误。
+// 如需取得更新后的值，请使用 DecrementInt64 等类型专用方法。
 func (c *xcache) Decrement(k string, n int64) error {
-	// TODO: Implement Increment and Decrement more cleanly.
-	// (Cannot do Increment(k, n*-1) for uints.)
+	// 待优化：整理 Increment 和 Decrement 的实现；无符号整数不能简单通过 Increment(k, n*-1) 处理。
 	c.mu.Lock()
 	v, found := c.items[k]
 	if !found || v.Expired() {
@@ -589,11 +554,8 @@ func (c *xcache) Decrement(k string, n int64) error {
 	return nil
 }
 
-// Decrement an item of type float32 or float64 by n. Returns an error if the
-// item's value is not floating point, if it was not found, or if it is not
-// possible to decrement it by n. Pass a negative number to decrement the
-// value. To retrieve the decremented value, use one of the specialized methods,
-// e.g. DecrementFloat64.
+// DecrementFloat 将 float32 或 float64 条目的值减少 n，传入负数表示增加。
+// 条目不存在、已过期或类型不匹配时返回错误；如需取得新值，请使用 DecrementFloat64 等方法。
 func (c *xcache) DecrementFloat(k string, n float64) error {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -615,9 +577,8 @@ func (c *xcache) DecrementFloat(k string, n float64) error {
 	return nil
 }
 
-// Decrement an item of type int by n. Returns an error if the item's value is
-// not an int, or if it was not found. If there is no error, the decremented
-// value is returned.
+// DecrementInt 将 int 类型条目的值减少 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) DecrementInt(k string, n int) (int, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -637,9 +598,8 @@ func (c *xcache) DecrementInt(k string, n int) (int, error) {
 	return nv, nil
 }
 
-// Decrement an item of type int8 by n. Returns an error if the item's value is
-// not an int8, or if it was not found. If there is no error, the decremented
-// value is returned.
+// DecrementInt8 将 int8 类型条目的值减少 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) DecrementInt8(k string, n int8) (int8, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -659,9 +619,8 @@ func (c *xcache) DecrementInt8(k string, n int8) (int8, error) {
 	return nv, nil
 }
 
-// Decrement an item of type int16 by n. Returns an error if the item's value is
-// not an int16, or if it was not found. If there is no error, the decremented
-// value is returned.
+// DecrementInt16 将 int16 类型条目的值减少 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) DecrementInt16(k string, n int16) (int16, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -681,9 +640,8 @@ func (c *xcache) DecrementInt16(k string, n int16) (int16, error) {
 	return nv, nil
 }
 
-// Decrement an item of type int32 by n. Returns an error if the item's value is
-// not an int32, or if it was not found. If there is no error, the decremented
-// value is returned.
+// DecrementInt32 将 int32 类型条目的值减少 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) DecrementInt32(k string, n int32) (int32, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -703,9 +661,8 @@ func (c *xcache) DecrementInt32(k string, n int32) (int32, error) {
 	return nv, nil
 }
 
-// Decrement an item of type int64 by n. Returns an error if the item's value is
-// not an int64, or if it was not found. If there is no error, the decremented
-// value is returned.
+// DecrementInt64 将 int64 类型条目的值减少 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) DecrementInt64(k string, n int64) (int64, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -725,9 +682,8 @@ func (c *xcache) DecrementInt64(k string, n int64) (int64, error) {
 	return nv, nil
 }
 
-// Decrement an item of type uint by n. Returns an error if the item's value is
-// not an uint, or if it was not found. If there is no error, the decremented
-// value is returned.
+// DecrementUint 将 uint 类型条目的值减少 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) DecrementUint(k string, n uint) (uint, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -747,9 +703,8 @@ func (c *xcache) DecrementUint(k string, n uint) (uint, error) {
 	return nv, nil
 }
 
-// Decrement an item of type uintptr by n. Returns an error if the item's value
-// is not an uintptr, or if it was not found. If there is no error, the
-// decremented value is returned.
+// DecrementUintptr 将 uintptr 类型条目的值减少 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) DecrementUintptr(k string, n uintptr) (uintptr, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -769,9 +724,8 @@ func (c *xcache) DecrementUintptr(k string, n uintptr) (uintptr, error) {
 	return nv, nil
 }
 
-// Decrement an item of type uint8 by n. Returns an error if the item's value is
-// not an uint8, or if it was not found. If there is no error, the decremented
-// value is returned.
+// DecrementUint8 将 uint8 类型条目的值减少 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) DecrementUint8(k string, n uint8) (uint8, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -791,9 +745,8 @@ func (c *xcache) DecrementUint8(k string, n uint8) (uint8, error) {
 	return nv, nil
 }
 
-// Decrement an item of type uint16 by n. Returns an error if the item's value
-// is not an uint16, or if it was not found. If there is no error, the
-// decremented value is returned.
+// DecrementUint16 将 uint16 类型条目的值减少 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) DecrementUint16(k string, n uint16) (uint16, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -813,9 +766,8 @@ func (c *xcache) DecrementUint16(k string, n uint16) (uint16, error) {
 	return nv, nil
 }
 
-// Decrement an item of type uint32 by n. Returns an error if the item's value
-// is not an uint32, or if it was not found. If there is no error, the
-// decremented value is returned.
+// DecrementUint32 将 uint32 类型条目的值减少 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) DecrementUint32(k string, n uint32) (uint32, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -835,9 +787,8 @@ func (c *xcache) DecrementUint32(k string, n uint32) (uint32, error) {
 	return nv, nil
 }
 
-// Decrement an item of type uint64 by n. Returns an error if the item's value
-// is not an uint64, or if it was not found. If there is no error, the
-// decremented value is returned.
+// DecrementUint64 将 uint64 类型条目的值减少 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) DecrementUint64(k string, n uint64) (uint64, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -857,9 +808,8 @@ func (c *xcache) DecrementUint64(k string, n uint64) (uint64, error) {
 	return nv, nil
 }
 
-// Decrement an item of type float32 by n. Returns an error if the item's value
-// is not an float32, or if it was not found. If there is no error, the
-// decremented value is returned.
+// DecrementFloat32 将 float32 类型条目的值减少 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) DecrementFloat32(k string, n float32) (float32, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -879,9 +829,8 @@ func (c *xcache) DecrementFloat32(k string, n float32) (float32, error) {
 	return nv, nil
 }
 
-// Decrement an item of type float64 by n. Returns an error if the item's value
-// is not an float64, or if it was not found. If there is no error, the
-// decremented value is returned.
+// DecrementFloat64 将 float64 类型条目的值减少 n，并返回更新后的值。
+// 条目不存在、已过期或类型不匹配时返回错误。
 func (c *xcache) DecrementFloat64(k string, n float64) (float64, error) {
 	c.mu.Lock()
 	v, found := c.items[k]
@@ -901,13 +850,14 @@ func (c *xcache) DecrementFloat64(k string, n float64) (float64, error) {
 	return nv, nil
 }
 
-// Delete an item from the xcache. Does nothing if the key is not in the xcache.
+// Delete 删除指定条目；键不存在时不执行操作。
 func (c *xcache) Delete(k string) {
 	c.mu.Lock()
 	v, evicted := c.delete(k)
+	callback := c.onEvicted
 	c.mu.Unlock()
 	if evicted {
-		c.onEvicted(k, v)
+		callback(k, v)
 	}
 }
 
@@ -927,13 +877,13 @@ type keyAndValue struct {
 	value interface{}
 }
 
-// Delete all expired items from the xcache.
+// DeleteExpired 删除所有已过期条目，并在锁外执行删除回调。
 func (c *xcache) DeleteExpired() {
 	var evictedItems []keyAndValue
 	now := time.Now().UnixNano()
 	c.mu.Lock()
 	for k, v := range c.items {
-		// "Inlining" of expired
+		// 直接判断条目是否过期。
 		if v.Expiration > 0 && now > v.Expiration {
 			ov, evicted := c.delete(k)
 			if evicted {
@@ -941,25 +891,23 @@ func (c *xcache) DeleteExpired() {
 			}
 		}
 	}
+	callback := c.onEvicted
 	c.mu.Unlock()
 	for _, v := range evictedItems {
-		c.onEvicted(v.key, v.value)
+		callback(v.key, v.value)
 	}
 }
 
-// Sets an (optional) function that is called with the key and value when an
-// item is evicted from the xcache. (Including when it is deleted manually, but
-// not when it is overwritten.) Set to nil to disable.
+// OnEvicted 设置条目被删除时的可选回调，参数为键和缓存值。
+// 手动删除和过期清理会触发回调，覆盖不会触发；传入 nil 可禁用后续删除的回调。
 func (c *xcache) OnEvicted(f func(string, interface{})) {
 	c.mu.Lock()
 	c.onEvicted = f
 	c.mu.Unlock()
 }
 
-// Write the xcache's items (using Gob) to an io.Writer.
-//
-// NOTE: This method is deprecated in favor of c.Items() and NewFrom() (see the
-// documentation for NewFrom().)
+// Save 使用 Gob 将缓存条目写入指定输出流。
+// 此方法已弃用，建议使用 Items 和 NewFrom，参见 NewFrom 的说明。
 func (c *xcache) Save(w io.Writer) (err error) {
 	enc := gob.NewEncoder(w)
 	defer func() {
@@ -976,11 +924,8 @@ func (c *xcache) Save(w io.Writer) (err error) {
 	return
 }
 
-// Save the xcache's items to the given filename, creating the file if it
-// doesn't exist, and overwriting it if it does.
-//
-// NOTE: This method is deprecated in favor of c.Items() and NewFrom() (see the
-// documentation for NewFrom().)
+// SaveFile 将缓存条目保存到指定文件；文件不存在时创建，存在时覆盖。
+// 此方法已弃用，建议使用 Items 和 NewFrom，参见 NewFrom 的说明。
 func (c *xcache) SaveFile(fname string) error {
 	fp, err := os.Create(fname)
 	if err != nil {
@@ -994,11 +939,8 @@ func (c *xcache) SaveFile(fname string) error {
 	return fp.Close()
 }
 
-// Add (Gob-serialized) xcache items from an io.Reader, excluding any items with
-// keys that already exist (and haven't expired) in the current xcache.
-//
-// NOTE: This method is deprecated in favor of c.Items() and NewFrom() (see the
-// documentation for NewFrom().)
+// Load 从输入流读取 Gob 编码的缓存条目，不覆盖当前缓存中仍未过期的同名条目。
+// 此方法已弃用，建议使用 Items 和 NewFrom，参见 NewFrom 的说明。
 func (c *xcache) Load(r io.Reader) error {
 	dec := gob.NewDecoder(r)
 	items := map[string]Item{}
@@ -1016,11 +958,8 @@ func (c *xcache) Load(r io.Reader) error {
 	return err
 }
 
-// Load and add xcache items from the given filename, excluding any items with
-// keys that already exist in the current xcache.
-//
-// NOTE: This method is deprecated in favor of c.Items() and NewFrom() (see the
-// documentation for NewFrom().)
+// LoadFile 从指定文件加载缓存条目，不覆盖当前缓存中仍未过期的同名条目。
+// 此方法已弃用，建议使用 Items 和 NewFrom，参见 NewFrom 的说明。
 func (c *xcache) LoadFile(fname string) error {
 	fp, err := os.Open(fname)
 	if err != nil {
@@ -1034,14 +973,14 @@ func (c *xcache) LoadFile(fname string) error {
 	return fp.Close()
 }
 
-// Copies all unexpired items in the xcache into a new map and returns it.
+// Items 将所有未过期条目浅拷贝到新的 map 并返回。
 func (c *xcache) Items() map[string]Item {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	m := make(map[string]Item, len(c.items))
 	now := time.Now().UnixNano()
 	for k, v := range c.items {
-		// "Inlining" of Expired
+		// 直接判断条目是否过期。
 		if v.Expiration > 0 {
 			if now > v.Expiration {
 				continue
@@ -1052,8 +991,7 @@ func (c *xcache) Items() map[string]Item {
 	return m
 }
 
-// Returns the number of items in the xcache. This may include items that have
-// expired, but have not yet been cleaned up.
+// ItemCount 返回内部条目数量，可能包含已经过期但尚未清理的条目。
 func (c *xcache) ItemCount() int {
 	c.mu.RLock()
 	n := len(c.items)
@@ -1061,7 +999,7 @@ func (c *xcache) ItemCount() int {
 	return n
 }
 
-// Delete all items from the xcache.
+// Flush 清空所有条目，不触发删除回调。
 func (c *xcache) Flush() {
 	c.mu.Lock()
 	c.items = map[string]Item{}
@@ -1070,36 +1008,48 @@ func (c *xcache) Flush() {
 
 type janitor struct {
 	Interval time.Duration
-	stop     chan bool
+	stop     chan struct{}
+	stopOnce sync.Once
 }
 
 func (j *janitor) Run(c *xcache) {
 	ticker := time.NewTicker(j.Interval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
 			c.DeleteExpired()
 		case <-j.stop:
-			ticker.Stop()
 			return
 		}
 	}
 }
 
 func stopJanitor(c *XCache) {
-	c.janitor.stop <- true
+	c.Close()
+}
+
+// Close 停止后台清理，可重复或并发调用；不清空数据，已有缓存仍可读写。
+// 此方法不等待正在执行的清理和回调结束，回调内调用也不会死锁。
+func (c *XCache) Close() {
+	if c.janitor != nil {
+		c.janitor.stopOnce.Do(func() { close(c.janitor.stop) })
+	}
 }
 
 func runJanitor(c *xcache, ci time.Duration) {
 	j := &janitor{
 		Interval: ci,
-		stop:     make(chan bool),
+		stop:     make(chan struct{}),
 	}
 	c.janitor = j
 	go j.Run(c)
 }
 
 func newCache(de time.Duration, m map[string]Item) *xcache {
+	if m == nil {
+		m = make(map[string]Item)
+	}
 	if de == 0 {
 		de = -1
 	}
@@ -1112,11 +1062,8 @@ func newCache(de time.Duration, m map[string]Item) *xcache {
 
 func newCacheWithJanitor(de time.Duration, ci time.Duration, m map[string]Item) *XCache {
 	c := newCache(de, m)
-	// This trick ensures that the janitor goroutine (which--granted it
-	// was enabled--is running DeleteExpired on c forever) does not keep
-	// the returned C object from being garbage collected. When it is
-	// garbage collected, the finalizer stops the janitor goroutine, after
-	// which c can be collected.
+	// 清理协程只持有内部缓存，不持有返回的外层对象。
+	// 外层对象被垃圾回收时，通过终结器停止清理协程，使内部缓存也能被回收。
 	C := &XCache{c}
 	if ci > 0 {
 		runJanitor(c, ci)
@@ -1125,37 +1072,22 @@ func newCacheWithJanitor(de time.Duration, ci time.Duration, m map[string]Item) 
 	return C
 }
 
-// Return a new xcache with a given default expiration duration and cleanup
-// interval. If the expiration duration is less than one (or NoExpiration),
-// the items in the xcache never expire (by default), and must be deleted
-// manually. If the cleanup interval is less than one, expired items are not
-// deleted from the xcache before calling c.DeleteExpired().
+// New 创建缓存并指定默认过期时间和后台清理间隔。
+// 默认过期时间不大于零表示默认永不过期，需要手动删除。
+// 清理间隔不大于零表示不启动后台清理，可通过 DeleteExpired 主动清理过期条目。
 func New(defaultExpiration, cleanupInterval time.Duration) *XCache {
 	items := make(map[string]Item)
 	return newCacheWithJanitor(defaultExpiration, cleanupInterval, items)
 }
 
-// Return a new xcache with a given default expiration duration and cleanup
-// interval. If the expiration duration is less than one (or NoExpiration),
-// the items in the xcache never expire (by default), and must be deleted
-// manually. If the cleanup interval is less than one, expired items are not
-// deleted from the xcache before calling c.DeleteExpired().
-//
-// NewFrom() also accepts an items map which will serve as the underlying map
-// for the xcache. This is useful for starting from a deserialized xcache
-// (serialized using e.g. gob.Encode() on c.Items()), or passing in e.g.
-// make(map[string]Item, 500) to improve startup performance when the xcache
-// is expected to reach a certain minimum size.
-//
-// Only the xcache's methods synchronize access to this map, so it is not
-// recommended to keep any references to the map around after creating a xcache.
-// If need be, the map can be accessed at a later point using c.Items() (subject
-// to the same caveat.)
-//
-// Note regarding serialization: When using e.g. gob, make sure to
-// gob.Register() the individual types stored in the xcache before encoding a
-// map retrieved with c.Items(), and to register those same types before
-// decoding a blob containing an items map.
+// NewFrom 从已有数据创建缓存，复制 map，避免创建后与调用方共享底层 map。
+// 构造期间调用方不能并发修改输入 map；Object 中的指针、切片等仍是浅拷贝。
+// 默认过期时间不大于零表示不过期，清理间隔不大于零表示关闭后台清理。
+// 输入条目保留原来的绝对过期时间；nil map 等同于空缓存。
 func NewFrom(defaultExpiration, cleanupInterval time.Duration, items map[string]Item) *XCache {
-	return newCacheWithJanitor(defaultExpiration, cleanupInterval, items)
+	copied := make(map[string]Item, len(items))
+	for key, item := range items {
+		copied[key] = item
+	}
+	return newCacheWithJanitor(defaultExpiration, cleanupInterval, copied)
 }

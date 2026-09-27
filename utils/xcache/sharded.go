@@ -7,17 +7,13 @@ import (
 	insecurerand "math/rand"
 	"os"
 	"runtime"
+	"sync"
 	"time"
 )
 
-// This is an experimental and unexported (for now) attempt at making a xcache
-// with better algorithmic complexity than the standard one, namely by
-// preventing write locks of the entire xcache when an item is added. As of the
-// time of writing, the overhead of selecting buckets results in xcache
-// operations being about twice as slow as for the standard xcache with small
-// total xcache sizes, and faster for larger ones.
-//
-// See cache_test.go for a few benchmarks.
+// 这是尚未导出的实验性分片缓存，写入时只锁定目标分片，避免锁住整个缓存。
+// 分片选择本身也有开销，是否更快需结合数据规模和并发情况评估。
+// 性能测试参见 cache_test.go 和 sharded_test.go。
 
 type unexportedShardedCache struct {
 	*shardedCache
@@ -30,36 +26,13 @@ type shardedCache struct {
 	janitor *shardedJanitor
 }
 
-// djb2 with better shuffling. 5x faster than FNV with the hash.Hash overhead.
+// djb33 计算完整键的哈希，包括最后一个字节，避免相同前缀的键集中到同一分片。
 func djb33(seed uint32, k string) uint32 {
-	var (
-		l = uint32(len(k))
-		d = 5381 + seed + l
-		i = uint32(0)
-	)
-	// Why is all this 5x faster than a for loop?
-	if l >= 4 {
-		for i < l-4 {
-			d = (d * 33) ^ uint32(k[i])
-			d = (d * 33) ^ uint32(k[i+1])
-			d = (d * 33) ^ uint32(k[i+2])
-			d = (d * 33) ^ uint32(k[i+3])
-			i += 4
-		}
+	hash := uint32(5381) + seed + uint32(len(k))
+	for index := 0; index < len(k); index++ {
+		hash = (hash * 33) ^ uint32(k[index])
 	}
-	switch l - i {
-	case 1:
-	case 2:
-		d = (d * 33) ^ uint32(k[i])
-	case 3:
-		d = (d * 33) ^ uint32(k[i])
-		d = (d * 33) ^ uint32(k[i+1])
-	case 4:
-		d = (d * 33) ^ uint32(k[i])
-		d = (d * 33) ^ uint32(k[i+1])
-		d = (d * 33) ^ uint32(k[i+2])
-	}
-	return d ^ (d >> 16)
+	return hash ^ (hash >> 16)
 }
 
 func (sc *shardedCache) bucket(k string) *xcache {
@@ -104,11 +77,8 @@ func (sc *shardedCache) DeleteExpired() {
 	}
 }
 
-// Returns the items in the xcache. This may include items that have expired,
-// but have not yet been cleaned up. If this is significant, the Expiration
-// fields of the items should be checked. Note that explicit synchronization
-// is needed to use a xcache and its corresponding Items() return values at
-// the same time, as the maps are shared.
+// Items 返回各分片中未过期条目的浅拷贝，不与缓存共享底层 map。
+// 各分片分别读取，因此结果不是所有分片在同一时刻的一致快照。
 func (sc *shardedCache) Items() []map[string]Item {
 	res := make([]map[string]Item, len(sc.cs))
 	for i, v := range sc.cs {
@@ -125,15 +95,16 @@ func (sc *shardedCache) Flush() {
 
 type shardedJanitor struct {
 	Interval time.Duration
-	stop     chan bool
+	stop     chan struct{}
+	stopOnce sync.Once
 }
 
 func (j *shardedJanitor) Run(sc *shardedCache) {
-	j.stop = make(chan bool)
-	tick := time.Tick(j.Interval)
+	ticker := time.NewTicker(j.Interval)
+	defer ticker.Stop()
 	for {
 		select {
-		case <-tick:
+		case <-ticker.C:
 			sc.DeleteExpired()
 		case <-j.stop:
 			return
@@ -142,18 +113,29 @@ func (j *shardedJanitor) Run(sc *shardedCache) {
 }
 
 func stopShardedJanitor(sc *unexportedShardedCache) {
-	sc.janitor.stop <- true
+	sc.Close()
+}
+
+// Close 幂等停止分片缓存的后台清理，不等待已经开始的清理和回调。
+func (sc *unexportedShardedCache) Close() {
+	if sc.janitor != nil {
+		sc.janitor.stopOnce.Do(func() { close(sc.janitor.stop) })
+	}
 }
 
 func runShardedJanitor(sc *shardedCache, ci time.Duration) {
 	j := &shardedJanitor{
 		Interval: ci,
+		stop:     make(chan struct{}),
 	}
 	sc.janitor = j
 	go j.Run(sc)
 }
 
 func newShardedCache(n int, de time.Duration) *shardedCache {
+	if n <= 0 {
+		panic("xcache: 分片数量必须大于零")
+	}
 	max := big.NewInt(0).SetUint64(uint64(math.MaxUint32))
 	rnd, err := rand.Int(rand.Reader, max)
 	var seed uint32

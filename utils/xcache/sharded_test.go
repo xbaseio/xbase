@@ -7,8 +7,7 @@ import (
 	"time"
 )
 
-// func TestDjb33(t *testing.T) {
-// }
+// 哈希回归测试参见 regression_test.go 中的 TestHashIncludesLastByte。
 
 var shardedKeys = []string{
 	"f",

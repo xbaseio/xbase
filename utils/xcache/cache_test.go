@@ -1251,8 +1251,7 @@ func TestCacheSerialization(t *testing.T) {
 	tc := New(DefaultExpiration, 0)
 	testFillAndSerialize(t, tc)
 
-	// Check if gob.Register behaves properly even after multiple gob.Register
-	// on c.Items (many of which will be the same type)
+	// 验证对缓存条目中的相同类型重复调用 gob.Register 后，序列化仍能正常工作。
 	testFillAndSerialize(t, tc)
 }
 
@@ -1387,7 +1386,7 @@ func TestFileSerialization(t *testing.T) {
 	tc.SaveFile(fname)
 
 	oc := New(DefaultExpiration, 0)
-	oc.Add("a", "aa", 0) // this should not be overwritten
+	oc.Add("a", "aa", 0) // 此条目不应被加载的数据覆盖
 	err = oc.LoadFile(fname)
 	if err != nil {
 		t.Error(err)
@@ -1419,7 +1418,7 @@ func TestSerializeUnserializable(t *testing.T) {
 	ch <- true
 	tc.Set("chan", ch, DefaultExpiration)
 	fp := &bytes.Buffer{}
-	err := tc.Save(fp) // this should fail gracefully
+	err := tc.Save(fp) // 此处应返回错误，而不是发生崩溃
 	if err.Error() != "gob NewTypeObject can't handle type: chan bool" {
 		t.Error("Error from Save was not gob NewTypeObject can't handle type chan bool:", err)
 	}
@@ -1547,9 +1546,8 @@ func BenchmarkCacheGetManyConcurrentNotExpiring(b *testing.B) {
 }
 
 func benchmarkCacheGetManyConcurrent(b *testing.B, exp time.Duration) {
-	// This is the same as BenchmarkCacheGetConcurrent, but its result
-	// can be compared against BenchmarkShardedCacheGetManyConcurrent
-	// in sharded_test.go.
+	// 该测试与 BenchmarkCacheGetConcurrent 相同，结果可与
+	// sharded_test.go 中的 BenchmarkShardedCacheGetManyConcurrent 对比。
 	b.StopTimer()
 	n := 10000
 	tc := New(exp, 0)
