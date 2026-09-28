@@ -196,7 +196,7 @@ func (r *upload) writeFiles(writer *multipart.Writer, files any) error {
 	for name, paths := range set {
 		for _, path := range paths {
 			if !xfile.Exists(path) {
-				return errors.New(fmt.Sprintf(`"%s" does not exist`, path))
+				return fmt.Errorf(`"%s" does not exist`, path)
 			}
 
 			stream, err = writer.CreateFormFile(name, filepath.Base(path))
