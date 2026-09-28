@@ -161,9 +161,9 @@ func startPprof() {
 // 执行压力测试
 func doPressureTest(t *testing.T, concurrency int, total int) {
 	var (
-		totalSent int64
+		totalSent atomic.Int64
 		totalRecv int64
-		totalFail int64
+		totalFail atomic.Int64
 	)
 
 	client := ws.NewClient()
@@ -213,14 +213,14 @@ func doPressureTest(t *testing.T, concurrency int, total int) {
 
 			for range jobs {
 				if err := conn.Push(msg); err != nil {
-					fail := atomic.AddInt64(&totalFail, 1)
+					fail := totalFail.Add(1)
 					if fail <= 10 {
 						xlog.Logger().Error("push message failed", zap.Error(err))
 					}
 					continue
 				}
 
-				atomic.AddInt64(&totalSent, 1)
+				totalSent.Add(1)
 			}
 		}(conn)
 	}
@@ -235,10 +235,10 @@ func doPressureTest(t *testing.T, concurrency int, total int) {
 
 	workerWG.Wait()
 
-	sent := atomic.LoadInt64(&totalSent)
+	sent := totalSent.Load()
 
 	if ok := waitRecv(&totalRecv, sent, 5*time.Minute); !ok {
-		xlog.Logger().Warn("wait receive timeout, sent: , recv: , fail", zap.Any("sent", sent), zap.Any("loadInt64", atomic.LoadInt64(&totalRecv)), zap.Any("loadInt642", atomic.LoadInt64(&totalFail)))
+		xlog.Logger().Warn("wait receive timeout, sent: , recv: , fail", zap.Any("sent", sent), zap.Any("loadInt64", atomic.LoadInt64(&totalRecv)), zap.Any("loadInt642", totalFail.Load()))
 	}
 
 	totalTime := time.Since(startTime).Seconds()
@@ -248,7 +248,7 @@ func doPressureTest(t *testing.T, concurrency int, total int) {
 	}
 
 	recv := atomic.LoadInt64(&totalRecv)
-	fail := atomic.LoadInt64(&totalFail)
+	fail := totalFail.Load()
 
 	fmt.Printf("server               : %s\n", "websocket")
 	fmt.Printf("concurrency          : %d\n", actualConcurrency)

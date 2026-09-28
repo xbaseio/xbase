@@ -41,12 +41,10 @@ const (
 
 func NewClient() *Client {
 	c := &Client{
-		Client: http.Client{
-			Transport: &http.Transport{
-				DisableKeepAlives: true,
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
 			},
 		},
 		headers:     make(map[string]string),

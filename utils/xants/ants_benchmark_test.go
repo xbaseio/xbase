@@ -37,11 +37,11 @@ func demoPoolFuncInt(n int) {
 	time.Sleep(time.Duration(n) * time.Millisecond)
 }
 
-var stopLongRunningFunc int32
+var stopLongRunningFunc atomic.Int32
 
 // longRunningFunc 模拟长时间运行的任务（自旋 + 主动让出 CPU）。
 func longRunningFunc() {
-	for atomic.LoadInt32(&stopLongRunningFunc) == 0 {
+	for stopLongRunningFunc.Load() == 0 {
 		runtime.Gosched()
 	}
 }

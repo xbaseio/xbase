@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"runtime"
 	"sync"
@@ -11,7 +12,7 @@ import (
 )
 
 type Item struct {
-	Object     interface{}
+	Object     any
 	Expiration int64
 }
 
@@ -39,12 +40,12 @@ type xcache struct {
 	defaultExpiration time.Duration
 	items             map[string]Item
 	mu                sync.RWMutex
-	onEvicted         func(string, interface{})
+	onEvicted         func(string, any)
 	janitor           *janitor
 }
 
 // Set 写入条目并覆盖已有值；DefaultExpiration 使用默认过期时间，NoExpiration 表示永不过期。
-func (c *xcache) Set(k string, x interface{}, d time.Duration) {
+func (c *xcache) Set(k string, x any, d time.Duration) {
 	// 直接展开 set 的逻辑，计算过期时间后加锁写入。
 	var e int64
 	if d == DefaultExpiration {
@@ -62,7 +63,7 @@ func (c *xcache) Set(k string, x interface{}, d time.Duration) {
 	c.mu.Unlock()
 }
 
-func (c *xcache) set(k string, x interface{}, d time.Duration) {
+func (c *xcache) set(k string, x any, d time.Duration) {
 	var e int64
 	if d == DefaultExpiration {
 		d = c.defaultExpiration
@@ -77,12 +78,12 @@ func (c *xcache) set(k string, x interface{}, d time.Duration) {
 }
 
 // SetDefault 使用默认过期时间写入条目，并覆盖已有值。
-func (c *xcache) SetDefault(k string, x interface{}) {
+func (c *xcache) SetDefault(k string, x any) {
 	c.Set(k, x, DefaultExpiration)
 }
 
 // Add 仅在键不存在或已有条目过期时写入，否则返回错误。
-func (c *xcache) Add(k string, x interface{}, d time.Duration) error {
+func (c *xcache) Add(k string, x any, d time.Duration) error {
 	c.mu.Lock()
 	_, found := c.get(k)
 	if found {
@@ -95,7 +96,7 @@ func (c *xcache) Add(k string, x interface{}, d time.Duration) error {
 }
 
 // Replace 仅在键存在且条目未过期时替换其值，否则返回错误。
-func (c *xcache) Replace(k string, x interface{}, d time.Duration) error {
+func (c *xcache) Replace(k string, x any, d time.Duration) error {
 	c.mu.Lock()
 	_, found := c.get(k)
 	if !found {
@@ -108,7 +109,7 @@ func (c *xcache) Replace(k string, x interface{}, d time.Duration) error {
 }
 
 // Get 获取条目，返回缓存值和是否命中；不存在或已过期时返回 nil、false。
-func (c *xcache) Get(k string) (interface{}, bool) {
+func (c *xcache) Get(k string) (any, bool) {
 	c.mu.RLock()
 	// 直接展开查询和过期判断逻辑。
 	item, found := c.items[k]
@@ -128,7 +129,7 @@ func (c *xcache) Get(k string) (interface{}, bool) {
 
 // GetWithExpiration 返回缓存值、过期时间和是否命中。
 // 永不过期的条目返回零值时间；不存在或已过期时返回 nil、零值时间和 false。
-func (c *xcache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
+func (c *xcache) GetWithExpiration(k string) (any, time.Time, bool) {
 	c.mu.RLock()
 	// 直接展开查询和过期判断逻辑。
 	item, found := c.items[k]
@@ -153,7 +154,7 @@ func (c *xcache) GetWithExpiration(k string) (interface{}, time.Time, bool) {
 	return item.Object, time.Time{}, true
 }
 
-func (c *xcache) get(k string) (interface{}, bool) {
+func (c *xcache) get(k string) (any, bool) {
 	item, found := c.items[k]
 	if !found {
 		return nil, false
@@ -861,7 +862,7 @@ func (c *xcache) Delete(k string) {
 	}
 }
 
-func (c *xcache) delete(k string) (interface{}, bool) {
+func (c *xcache) delete(k string) (any, bool) {
 	if c.onEvicted != nil {
 		if v, found := c.items[k]; found {
 			delete(c.items, k)
@@ -874,7 +875,7 @@ func (c *xcache) delete(k string) (interface{}, bool) {
 
 type keyAndValue struct {
 	key   string
-	value interface{}
+	value any
 }
 
 // DeleteExpired 删除所有已过期条目，并在锁外执行删除回调。
@@ -900,7 +901,7 @@ func (c *xcache) DeleteExpired() {
 
 // OnEvicted 设置条目被删除时的可选回调，参数为键和缓存值。
 // 手动删除和过期清理会触发回调，覆盖不会触发；传入 nil 可禁用后续删除的回调。
-func (c *xcache) OnEvicted(f func(string, interface{})) {
+func (c *xcache) OnEvicted(f func(string, any)) {
 	c.mu.Lock()
 	c.onEvicted = f
 	c.mu.Unlock()
@@ -1086,8 +1087,6 @@ func New(defaultExpiration, cleanupInterval time.Duration) *XCache {
 // 输入条目保留原来的绝对过期时间；nil map 等同于空缓存。
 func NewFrom(defaultExpiration, cleanupInterval time.Duration, items map[string]Item) *XCache {
 	copied := make(map[string]Item, len(items))
-	for key, item := range items {
-		copied[key] = item
-	}
+	maps.Copy(copied, items)
 	return newCacheWithJanitor(defaultExpiration, cleanupInterval, copied)
 }

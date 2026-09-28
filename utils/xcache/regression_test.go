@@ -33,7 +33,7 @@ func TestEvictionCallbackSnapshot(t *testing.T) {
 		"second": {Object: 2, Expiration: time.Now().Add(-time.Second).UnixNano()},
 	})
 	calls := 0
-	cache.OnEvicted(func(key string, value interface{}) {
+	cache.OnEvicted(func(key string, value any) {
 		calls++
 		cache.OnEvicted(nil)
 		cache.SetDefault("replacement", value)
@@ -42,7 +42,7 @@ func TestEvictionCallbackSnapshot(t *testing.T) {
 	if calls != 2 {
 		t.Fatalf("删除回调次数: %d", calls)
 	}
-	cache.OnEvicted(func(key string, value interface{}) {
+	cache.OnEvicted(func(key string, value any) {
 		cache.SetDefault("restored", value)
 	})
 	cache.Delete("replacement")
@@ -59,7 +59,7 @@ func TestConcurrentEvictionCallback(t *testing.T) {
 	go func() {
 		defer workers.Done()
 		for range 1000 {
-			cache.OnEvicted(func(string, interface{}) {})
+			cache.OnEvicted(func(string, any) {})
 			cache.OnEvicted(nil)
 		}
 	}()
@@ -86,12 +86,10 @@ func TestCloseJanitor(t *testing.T) {
 	sharded := unexportedNewSharded(time.Minute, time.Hour, 4)
 	var workers sync.WaitGroup
 	for range 16 {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
+		workers.Go(func() {
 			cache.Close()
 			sharded.Close()
-		}()
+		})
 	}
 	workers.Wait()
 	select {
@@ -114,7 +112,7 @@ func TestCloseJanitor(t *testing.T) {
 
 // TestHashIncludesLastByte 验证不同长度键的最后一个字节参与哈希。
 func TestHashIncludesLastByte(t *testing.T) {
-	for length := 0; length < 16; length++ {
+	for length := range 16 {
 		prefix := strings.Repeat("a", length)
 		if djb33(123, prefix+"x") == djb33(123, prefix+"y") {
 			t.Fatalf("末尾字符未参与哈希，前缀长度: %d", length)

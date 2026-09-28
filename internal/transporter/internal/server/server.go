@@ -28,7 +28,7 @@ type Server struct {
 	handlers    map[uint8]RouteHandler // 路由处理器
 	rw          sync.RWMutex           // 锁
 	connections map[net.Conn]*Conn     // 连接
-	closed      int32                  // 是否关闭
+	closed      atomic.Int32           // 是否关闭
 }
 
 func NewServer(opts *Options) (*Server, error) {
@@ -72,7 +72,7 @@ func (s *Server) Endpoint() *endpoint.Endpoint {
 
 // Start 启动服务器
 func (s *Server) Start() error {
-	if atomic.LoadInt32(&s.closed) == 1 {
+	if s.closed.Load() == 1 {
 		return net.ErrClosed
 	}
 
@@ -87,7 +87,7 @@ func (s *Server) Start() error {
 	}
 
 	s.rw.Lock()
-	if atomic.LoadInt32(&s.closed) == 1 {
+	if s.closed.Load() == 1 {
 		s.rw.Unlock()
 		_ = ln.Close()
 		return net.ErrClosed
@@ -130,7 +130,7 @@ func (s *Server) Start() error {
 
 // Stop 停止服务器
 func (s *Server) Stop() error {
-	if !atomic.CompareAndSwapInt32(&s.closed, 0, 1) {
+	if !s.closed.CompareAndSwap(0, 1) {
 		return nil
 	}
 
@@ -185,7 +185,7 @@ func (s *Server) allocate(rawConn net.Conn) {
 
 	s.rw.Lock()
 
-	if atomic.LoadInt32(&s.closed) == 1 {
+	if s.closed.Load() == 1 {
 		s.rw.Unlock()
 		_ = conn.close(false)
 		return

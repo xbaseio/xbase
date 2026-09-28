@@ -3,6 +3,7 @@ package jwt
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"strconv"
@@ -139,9 +140,7 @@ func (j *JWT) RefreshToken(token string, ignoreExpired ...bool) (*Token, error) 
 	}
 
 	newClaims = make(jwt.MapClaims)
-	for k, v := range claims {
-		newClaims[k] = v
-	}
+	maps.Copy(newClaims, claims)
 
 	expiredAt := now.Add(j.opts.validDuration)
 	refreshAt := now.Add(j.opts.refreshDuration)

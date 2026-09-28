@@ -260,12 +260,14 @@ func Code(err error) *codes.Code {
 	}
 
 	type coder interface {
+		error
 		Code() *codes.Code
 	}
 
-	var c coder
-	if stderrors.As(err, &c) {
-		return c.Code()
+	if c, ok := stderrors.AsType[coder](err); ok {
+		if code := c.Code(); code != nil {
+			return code
+		}
 	}
 
 	return nil
@@ -303,12 +305,14 @@ func Stack(err error) *stack.Stack {
 	}
 
 	type stacker interface {
+		error
 		Stack() *stack.Stack
 	}
 
-	var s stacker
-	if stderrors.As(err, &s) {
-		return s.Stack()
+	if s, ok := stderrors.AsType[stacker](err); ok {
+		if stack := s.Stack(); stack != nil {
+			return stack
+		}
 	}
 
 	return nil
@@ -321,11 +325,11 @@ func Replace(err error, text string, condition ...*codes.Code) error {
 	}
 
 	type replacer interface {
+		error
 		Replace(text string, condition ...*codes.Code) error
 	}
 
-	var r replacer
-	if stderrors.As(err, &r) {
+	if r, ok := stderrors.AsType[replacer](err); ok {
 		return r.Replace(text, condition...)
 	}
 

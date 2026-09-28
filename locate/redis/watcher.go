@@ -14,7 +14,7 @@ import (
 
 type watcher struct {
 	idx        int64
-	state      int32
+	state      atomic.Int32
 	ctx        context.Context
 	cancel     context.CancelFunc
 	chEvent    chan []*locate.Event
@@ -32,7 +32,7 @@ func newWatcher(wm *watcherMgr, idx int64) *watcher {
 }
 
 func (w *watcher) notify(events []*locate.Event) {
-	if atomic.LoadInt32(&w.state) == 0 {
+	if w.state.Load() == 0 {
 		return
 	}
 
@@ -41,8 +41,8 @@ func (w *watcher) notify(events []*locate.Event) {
 
 // Next 返回变动事件列表
 func (w *watcher) Next() ([]*locate.Event, error) {
-	if atomic.LoadInt32(&w.state) == 0 {
-		atomic.StoreInt32(&w.state, 1)
+	if w.state.Load() == 0 {
+		w.state.Store(1)
 	}
 
 	select {
@@ -73,7 +73,7 @@ type watcherMgr struct {
 	key      string
 	sub      *redis.PubSub
 	rw       sync.RWMutex
-	idx      int64
+	idx      atomic.Int64
 	watchers map[int64]*watcher
 }
 
@@ -122,7 +122,7 @@ func (wm *watcherMgr) fork() locate.Watcher {
 	wm.rw.Lock()
 	defer wm.rw.Unlock()
 
-	w := newWatcher(wm, atomic.AddInt64(&wm.idx, 1))
+	w := newWatcher(wm, wm.idx.Add(1))
 	wm.watchers[w.idx] = w
 
 	return w

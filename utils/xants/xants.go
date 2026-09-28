@@ -133,7 +133,7 @@ type poolCommon struct {
 	capacity int32
 
 	// 当前运行中的 goroutine 数量
-	running int32
+	running atomic.Int32
 
 	// 保护 worker 队列的锁
 	lock sync.Locker
@@ -142,7 +142,7 @@ type poolCommon struct {
 	workers workerQueue
 
 	// 状态（OPENED / CLOSED）
-	state int32
+	state atomic.Int32
 
 	// 条件变量，用于等待空闲 worker
 	cond *sync.Cond
@@ -157,17 +157,17 @@ type poolCommon struct {
 	workerCache sync.Pool
 
 	// 当前阻塞的 goroutine 数量
-	waiting int32
+	waiting atomic.Int32
 
-	purgeDone int32
+	purgeDone atomic.Int32
 	purgeCtx  context.Context
 	stopPurge context.CancelFunc
 
-	ticktockDone int32
+	ticktockDone atomic.Int32
 	ticktockCtx  context.Context
 	stopTicktock context.CancelFunc
 
-	now int64
+	now atomic.Int64
 
 	options *Options
 }
@@ -221,7 +221,7 @@ func (p *poolCommon) purgeStaleWorkers() {
 
 	defer func() {
 		ticker.Stop()
-		atomic.StoreInt32(&p.purgeDone, 1)
+		p.purgeDone.Store(1)
 	}()
 
 	purgeCtx := p.purgeCtx
@@ -263,7 +263,7 @@ func (p *poolCommon) ticktock() {
 	ticker := time.NewTicker(nowTimeUpdateInterval)
 	defer func() {
 		ticker.Stop()
-		atomic.StoreInt32(&p.ticktockDone, 1)
+		p.ticktockDone.Store(1)
 	}()
 
 	ticktockCtx := p.ticktockCtx
@@ -278,7 +278,7 @@ func (p *poolCommon) ticktock() {
 			break
 		}
 
-		atomic.StoreInt64(&p.now, time.Now().UnixNano())
+		p.now.Store(time.Now().UnixNano())
 	}
 }
 
@@ -291,18 +291,18 @@ func (p *poolCommon) goPurge() {
 }
 
 func (p *poolCommon) goTicktock() {
-	atomic.StoreInt64(&p.now, time.Now().UnixNano())
+	p.now.Store(time.Now().UnixNano())
 	p.ticktockCtx, p.stopTicktock = context.WithCancel(context.Background())
 	go p.ticktock()
 }
 
 func (p *poolCommon) nowTime() int64 {
-	return atomic.LoadInt64(&p.now)
+	return p.now.Load()
 }
 
 // Running 返回当前运行 worker 数
 func (p *poolCommon) Running() int {
-	return int(atomic.LoadInt32(&p.running))
+	return int(p.running.Load())
 }
 
 // Free 返回可用 worker 数
@@ -316,7 +316,7 @@ func (p *poolCommon) Free() int {
 
 // Waiting 返回等待任务数量
 func (p *poolCommon) Waiting() int {
-	return int(atomic.LoadInt32(&p.waiting))
+	return int(p.waiting.Load())
 }
 
 // Cap 返回池容量
@@ -342,12 +342,12 @@ func (p *poolCommon) Tune(size int) {
 
 // IsClosed 判断池是否关闭
 func (p *poolCommon) IsClosed() bool {
-	return atomic.LoadInt32(&p.state) == CLOSED
+	return p.state.Load() == CLOSED
 }
 
 // Release 关闭池
 func (p *poolCommon) Release() {
-	if !atomic.CompareAndSwapInt32(&p.state, OPENED, CLOSED) {
+	if !p.state.CompareAndSwap(OPENED, CLOSED) {
 		return
 	}
 
@@ -411,8 +411,8 @@ func (p *poolCommon) ReleaseContext(ctx context.Context) error {
 			<-purgeCh
 			<-p.ticktockCtx.Done()
 			if p.Running() == 0 &&
-				(p.options.DisablePurge || atomic.LoadInt32(&p.purgeDone) == 1) &&
-				atomic.LoadInt32(&p.ticktockDone) == 1 {
+				(p.options.DisablePurge || p.purgeDone.Load() == 1) &&
+				p.ticktockDone.Load() == 1 {
 				return nil
 			}
 		}
@@ -421,10 +421,10 @@ func (p *poolCommon) ReleaseContext(ctx context.Context) error {
 
 // Reboot 重启已关闭的池
 func (p *poolCommon) Reboot() {
-	if atomic.CompareAndSwapInt32(&p.state, CLOSED, OPENED) {
-		atomic.StoreInt32(&p.purgeDone, 0)
+	if p.state.CompareAndSwap(CLOSED, OPENED) {
+		p.purgeDone.Store(0)
 		p.goPurge()
-		atomic.StoreInt32(&p.ticktockDone, 0)
+		p.ticktockDone.Store(0)
 		p.goTicktock()
 		p.allDone = make(chan struct{})
 		p.once = &sync.Once{}
@@ -432,11 +432,11 @@ func (p *poolCommon) Reboot() {
 }
 
 func (p *poolCommon) addRunning(delta int) int {
-	return int(atomic.AddInt32(&p.running, int32(delta)))
+	return int(p.running.Add(int32(delta)))
 }
 
 func (p *poolCommon) addWaiting(delta int) {
-	atomic.AddInt32(&p.waiting, int32(delta))
+	p.waiting.Add(int32(delta))
 }
 
 // retrieveWorker 获取一个可用 worker

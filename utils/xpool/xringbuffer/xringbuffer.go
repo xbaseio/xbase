@@ -29,10 +29,10 @@ type RingBuffer = xring.XBuffer
 // 这样有助于减少内存浪费。
 type Pool struct {
 	calls       [steps]uint64
-	calibrating uint64
+	calibrating atomic.Uint64
 
-	defaultSize uint64
-	maxSize     uint64
+	defaultSize atomic.Uint64
+	maxSize     atomic.Uint64
 
 	pool sync.Pool
 }
@@ -51,7 +51,7 @@ func (p *Pool) Get() *RingBuffer {
 	if v != nil {
 		return v.(*RingBuffer)
 	}
-	return xring.New(int(atomic.LoadUint64(&p.defaultSize)))
+	return xring.New(int(p.defaultSize.Load()))
 }
 
 // Put 将 RingBuffer 放回默认对象池。
@@ -67,7 +67,7 @@ func (p *Pool) Put(b *RingBuffer) {
 		p.calibrate()
 	}
 
-	maxSize := int(atomic.LoadUint64(&p.maxSize))
+	maxSize := int(p.maxSize.Load())
 	if maxSize == 0 || b.Cap() <= maxSize {
 		b.Reset()
 		p.pool.Put(b)
@@ -75,7 +75,7 @@ func (p *Pool) Put(b *RingBuffer) {
 }
 
 func (p *Pool) calibrate() {
-	if !atomic.CompareAndSwapUint64(&p.calibrating, 0, 1) {
+	if !p.calibrating.CompareAndSwap(0, 1) {
 		return
 	}
 
@@ -111,9 +111,9 @@ func (p *Pool) calibrate() {
 		}
 	}
 
-	atomic.StoreUint64(&p.defaultSize, defaultSize)
-	atomic.StoreUint64(&p.maxSize, maxSize)
-	atomic.StoreUint64(&p.calibrating, 0)
+	p.defaultSize.Store(defaultSize)
+	p.maxSize.Store(maxSize)
+	p.calibrating.Store(0)
 }
 
 type callSize struct {

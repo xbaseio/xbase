@@ -9,7 +9,7 @@ import (
 
 type client struct {
 	opts              *clientOptions            // 配置
-	id                int64                     // 连接ID
+	id                atomic.Int64              // 连接ID
 	dialer            *websocket.Dialer         // 拨号器
 	connectHandler    network.ConnectHandler    // 连接打开hook函数
 	disconnectHandler network.DisconnectHandler // 连接关闭hook函数
@@ -44,7 +44,7 @@ func (c *client) Dial(addr ...string) (network.Conn, error) {
 		return nil, err
 	}
 
-	return newClientConn(atomic.AddInt64(&c.id, 1), conn, c), nil
+	return newClientConn(c.id.Add(1), conn, c), nil
 }
 
 // Protocol 协议

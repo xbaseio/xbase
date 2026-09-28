@@ -16,7 +16,7 @@ import (
 type MultiPoolWithFunc struct {
 	pools []*PoolWithFunc
 	index uint32
-	state int32
+	state atomic.Int32
 	lbs   LoadBalancingStrategy
 }
 
@@ -156,7 +156,7 @@ func (mp *MultiPoolWithFunc) Tune(size int) {
 
 // IsClosed 判断多池是否已关闭
 func (mp *MultiPoolWithFunc) IsClosed() bool {
-	return atomic.LoadInt32(&mp.state) == CLOSED
+	return mp.state.Load() == CLOSED
 }
 
 // ReleaseTimeout 带超时关闭多池
@@ -170,7 +170,7 @@ func (mp *MultiPoolWithFunc) ReleaseTimeout(timeout time.Duration) error {
 // ReleaseContext 带 context 关闭多池
 // 会等待所有子池关闭，直到 context 结束
 func (mp *MultiPoolWithFunc) ReleaseContext(ctx context.Context) error {
-	if !atomic.CompareAndSwapInt32(&mp.state, OPENED, CLOSED) {
+	if !mp.state.CompareAndSwap(OPENED, CLOSED) {
 		return ErrPoolClosed
 	}
 
@@ -183,7 +183,7 @@ func (mp *MultiPoolWithFunc) ReleaseContext(ctx context.Context) error {
 
 // Reboot 重启一个已关闭的多池
 func (mp *MultiPoolWithFunc) Reboot() {
-	if atomic.CompareAndSwapInt32(&mp.state, CLOSED, OPENED) {
+	if mp.state.CompareAndSwap(CLOSED, OPENED) {
 		atomic.StoreUint32(&mp.index, 0)
 		for _, pool := range mp.pools {
 			pool.Reboot()

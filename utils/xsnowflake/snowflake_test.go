@@ -17,16 +17,14 @@ func TestGenerateUniqueIDsConcurrently(t *testing.T) {
 	ids := make(chan int64, count)
 	var wg sync.WaitGroup
 	for range count {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			id, generateErr := generator.Generate()
 			if generateErr != nil {
 				t.Errorf("generate ID: %v", generateErr)
 				return
 			}
 			ids <- id
-		}()
+		})
 	}
 	wg.Wait()
 	close(ids)

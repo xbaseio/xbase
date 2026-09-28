@@ -6,11 +6,11 @@ import (
 	"testing"
 )
 
-var idx uint64
+var idx atomic.Uint64
 
 func TestNewClient(t *testing.T) {
-	atomic.AddUint64(&idx, math.MaxUint64)
+	idx.Add(math.MaxUint64)
 
-	t.Log(atomic.AddUint64(&idx, 1))
-	t.Log(atomic.AddUint64(&idx, 1))
+	t.Log(idx.Add(1))
+	t.Log(idx.Add(1))
 }

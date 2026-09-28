@@ -137,11 +137,11 @@ func Convert(err error) *Code {
 	}
 
 	type coder interface {
+		error
 		Code() *Code
 	}
 
-	var c coder
-	if errors.As(err, &c) {
+	if c, ok := errors.AsType[coder](err); ok {
 		if code := c.Code(); code != nil {
 			return code
 		}

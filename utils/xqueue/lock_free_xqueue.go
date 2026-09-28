@@ -31,7 +31,7 @@ import (
 type lockFreeQueue struct {
 	head   unsafe.Pointer // 指向头节点（哨兵节点）
 	tail   unsafe.Pointer // 指向尾节点
-	length int32          // 队列长度（近似值）
+	length atomic.Int32   // 队列长度（近似值）
 }
 
 // node 表示队列中的一个节点。
@@ -62,7 +62,7 @@ retry:
 			if cas(&tail.next, next, n) {
 				// 插入成功，尝试推进 tail 指针
 				cas(&q.tail, tail, n)
-				atomic.AddInt32(&q.length, 1)
+				q.length.Add(1)
 				return
 			}
 		} else {
@@ -103,7 +103,7 @@ retry:
 
 			// 尝试移动 head 指针
 			if cas(&q.head, head, next) {
-				atomic.AddInt32(&q.length, -1)
+				q.length.Add(-1)
 				return task
 			}
 		}
@@ -115,12 +115,12 @@ retry:
 
 // IsEmpty 判断队列是否为空。
 func (q *lockFreeQueue) IsEmpty() bool {
-	return atomic.LoadInt32(&q.length) == 0
+	return q.length.Load() == 0
 }
 
 // Length 返回队列长度（注意：并发下是近似值）。
 func (q *lockFreeQueue) Length() int32 {
-	return atomic.LoadInt32(&q.length)
+	return q.length.Load()
 }
 
 // load 原子读取指针并转换为 node。

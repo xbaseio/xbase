@@ -7,7 +7,7 @@ import (
 )
 
 type spinLockBackoff struct {
-	state uint32
+	state atomic.Uint32
 	_     [60]byte
 }
 
@@ -17,14 +17,14 @@ const (
 )
 
 func (sl *spinLockBackoff) Lock() {
-	if atomic.CompareAndSwapUint32(&sl.state, 0, 1) {
+	if sl.state.CompareAndSwap(0, 1) {
 		return
 	}
 
 	for {
 		for range activeSpin {
 			for range activeCount {
-				if atomic.LoadUint32(&sl.state) == 0 && atomic.CompareAndSwapUint32(&sl.state, 0, 1) {
+				if sl.state.Load() == 0 && sl.state.CompareAndSwap(0, 1) {
 					return
 				}
 			}
@@ -34,7 +34,7 @@ func (sl *spinLockBackoff) Lock() {
 
 }
 func (sl *spinLockBackoff) Unlock() {
-	atomic.StoreUint32(&sl.state, 0)
+	sl.state.Store(0)
 }
 func NewSpinLockBackoff() sync.Locker {
 	return new(spinLockBackoff)

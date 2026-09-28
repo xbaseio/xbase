@@ -68,7 +68,7 @@ func releasePools(ctx context.Context, pools []contextReleaser) error {
 type MultiPool struct {
 	pools []*Pool
 	index uint32
-	state int32
+	state atomic.Int32
 	lbs   LoadBalancingStrategy
 }
 
@@ -192,7 +192,7 @@ func (mp *MultiPool) Tune(size int) {
 
 // IsClosed indicates whether the multi-pool is closed.
 func (mp *MultiPool) IsClosed() bool {
-	return atomic.LoadInt32(&mp.state) == CLOSED
+	return mp.state.Load() == CLOSED
 }
 
 // ReleaseTimeout closes the multi-pool with a timeout,
@@ -206,7 +206,7 @@ func (mp *MultiPool) ReleaseTimeout(timeout time.Duration) error {
 // ReleaseContext closes the multi-pool with a context,
 // it waits all pools to be closed before the context is done.
 func (mp *MultiPool) ReleaseContext(ctx context.Context) error {
-	if !atomic.CompareAndSwapInt32(&mp.state, OPENED, CLOSED) {
+	if !mp.state.CompareAndSwap(OPENED, CLOSED) {
 		return ErrPoolClosed
 	}
 
@@ -219,7 +219,7 @@ func (mp *MultiPool) ReleaseContext(ctx context.Context) error {
 
 // Reboot reboots a released multi-pool.
 func (mp *MultiPool) Reboot() {
-	if atomic.CompareAndSwapInt32(&mp.state, CLOSED, OPENED) {
+	if mp.state.CompareAndSwap(CLOSED, OPENED) {
 		atomic.StoreUint32(&mp.index, 0)
 		for _, pool := range mp.pools {
 			pool.Reboot()
