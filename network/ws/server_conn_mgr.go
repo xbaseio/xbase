@@ -1,7 +1,10 @@
 package ws
 
 import (
+	"net"
+	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -50,19 +53,32 @@ func (cm *serverConnMgr) close() {
 }
 
 // 分配连接
-func (cm *serverConnMgr) allocate(c *websocket.Conn) error {
+func (cm *serverConnMgr) allocate(c *websocket.Conn, remoteIP string) error {
 	if cm.total.Load() >= int64(cm.server.opts.maxConnNum) {
 		return xerrors.ErrTooManyConnection
 	}
 
 	id := cm.id.Add(1)
 	conn := cm.pool.Get().(*serverConn)
-	conn.init(cm, id, c)
+	conn.init(cm, id, c, remoteIP)
 	index := int(reflect.ValueOf(c).Pointer()) % len(cm.partitions)
 	cm.partitions[index].store(c, conn)
 	cm.total.Add(1)
 
 	return nil
+}
+
+func requestClientIP(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	for _, value := range []string{r.Header.Get("X-Real-IP"), strings.Split(r.Header.Get("X-Forwarded-For"), ",")[0]} {
+		value = strings.TrimSpace(value)
+		if net.ParseIP(value) != nil {
+			return value
+		}
+	}
+	return ""
 }
 
 // 回收连接

@@ -201,7 +201,7 @@ func (s *server) handleUpgrade(w http.ResponseWriter, r *http.Request, upgrader 
 		return
 	}
 
-	if err = s.connMgr.allocate(conn); err != nil {
+	if err = s.connMgr.allocate(conn, requestClientIP(r)); err != nil {
 		xlog.Logger().Error("connection allocate error, remote=, err", zap.Any("remoteAddr", r.RemoteAddr), zap.Error(err))
 		_ = conn.Close()
 		return

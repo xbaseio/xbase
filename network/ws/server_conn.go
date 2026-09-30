@@ -26,6 +26,7 @@ type serverConn struct {
 	sendMu sync.Mutex   // 发送锁，保护 Send/Push/closeSig 和 channel close 的并发安全
 
 	conn        *websocket.Conn // WS源连接
+	remoteIP    string          // 握手时解析的代理客户端IP；为空时回退 TCP 对端地址
 	recvQ       chan []byte     // 收包队列
 	chLowWrite  chan chWrite    // 低优先级队列
 	chHighWrite chan chWrite    // 高优先级队列
@@ -185,6 +186,9 @@ func (c *serverConn) LocalAddr() (net.Addr, error) {
 
 // RemoteIP 获取远端IP
 func (c *serverConn) RemoteIP() (string, error) {
+	if c.remoteIP != "" {
+		return c.remoteIP, nil
+	}
 	addr, err := c.RemoteAddr()
 	if err != nil {
 		return "", err
@@ -208,7 +212,7 @@ func (c *serverConn) RemoteAddr() (net.Addr, error) {
 }
 
 // 初始化连接
-func (c *serverConn) init(cm *serverConnMgr, id int64, conn *websocket.Conn) {
+func (c *serverConn) init(cm *serverConnMgr, id int64, conn *websocket.Conn, remoteIP string) {
 	// 如果 serverConn 会被复用，锁、Once、channel 必须重新初始化。
 	c.rw = sync.RWMutex{}
 	c.sendMu = sync.Mutex{}
@@ -220,6 +224,7 @@ func (c *serverConn) init(cm *serverConnMgr, id int64, conn *websocket.Conn) {
 	c.attr = &attr{}
 	c.state.Store(int32(network.ConnOpened))
 	c.conn = conn
+	c.remoteIP = remoteIP
 	c.connMgr = cm
 	c.recvQ = make(chan []byte, network.DefaultRecvQueueSize)
 	c.chLowWrite = make(chan chWrite, network.DefaultWriteQueueSize)
@@ -242,6 +247,7 @@ func (c *serverConn) init(cm *serverConnMgr, id int64, conn *websocket.Conn) {
 // 重置连接
 func (c *serverConn) reset() {
 	c.attr = nil
+	c.remoteIP = ""
 }
 
 // 检测连接状态
@@ -412,6 +418,7 @@ func (c *serverConn) doClose(isNeedRecycle bool) error {
 		c.rw.Lock()
 		conn := c.conn
 		c.conn = nil
+	c.remoteIP = ""
 		c.rw.Unlock()
 
 		if conn != nil {
