@@ -1,7 +1,7 @@
 package json
 
 import (
-	"github.com/bytedance/sonic"
+	"encoding/json/v2"
 )
 
 const Name = "json"
@@ -17,12 +17,12 @@ func (codec) Name() string {
 
 // Marshal 编码
 func (codec) Marshal(v any) ([]byte, error) {
-	return sonic.Marshal(v)
+	return json.Marshal(v)
 }
 
 // Unmarshal 解码
 func (codec) Unmarshal(data []byte, v any) error {
-	return sonic.Unmarshal(data, v)
+	return json.Unmarshal(data, v)
 }
 
 // Marshal 编码
