@@ -7,6 +7,7 @@ import (
 const (
 	GateGameID  int32 = 0 // Gate 控制消息
 	LobbyGameID int32 = 1 // 大厅消息
+	AdminGameID int32 = 2 // 大厅消息
 )
 
 const (
@@ -201,6 +202,7 @@ const (
 	Node_Normal NodeKind = iota + 1 // 正常节点服
 	Node_Lobby                      // 大厅节点服
 	Node_Game                       // 游戏节点服
+	Node_Admin                      // 后台节点服
 )
 
 func (k NodeKind) String() string {
@@ -211,6 +213,8 @@ func (k NodeKind) String() string {
 		return "lobby"
 	case Node_Game:
 		return "game"
+	case Node_Admin:
+		return "admin"
 	default:
 		return "unknown"
 	}
