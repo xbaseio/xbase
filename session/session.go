@@ -271,9 +271,9 @@ func (s *Session) RemoteAddr(kind Kind, target int64) (net.Addr, error) {
 }
 
 // 安全原则：
-// 1. 必须先通过 cid 找连接
+// 1. 优先通过 cid 找连接，cid 不存在时才通过 uid 找当前连接
 // 2. 必须校验 conn.UID() == uid
-// 3. uid 不匹配说明连接可能已经重连 / 被复用 / 已解绑，不能关闭
+// 3. cid 存在但 uid 不匹配说明连接可能已经被复用，不能按 uid 关闭其他连接
 // 4. 不要在 Session 锁内调用 conn.Close，避免 Close -> RemConn -> 再次拿锁导致死锁
 func (s *Session) Close(cid, uid int64, force ...bool) error {
 	var conn network.Conn
@@ -282,8 +282,11 @@ func (s *Session) Close(cid, uid int64, force ...bool) error {
 
 	c, ok := s.conns[cid]
 	if !ok || c == nil {
-		s.rw.RUnlock()
-		return xerrors.ErrNotFoundSession
+		c, ok = s.users[uid]
+		if !ok || c == nil {
+			s.rw.RUnlock()
+			return xerrors.ErrNotFoundSession
+		}
 	}
 
 	// 必须校验 cid 对应的连接是否还是这个 uid
