@@ -492,3 +492,7 @@ func MustParseDate(value string) time.Time {
 func MustParseDatetime(value string) time.Time {
 	return MustParse(DateTime, value)
 }
+
+func DateDay(value time.Time) time.Time {
+	return time.Date(value.Year(), value.Month(), value.Day(), 0, 0, 0, 0, Location())
+}
