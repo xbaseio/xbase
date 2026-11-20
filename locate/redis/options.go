@@ -2,6 +2,8 @@ package redis
 
 import (
 	"context"
+	"os"
+	"strings"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/xbaseio/xbase/etc"
@@ -70,12 +72,19 @@ type options struct {
 }
 
 func defaultOptions() *options {
+	password := etc.Get(defaultPasswordKey).String()
+	if _, hasSpecificEnv := os.LookupEnv("XBASE_CONFIG_LOCATE_REDIS_PASSWORD"); !hasSpecificEnv {
+		if envPassword := strings.TrimSpace(os.Getenv("REDIS_PASSWORD")); envPassword != "" {
+			password = envPassword
+		}
+	}
+
 	return &options{
 		ctx:        context.Background(),
 		addrs:      etc.Get(defaultAddrsKey, []string{defaultAddr}).Strings(),
 		db:         etc.Get(defaultDBKey, defaultDB).Int(),
 		username:   etc.Get(defaultUsernameKey).String(),
-		password:   etc.Get(defaultPasswordKey).String(),
+		password:   password,
 		certFile:   etc.Get(defaultCertFileKey).String(),
 		keyFile:    etc.Get(defaultKeyFileKey).String(),
 		caFile:     etc.Get(defaultCAFileKey).String(),
