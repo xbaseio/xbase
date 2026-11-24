@@ -316,6 +316,12 @@ func (p *Proxy) Deliver(ctx context.Context, args *cluster.DeliverArgs) error {
 	})
 }
 
+// DeliverToAllByGameID 向匹配 GameID 的所有其他 Work 节点各投递一次。
+// 单个节点发送失败时继续，返回的合并错误包含失败实例 ID。成功仅表示已提交发送。
+func (p *Proxy) DeliverToAllByGameID(ctx context.Context, msg *cluster.Message) error {
+	return p.nodeLinker.DeliverToAllByGameID(ctx, msg)
+}
+
 // Invoke 调用函数（线程安全）
 func (p *Proxy) Invoke(fn func()) {
 	p.node.addWait()

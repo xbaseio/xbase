@@ -1,14 +1,18 @@
 package dispatcher_test
 
 import (
+	"errors"
 	"fmt"
 	"math"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/xbaseio/xbase/cluster"
 	"github.com/xbaseio/xbase/core/endpoint"
 	"github.com/xbaseio/xbase/internal/dispatcher"
 	"github.com/xbaseio/xbase/registry"
+	"github.com/xbaseio/xbase/xerrors"
 )
 
 func TestDispatcher_ReplaceServices(t *testing.T) {
@@ -52,6 +56,53 @@ func TestDispatcher_ReplaceServices(t *testing.T) {
 		t.Errorf("find route failed: %v", err)
 	} else {
 		t.Log(route.FindEndpoint())
+	}
+}
+
+func TestVisitWorkingNodesContinuesAfterFailures(t *testing.T) {
+	const gameID = cluster.AdminGameID
+	instance := func(id string, game int32, state cluster.State, port string) *registry.ServiceInstance {
+		return &registry.ServiceInstance{
+			ID: id, Kind: cluster.Node.String(), GameID: game, State: state.String(),
+			Endpoint: endpoint.NewEndpoint("grpc", "127.0.0.1:"+port, false).String(),
+		}
+	}
+	a := instance("admin-a", gameID, cluster.Work, "8001")
+	b := instance("admin-b", gameID, cluster.Work, "8002")
+	c := instance("admin-c", gameID, cluster.Work, "8003")
+	a.Version, b.Version = "1", "2"
+	d := dispatcher.NewDispatcher(cluster.Random)
+	d.ReplaceServices(c, b, a, a, instance("self", gameID, cluster.Work, "8004"),
+		instance("busy", gameID, cluster.Busy, "8005"), instance("lobby", cluster.LobbyGameID, cluster.Work, "8006"))
+	route, err := d.FindGameRoute(gameID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var visited []string
+	errA, errB := errors.New("first failure"), errors.New("second failure")
+	err = route.VisitWorkingNodes("self", func(addr string) error {
+		visited = append(visited, addr)
+		switch addr {
+		case "127.0.0.1:8001":
+			return errA
+		case "127.0.0.1:8002":
+			return errB
+		}
+		return nil
+	})
+	if !slices.Equal(visited, []string{"127.0.0.1:8001", "127.0.0.1:8002", "127.0.0.1:8003"}) {
+		t.Fatalf("visited %v", visited)
+	}
+	if !errors.Is(err, errA) || !errors.Is(err, errB) || !strings.Contains(err.Error(), "admin-a") || !strings.Contains(err.Error(), "admin-b") {
+		t.Fatalf("unexpected fan-out error: %v", err)
+	}
+	d.ReplaceServices(a)
+	route, err = d.FindGameRoute(gameID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := route.VisitWorkingNodes("admin-a", func(string) error { t.Fatal("visited self"); return nil }); !errors.Is(err, xerrors.ErrNotFoundEndpoint) {
+		t.Fatalf("no remote targets: %v", err)
 	}
 }
 

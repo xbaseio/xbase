@@ -1,6 +1,8 @@
 package dispatcher
 
 import (
+	"errors"
+	"fmt"
 	"math/rand/v2"
 	"sync"
 	"sync/atomic"
@@ -13,11 +15,12 @@ import (
 
 type GameRoute struct {
 	abstract
-	group      string
-	counter    atomic.Uint64
-	dispatcher *Dispatcher
-	gameID     int32
-	mu         sync.Mutex // 保护 weightRoundRobinDispatch 中 currWeight 的并发修改
+	group        string
+	workingNodes []*serviceEndpoint
+	counter      atomic.Uint64
+	dispatcher   *Dispatcher
+	gameID       int32
+	mu           sync.Mutex // 保护 weightRoundRobinDispatch 中 currWeight 的并发修改
 }
 
 func newRoute_001(dispatcher *Dispatcher, group string, gameID int32) *GameRoute {
@@ -31,6 +34,26 @@ func newRoute_001(dispatcher *Dispatcher, group string, gameID int32) *GameRoute
 
 func (r *GameRoute) ID() int32     { return r.gameID }
 func (r *GameRoute) Group() string { return r.group }
+
+// VisitWorkingNodes visits the immutable discovery snapshot without holding a
+// dispatcher lock during I/O. Each failed visit contributes one instance error.
+func (r *GameRoute) VisitWorkingNodes(excludeID string, visit func(addr string) error) error {
+	var failures []error
+	found := false
+	for _, target := range r.workingNodes {
+		if target.insID == excludeID {
+			continue
+		}
+		found = true
+		if err := visit(target.endpoint.Address()); err != nil {
+			failures = append(failures, fmt.Errorf("node %s: %w", target.insID, err))
+		}
+	}
+	if !found {
+		return xerrors.ErrNotFoundEndpoint
+	}
+	return errors.Join(failures...)
+}
 
 func (r *GameRoute) FindEndpoint(insID ...string) (*endpoint.Endpoint, error) {
 	return r.FindEndpointForServiceStatus(registry.ServiceStatusNormal, insID...)

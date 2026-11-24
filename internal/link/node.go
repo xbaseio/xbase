@@ -242,6 +242,46 @@ func (l *NodeLinker) Deliver(ctx context.Context, args *DeliverArgs) error {
 	}
 }
 
+// DeliverToAllByGameID uses one discovery snapshot and encodes the message once.
+func (l *NodeLinker) DeliverToAllByGameID(ctx context.Context, msg *Message) error {
+	if msg == nil {
+		return xerrors.ErrInvalidMessage
+	}
+	if msg.GameID <= cluster.GateGameID {
+		return xerrors.ErrInvalidGameID
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	route, err := l.dispatcher.FindGameRoute(msg.GameID)
+	if err != nil {
+		return err
+	}
+	packed, err := l.PackMessage(msg, false)
+	if err != nil {
+		return err
+	}
+	// Copy the packed segments once so queued sends outlive the pooled header
+	// and the caller can reuse its payload after this method returns.
+	frame := make([]byte, 0, packed.Len())
+	packed.Visit(func(segment *buffer.NocopyNode) bool {
+		frame = append(frame, segment.Bytes()...)
+		return true
+	})
+	packed.Release()
+	return route.VisitWorkingNodes(l.opts.InsID, func(addr string) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		client, err := l.builder.Build(addr)
+		if err != nil {
+			return err
+		}
+		// Each transport send owns its buffer wrapper and shares only immutable bytes.
+		return client.Deliver(ctx, 0, 0, nil, buffer.NewNocopyBuffer(frame))
+	})
+}
+
 // Trigger 触发事件
 func (l *NodeLinker) Trigger(ctx context.Context, args *TriggerArgs) error {
 	event, err := l.dispatcher.FindEvent(int(args.Event))

@@ -1,6 +1,8 @@
 package dispatcher
 
 import (
+	"cmp"
+	"slices"
 	"sync"
 
 	"github.com/xbaseio/xbase/cluster"
@@ -167,6 +169,20 @@ func (d *Dispatcher) ReplaceServices(services ...*registry.ServiceInstance) {
 			}
 			event.addServiceEndpoint(se, balance)
 		}
+	}
+
+	// Each route is published as a snapshot. Include older versions and all
+	// service statuses: explicit fan-out targets every working instance.
+	for id, service := range instances {
+		if service.Kind == cluster.Node.String() && service.State == cluster.Work.String() {
+			route := routes[service.GameID]
+			route.workingNodes = append(route.workingNodes, route.endpoints5[id])
+		}
+	}
+	for _, route := range routes {
+		slices.SortFunc(route.workingNodes, func(a, b *serviceEndpoint) int {
+			return cmp.Compare(a.insID, b.insID)
+		})
 	}
 
 	d.rw.Lock()
